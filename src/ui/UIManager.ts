@@ -24,6 +24,9 @@ export class UIManager {
   public chestOpenProgress = 0;
   public chestRewardOptions: UpgradeOption[] = [];
 
+  // Card hover animation progress (for smooth GSAP-like interpolation)
+  private cardHoverProgress: number[] = [0, 0, 0, 0];
+
   constructor(
     private saveManager: SaveManager,
     private sound: SoundSynthesizer
@@ -41,87 +44,109 @@ export class UIManager {
   ): void {
     ctx.save();
 
-    // 1. Top Experience Bar
+    // 1. Top Experience Bar (Crystal Neon Bar)
     const xpPercent = Math.max(0, Math.min(1, player.xp / player.nextLevelXp));
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.fillRect(0, 0, width, 18);
+    ctx.fillStyle = '#090d16';
+    ctx.fillRect(0, 0, width, 20);
 
     const xpGrad = ctx.createLinearGradient(0, 0, width, 0);
     xpGrad.addColorStop(0, '#0284c7');
     xpGrad.addColorStop(0.5, '#38bdf8');
     xpGrad.addColorStop(1, '#67e8f9');
     ctx.fillStyle = xpGrad;
-    ctx.fillRect(0, 0, width * xpPercent, 18);
+    ctx.fillRect(0, 0, width * xpPercent, 20);
+
+    // XP Bar Glass Gloss Highlight (top 40%)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.fillRect(0, 0, width * xpPercent, 8);
+
+    // XP Bar Golden Border
+    ctx.strokeStyle = '#0284c7';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 20);
+    ctx.lineTo(width, 20);
+    ctx.stroke();
 
     // XP text
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 11px -apple-system, sans-serif';
+    ctx.font = 'bold 11px "Cinzel", -apple-system, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = '#000000';
-    ctx.shadowBlur = 4;
-    ctx.fillText(`LV ${player.level}  -  ${Math.floor(player.xp)} / ${player.nextLevelXp} XP`, width / 2, 9);
+    ctx.shadowBlur = 6;
+    ctx.fillText(`LEVEL ${player.level}   ✦   ${Math.floor(player.xp)} / ${player.nextLevelXp} XP`, width / 2, 10);
 
     // 2. Timer & Counters (Center below XP bar)
     const minutes = Math.floor(elapsedSeconds / 60);
     const seconds = Math.floor(elapsedSeconds % 60);
     const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
 
-    ctx.font = 'bold 20px -apple-system, sans-serif';
+    ctx.font = '900 24px "Cinzel", serif';
     ctx.fillStyle = '#f8fafc';
-    ctx.fillText(timeStr, width / 2, 40);
+    ctx.shadowColor = '#000000';
+    ctx.shadowBlur = 8;
+    ctx.fillText(timeStr, width / 2, 44);
 
     ctx.font = 'bold 13px -apple-system, sans-serif';
     ctx.fillStyle = '#ef4444';
-    ctx.fillText(`💀 ${player.kills}`, width / 2 - 75, 40);
+    ctx.fillText(`💀 ${player.kills}`, width / 2 - 80, 44);
 
     ctx.fillStyle = '#fbbf24';
-    ctx.fillText(`💰 ${player.gold}`, width / 2 + 75, 40);
+    ctx.fillText(`💰 ${player.gold}`, width / 2 + 80, 44);
 
     // 3. Top Left Health Bar & Inventory Slots
-    const hpBarW = 160;
-    const hpBarH = 16;
-    const hpX = 20;
-    const hpY = 30;
+    const hpBarW = 175;
+    const hpBarH = 18;
+    const hpX = 22;
+    const hpY = 32;
 
-    // Background
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-    ctx.roundRect(hpX, hpY, hpBarW, hpBarH, 4);
+    // Dark Ornate Beveled Plate
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.roundRect(hpX - 2, hpY - 2, hpBarW + 4, hpBarH + 4, 6);
     ctx.fill();
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = '#d97706';
     ctx.lineWidth = 1.5;
     ctx.stroke();
 
-    // HP Fill
+    // HP Fill Gradient
     const hpPct = Math.max(0, Math.min(1, player.hp / player.maxHp));
     const hpGrad = ctx.createLinearGradient(hpX, 0, hpX + hpBarW, 0);
     if (hpPct > 0.5) {
-      hpGrad.addColorStop(0, '#16a34a');
+      hpGrad.addColorStop(0, '#15803d');
       hpGrad.addColorStop(1, '#22c55e');
     } else if (hpPct > 0.25) {
-      hpGrad.addColorStop(0, '#ca8a04');
-      hpGrad.addColorStop(1, '#eab308');
+      hpGrad.addColorStop(0, '#b45309');
+      hpGrad.addColorStop(1, '#f59e0b');
     } else {
-      hpGrad.addColorStop(0, '#b91c1c');
+      hpGrad.addColorStop(0, '#7f1d1d');
       hpGrad.addColorStop(1, '#ef4444');
     }
     ctx.fillStyle = hpGrad;
     ctx.beginPath();
-    ctx.roundRect(hpX + 1, hpY + 1, (hpBarW - 2) * hpPct, hpBarH - 2, 3);
+    ctx.roundRect(hpX, hpY, hpBarW * hpPct, hpBarH, 4);
+    ctx.fill();
+
+    // Glass specular gloss on HP bar
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.beginPath();
+    ctx.roundRect(hpX, hpY, hpBarW * hpPct, hpBarH * 0.45, 3);
     ctx.fill();
 
     // HP Text
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 10px -apple-system, sans-serif';
+    ctx.font = 'bold 11px "Cinzel", -apple-system, sans-serif';
     ctx.textAlign = 'left';
-    ctx.fillText(`${Math.round(player.hp)} / ${player.maxHp} HP`, hpX + 6, hpY + 9);
+    ctx.shadowBlur = 4;
+    ctx.fillText(`${Math.round(player.hp)} / ${player.maxHp} HP`, hpX + 8, hpY + 11);
 
     // Weapon Inventory Slots (Row 1)
-    const slotSize = 24;
-    const slotMargin = 4;
+    const slotSize = 25;
+    const slotMargin = 5;
     for (let i = 0; i < player.maxWeaponSlots; i++) {
       const sx = hpX + i * (slotSize + slotMargin);
-      const sy = hpY + 24;
+      const sy = hpY + 26;
       this.renderSlot(ctx, sx, sy, slotSize, player.weapons[i]);
     }
 
@@ -129,89 +154,100 @@ export class UIManager {
     const passiveKeys = Array.from(player.passives.entries());
     for (let i = 0; i < player.maxPassiveSlots; i++) {
       const sx = hpX + i * (slotSize + slotMargin);
-      const sy = hpY + 24 + slotSize + slotMargin;
+      const sy = hpY + 26 + slotSize + slotMargin;
       const passiveData = passiveKeys[i];
       this.renderPassiveSlot(ctx, sx, sy, slotSize, passiveData);
     }
 
     // 4. Top Right Buttons (Sound & Pause)
-    const btnSize = 32;
+    const btnSize = 34;
     const soundBtnX = width - 85;
-    const soundBtnY = 28;
+    const soundBtnY = 30;
 
-    // Sound button
-    ctx.fillStyle = this.hoveredButton === 'sound' ? '#334155' : 'rgba(15, 23, 42, 0.85)';
+    // Sound button with beveled dark fantasy border
+    ctx.fillStyle = this.hoveredButton === 'sound' ? '#1e293b' : 'rgba(15, 23, 42, 0.9)';
     ctx.beginPath();
     ctx.roundRect(soundBtnX, soundBtnY, btnSize, btnSize, 6);
     ctx.fill();
-    ctx.strokeStyle = '#475569';
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.5;
     ctx.stroke();
 
     ctx.fillStyle = player.isDead ? '#64748b' : '#38bdf8';
-    ctx.font = '14px sans-serif';
+    ctx.font = '15px sans-serif';
     ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     ctx.fillText(this.sound.isMuted ? '🔇' : '🔊', soundBtnX + btnSize / 2, soundBtnY + btnSize / 2);
 
-    // Frozen Map Visual Frame
+    // Frozen Map Frost Border
     if (isFrozen) {
-      ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-      ctx.lineWidth = 10;
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.55)';
+      ctx.lineWidth = 12;
       ctx.strokeRect(0, 0, width, height);
     }
 
     // Flashing Boss Warning Banner
     if (hasBoss) {
       const pulse = (Math.sin(Date.now() * 0.008) + 1) / 2;
-      ctx.fillStyle = `rgba(185, 28, 28, ${0.45 + pulse * 0.4})`;
-      ctx.fillRect(0, 22, width, 26);
+      ctx.fillStyle = `rgba(185, 28, 28, ${0.5 + pulse * 0.4})`;
+      ctx.fillRect(0, 24, width, 28);
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(0, 24, width, 28);
 
       ctx.fillStyle = '#fef08a';
-      ctx.font = '900 13px -apple-system, sans-serif';
+      ctx.font = '900 14px "Cinzel", serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.shadowColor = '#000000';
-      ctx.shadowBlur = 6;
-      ctx.fillText('⚠️ WARNING: ELITE OVERLORD DETECTED ⚠️', width / 2, 35);
+      ctx.shadowBlur = 8;
+      ctx.fillText('⚔ WARNING: ELITE DEMON LORD DETECTED ⚔', width / 2, 38);
     }
 
     ctx.restore();
   }
 
   private renderSlot(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, weapon?: any): void {
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
-    ctx.fillRect(x, y, size, size);
-    ctx.strokeStyle = weapon ? (weapon.isEvolved ? '#f59e0b' : '#3b82f6') : '#334155';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(x, y, size, size);
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.roundRect(x, y, size, size, 4);
+    ctx.fill();
+
+    ctx.strokeStyle = weapon ? (weapon.isEvolved ? '#fbbf24' : '#38bdf8') : '#334155';
+    ctx.lineWidth = weapon ? 2 : 1;
+    ctx.stroke();
 
     if (weapon) {
-      this.renderVectorIcon(ctx, weapon.iconName, x + size / 2, y + size / 2, size * 0.7);
+      this.renderVectorIcon(ctx, weapon.iconName, x + size / 2, y + size / 2, size * 0.72);
       // Level dots
       for (let lvl = 0; lvl < weapon.level; lvl++) {
-        ctx.fillStyle = weapon.isEvolved ? '#fbbf24' : '#60a5fa';
-        ctx.fillRect(x + 2 + lvl * 2.5, y + size - 3, 2, 2);
+        ctx.fillStyle = weapon.isEvolved ? '#facc15' : '#60a5fa';
+        ctx.fillRect(x + 2 + lvl * 2.6, y + size - 3.5, 2.2, 2.2);
       }
     }
   }
 
   private renderPassiveSlot(ctx: CanvasRenderingContext2D, x: number, y: number, size: number, passiveEntry?: [string, number]): void {
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.8)';
-    ctx.fillRect(x, y, size, size);
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.roundRect(x, y, size, size, 4);
+    ctx.fill();
+
     ctx.strokeStyle = passiveEntry ? '#10b981' : '#334155';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(x, y, size, size);
+    ctx.lineWidth = passiveEntry ? 2 : 1;
+    ctx.stroke();
 
     if (passiveEntry) {
       const [id, lvl] = passiveEntry;
-      this.renderVectorIcon(ctx, id, x + size / 2, y + size / 2, size * 0.7);
+      this.renderVectorIcon(ctx, id, x + size / 2, y + size / 2, size * 0.72);
       for (let l = 0; l < lvl; l++) {
         ctx.fillStyle = '#34d399';
-        ctx.fillRect(x + 2 + l * 3.5, y + size - 3, 2.5, 2);
+        ctx.fillRect(x + 2 + l * 3.6, y + size - 3.5, 2.8, 2.2);
       }
     }
   }
 
-  // --- Level Up Modal ---
+  // --- Level Up Modal (AAA Commercial Dark Fantasy Cards) ---
   public renderLevelUpModal(
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -222,28 +258,28 @@ export class UIManager {
   ): void {
     ctx.save();
 
-    // Dark backdrop overlay
-    ctx.fillStyle = 'rgba(5, 5, 10, 0.82)';
+    // Dark gothic vignette backdrop
+    ctx.fillStyle = 'rgba(4, 4, 10, 0.88)';
     ctx.fillRect(0, 0, width, height);
 
-    // Title Banner
-    ctx.fillStyle = '#fbbf24';
-    ctx.font = '900 36px -apple-system, sans-serif';
+    // Title Banner with Gothic Typography
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = '900 42px "Cinzel", serif';
     ctx.textAlign = 'center';
     ctx.shadowColor = '#d97706';
-    ctx.shadowBlur = 18;
-    ctx.fillText('LEVEL UP!', width / 2, height * 0.14);
+    ctx.shadowBlur = 24;
+    ctx.fillText('LEVEL UP', width / 2, height * 0.13);
 
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '14px -apple-system, sans-serif';
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '13px "Cinzel", sans-serif';
     ctx.shadowBlur = 0;
-    ctx.fillText('Choose an enhancement (Press 1-4 or Click):', width / 2, height * 0.19);
+    ctx.fillText('SELECT YOUR ENHANCEMENT (PRESS 1-4 OR CLICK)', width / 2, height * 0.18);
 
     // Card dimensions
-    const cardWidth = Math.min(460, width - 40);
-    const cardHeight = 76;
-    const cardGap = 12;
-    const startY = height * 0.23;
+    const cardWidth = Math.min(480, width - 40);
+    const cardHeight = 78;
+    const cardGap = 13;
+    const startY = height * 0.22;
 
     for (let i = 0; i < options.length; i++) {
       const opt = options[i];
@@ -257,15 +293,15 @@ export class UIManager {
     // Meta Control Buttons (REROLL, SKIP, BANISH)
     if (player) {
       const bottomY = startY + options.length * (cardHeight + cardGap) + 16;
-      const btnW = 120;
-      const btnH = 34;
-      const btnGap = 16;
+      const btnW = 125;
+      const btnH = 36;
+      const btnGap = 18;
       const totalBtnW = btnW * 3 + btnGap * 2;
       const btnStartX = width / 2 - totalBtnW / 2;
 
       // 1. Reroll Button
       const rX = btnStartX;
-      ctx.fillStyle = this.hoveredButton === 'reroll' ? '#2563eb' : '#1e293b';
+      ctx.fillStyle = this.hoveredButton === 'reroll' ? '#1d4ed8' : '#0f172a';
       ctx.beginPath();
       ctx.roundRect(rX, bottomY, btnW, btnH, 6);
       ctx.fill();
@@ -274,14 +310,14 @@ export class UIManager {
       ctx.stroke();
 
       ctx.fillStyle = player.rerollsRemaining > 0 ? '#ffffff' : '#64748b';
-      ctx.font = 'bold 12px sans-serif';
+      ctx.font = 'bold 12px "Cinzel", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(`🎲 REROLL (${player.rerollsRemaining}) [R]`, rX + btnW / 2, bottomY + btnH / 2);
 
       // 2. Skip Button
       const sX = btnStartX + btnW + btnGap;
-      ctx.fillStyle = this.hoveredButton === 'skip' ? '#059669' : '#1e293b';
+      ctx.fillStyle = this.hoveredButton === 'skip' ? '#047857' : '#0f172a';
       ctx.beginPath();
       ctx.roundRect(sX, bottomY, btnW, btnH, 6);
       ctx.fill();
@@ -293,7 +329,7 @@ export class UIManager {
 
       // 3. Banish Button
       const bX = btnStartX + (btnW + btnGap) * 2;
-      ctx.fillStyle = this.hoveredButton === 'banish' ? '#b91c1c' : '#1e293b';
+      ctx.fillStyle = this.hoveredButton === 'banish' ? '#991b1b' : '#0f172a';
       ctx.beginPath();
       ctx.roundRect(bX, bottomY, btnW, btnH, 6);
       ctx.fill();
@@ -319,15 +355,23 @@ export class UIManager {
   ): void {
     ctx.save();
 
-    // 3D Card Hover & Holographic Foil
+    // 3D Card Hover & Scale
     if (isHovered) {
       ctx.translate(x + w / 2, y + h / 2);
-      ctx.scale(1.025, 1.025);
+      ctx.scale(1.028, 1.028);
       ctx.translate(-(x + w / 2), -(y + h / 2));
     }
 
-    // Card background
-    ctx.fillStyle = isHovered ? '#1e1b4b' : '#0f172a';
+    // Beveled Obsidian Card Base
+    const bgGrad = ctx.createLinearGradient(x, y, x, y + h);
+    if (isHovered) {
+      bgGrad.addColorStop(0, '#1e1b4b');
+      bgGrad.addColorStop(1, '#0f172a');
+    } else {
+      bgGrad.addColorStop(0, '#0f172a');
+      bgGrad.addColorStop(1, '#020617');
+    }
+    ctx.fillStyle = bgGrad;
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, 8);
     ctx.fill();
@@ -336,63 +380,73 @@ export class UIManager {
     if (isHovered) {
       const shimmerGrad = ctx.createLinearGradient(x, y, x + w, y + h);
       shimmerGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
-      shimmerGrad.addColorStop(0.5, 'rgba(251, 191, 36, 0.15)');
-      shimmerGrad.addColorStop(1, 'rgba(56, 189, 248, 0.12)');
+      shimmerGrad.addColorStop(0.5, 'rgba(251, 191, 36, 0.18)');
+      shimmerGrad.addColorStop(1, 'rgba(56, 189, 248, 0.15)');
       ctx.fillStyle = shimmerGrad;
       ctx.fill();
     }
 
-    ctx.strokeStyle = isHovered ? '#818cf8' : '#334155';
+    // Card Ornate Border (Golden Filigree when hovered)
+    ctx.strokeStyle = isHovered ? '#fbbf24' : '#334155';
     ctx.lineWidth = isHovered ? 2.5 : 1.5;
     if (isHovered) {
-      ctx.shadowColor = '#6366f1';
-      ctx.shadowBlur = 16;
+      ctx.shadowColor = '#d97706';
+      ctx.shadowBlur = 18;
     }
     ctx.stroke();
 
-    // Key shortcut badge
-    ctx.fillStyle = isHovered ? '#6366f1' : '#1e293b';
+    // Key shortcut coin badge
+    ctx.fillStyle = isHovered ? '#f59e0b' : '#1e293b';
     ctx.beginPath();
-    ctx.roundRect(x + 10, y + h / 2 - 12, 24, 24, 4);
+    ctx.arc(x + 22, y + h / 2, 13, 0, Math.PI * 2);
     ctx.fill();
+    ctx.strokeStyle = isHovered ? '#fbbf24' : '#475569';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px sans-serif';
+    ctx.font = 'bold 12px "Cinzel", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${keyNum}`, x + 22, y + h / 2);
 
-    // Icon Box
-    const iconBoxSize = 44;
+    // Icon Box with Golden Bevel
+    const iconBoxSize = 46;
     const iconBoxX = x + 44;
     const iconBoxY = y + (h - iconBoxSize) / 2;
-    ctx.fillStyle = '#1e293b';
+    ctx.fillStyle = '#090d16';
     ctx.beginPath();
     ctx.roundRect(iconBoxX, iconBoxY, iconBoxSize, iconBoxSize, 6);
     ctx.fill();
-    this.renderVectorIcon(ctx, opt.iconName, iconBoxX + iconBoxSize / 2, iconBoxY + iconBoxSize / 2, iconBoxSize * 0.7);
+    ctx.strokeStyle = isHovered ? '#f59e0b' : '#334155';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
-    // Name & Level text
+    this.renderVectorIcon(ctx, opt.iconName, iconBoxX + iconBoxSize / 2, iconBoxY + iconBoxSize / 2, iconBoxSize * 0.72);
+
+    // Name with Gothic Typography
     ctx.shadowBlur = 0;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 15px -apple-system, sans-serif';
-    ctx.fillText(opt.name, x + 100, y + 14);
+    ctx.font = 'bold 16px "Cinzel", serif';
+    ctx.fillText(opt.name, x + 102, y + 14);
 
-    // Level tag
-    ctx.fillStyle = opt.levelText === 'NEW!' ? '#22c55e' : '#38bdf8';
-    ctx.font = 'bold 12px -apple-system, sans-serif';
-    ctx.fillText(opt.levelText, x + 100 + ctx.measureText(opt.name).width + 12, y + 15);
+    // Level badge tag
+    const isNew = opt.levelText === 'NEW!';
+    ctx.fillStyle = isNew ? '#22c55e' : '#38bdf8';
+    ctx.font = 'bold 12px "Cinzel", sans-serif';
+    ctx.fillText(opt.levelText, x + 102 + ctx.measureText(opt.name).width + 12, y + 16);
 
     // Description
     ctx.fillStyle = '#94a3b8';
     ctx.font = '12px -apple-system, sans-serif';
-    ctx.fillText(opt.description, x + 100, y + 38);
+    ctx.fillText(opt.description, x + 102, y + 42);
 
     ctx.restore();
   }
 
-  // --- Boss Chest Modal ---
+  // --- Boss Chest Modal (Ornate Golden Fanfare) ---
   public renderBossChestModal(
     ctx: CanvasRenderingContext2D,
     width: number,
@@ -402,19 +456,19 @@ export class UIManager {
     ctx.save();
 
     // Dim background
-    ctx.fillStyle = 'rgba(5, 5, 12, 0.88)';
+    ctx.fillStyle = 'rgba(5, 5, 12, 0.9)';
     ctx.fillRect(0, 0, width, height);
 
-    // Rotating Rays
-    const rays = 16;
+    // Rotating Sunburst Rays
+    const rays = 18;
     ctx.save();
     ctx.translate(width / 2, height * 0.42);
-    ctx.rotate(this.chestOpenProgress * 2.5);
+    ctx.rotate(this.chestOpenProgress * 2.2);
     for (let r = 0; r < rays; r++) {
-      ctx.fillStyle = r % 2 === 0 ? 'rgba(251, 191, 36, 0.08)' : 'rgba(251, 191, 36, 0.02)';
+      ctx.fillStyle = r % 2 === 0 ? 'rgba(251, 191, 36, 0.10)' : 'rgba(251, 191, 36, 0.02)';
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.arc(0, 0, 400, (r * Math.PI * 2) / rays, ((r + 1) * Math.PI * 2) / rays);
+      ctx.arc(0, 0, 450, (r * Math.PI * 2) / rays, ((r + 1) * Math.PI * 2) / rays);
       ctx.closePath();
       ctx.fill();
     }
@@ -422,25 +476,25 @@ export class UIManager {
 
     // Title
     ctx.fillStyle = '#fbbf24';
-    ctx.font = '900 32px -apple-system, sans-serif';
+    ctx.font = '900 36px "Cinzel", serif';
     ctx.textAlign = 'center';
     ctx.shadowColor = '#d97706';
-    ctx.shadowBlur = 18;
-    ctx.fillText('TREASURE CHEST!', width / 2, height * 0.18);
+    ctx.shadowBlur = 22;
+    ctx.fillText('TREASURE CHEST', width / 2, height * 0.17);
 
     // Reward Details
     if (reward) {
       const isEvo = reward.type === 'EVOLUTION';
       ctx.fillStyle = isEvo ? '#f43f5e' : '#38bdf8';
-      ctx.font = 'bold 20px -apple-system, sans-serif';
-      ctx.fillText(isEvo ? '★ WEAPON EVOLVED! ★' : 'ITEM UPGRADE!', width / 2, height * 0.3);
+      ctx.font = 'bold 22px "Cinzel", serif';
+      ctx.fillText(isEvo ? '★ WEAPON EVOLVED ★' : 'ITEM UPGRADED', width / 2, height * 0.29);
 
       // Icon
-      this.renderVectorIcon(ctx, reward.iconName, width / 2, height * 0.44, 60);
+      this.renderVectorIcon(ctx, reward.iconName, width / 2, height * 0.44, 64);
 
       // Name & Description
       ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 22px -apple-system, sans-serif';
+      ctx.font = '900 24px "Cinzel", serif';
       ctx.fillText(reward.name, width / 2, height * 0.58);
 
       ctx.fillStyle = '#cbd5e1';
@@ -448,13 +502,13 @@ export class UIManager {
       ctx.fillText(reward.description, width / 2, height * 0.64);
     } else {
       ctx.fillStyle = '#fbbf24';
-      ctx.font = 'bold 22px -apple-system, sans-serif';
-      ctx.fillText('+250 GOLD COINS!', width / 2, height * 0.52);
+      ctx.font = 'bold 24px "Cinzel", serif';
+      ctx.fillText('+250 GOLD COINS', width / 2, height * 0.52);
     }
 
     // Done button
-    const btnW = 160;
-    const btnH = 46;
+    const btnW = 180;
+    const btnH = 48;
     const btnX = width / 2 - btnW / 2;
     const btnY = height * 0.74;
 
@@ -467,8 +521,8 @@ export class UIManager {
     ctx.stroke();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 16px -apple-system, sans-serif';
-    ctx.fillText('CLAIM (SPACE)', width / 2, btnY + 28);
+    ctx.font = 'bold 16px "Cinzel", sans-serif';
+    ctx.fillText('CLAIM (SPACE)', width / 2, btnY + 29);
 
     ctx.restore();
   }
@@ -483,28 +537,28 @@ export class UIManager {
     ctx.save();
 
     // Dark gothic vignette overlay
-    ctx.fillStyle = 'rgba(5, 5, 8, 0.92)';
+    ctx.fillStyle = 'rgba(5, 5, 8, 0.94)';
     ctx.fillRect(0, 0, width, height);
 
     // Title
     ctx.fillStyle = '#ef4444';
-    ctx.font = '900 42px -apple-system, sans-serif';
+    ctx.font = '900 48px "Cinzel", serif';
     ctx.textAlign = 'center';
     ctx.shadowColor = '#991b1b';
-    ctx.shadowBlur = 24;
-    ctx.fillText('YOU DIED', width / 2, height * 0.16);
+    ctx.shadowBlur = 28;
+    ctx.fillText('YOU DIED', width / 2, height * 0.15);
 
     // Summary Box
-    const boxW = Math.min(520, width - 40);
+    const boxW = Math.min(540, width - 40);
     const boxH = 340;
     const boxX = width / 2 - boxW / 2;
-    const boxY = height * 0.22;
+    const boxY = height * 0.21;
 
     ctx.fillStyle = '#0f172a';
     ctx.beginPath();
     ctx.roundRect(boxX, boxY, boxW, boxH, 12);
     ctx.fill();
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = '#d97706';
     ctx.lineWidth = 2;
     ctx.stroke();
 
@@ -516,42 +570,42 @@ export class UIManager {
     ctx.shadowBlur = 0;
     ctx.textAlign = 'left';
     ctx.fillStyle = '#94a3b8';
-    ctx.font = '14px -apple-system, sans-serif';
+    ctx.font = '14px "Cinzel", sans-serif';
 
     const statRows = [
-      ['Time Survived:', timeFormatted],
-      ['Enemies Defeated:', `${player.kills}`],
-      ['Level Reached:', `LV ${player.level}`],
-      ['Gold Collected:', `+${player.gold}`],
-      ['Lifetime Kills:', `${this.saveManager.getData().lifetimeKills}`]
+      ['TIME SURVIVED:', timeFormatted],
+      ['ENEMIES DEFEATED:', `${player.kills}`],
+      ['LEVEL REACHED:', `LEVEL ${player.level}`],
+      ['GOLD COLLECTED:', `+${player.gold}`],
+      ['LIFETIME KILLS:', `${this.saveManager.getData().lifetimeKills}`]
     ];
 
     for (let r = 0; r < statRows.length; r++) {
-      const sy = boxY + 32 + r * 26;
+      const sy = boxY + 34 + r * 26;
       ctx.fillStyle = '#94a3b8';
       ctx.fillText(statRows[r][0], boxX + 24, sy);
       ctx.fillStyle = '#f8fafc';
-      ctx.fillText(statRows[r][1], boxX + 220, sy);
+      ctx.fillText(statRows[r][1], boxX + 240, sy);
     }
 
     // Weapons DPS Breakdown
     ctx.fillStyle = '#38bdf8';
-    ctx.font = 'bold 13px -apple-system, sans-serif';
-    ctx.fillText('WEAPONS DAMAGE BREAKDOWN:', boxX + 24, boxY + 175);
+    ctx.font = 'bold 14px "Cinzel", serif';
+    ctx.fillText('WEAPONS DAMAGE BREAKDOWN:', boxX + 24, boxY + 180);
 
     for (let w = 0; w < player.weapons.length; w++) {
       const wep = player.weapons[w];
-      const wy = boxY + 198 + w * 20;
+      const wy = boxY + 204 + w * 20;
       ctx.fillStyle = '#cbd5e1';
       ctx.font = '12px -apple-system, sans-serif';
       ctx.fillText(`${wep.name} (LV ${wep.level}):`, boxX + 24, wy);
       ctx.fillStyle = '#facc15';
-      ctx.fillText(`${wep.totalDamageDealt} dmg  (${wep.totalKills} kills)`, boxX + 220, wy);
+      ctx.fillText(`${wep.totalDamageDealt} dmg  (${wep.totalKills} kills)`, boxX + 240, wy);
     }
 
     // Play Again Button
-    const btnW = 200;
-    const btnH = 50;
+    const btnW = 220;
+    const btnH = 52;
     const btnX = width / 2 - btnW / 2;
     const btnY = boxY + boxH + 24;
 
@@ -564,9 +618,9 @@ export class UIManager {
     ctx.stroke();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 16px -apple-system, sans-serif';
+    ctx.font = 'bold 17px "Cinzel", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('PLAY AGAIN', width / 2, btnY + 30);
+    ctx.fillText('PLAY AGAIN', width / 2, btnY + 32);
 
     ctx.restore();
   }
@@ -581,29 +635,29 @@ export class UIManager {
     ctx.save();
 
     // Dark blood-red gothic backdrop
-    ctx.fillStyle = '#090810';
+    ctx.fillStyle = '#08070e';
     ctx.fillRect(0, 0, width, height);
 
-    // Title
+    // Title with AAA Gothic Typography
     ctx.fillStyle = '#dc2626';
-    ctx.font = '900 40px -apple-system, sans-serif';
+    ctx.font = '900 46px "Cinzel", serif';
     ctx.textAlign = 'center';
     ctx.shadowColor = '#7f1d1d';
-    ctx.shadowBlur = 20;
-    ctx.fillText('BLOODYBERRY', width / 2, height * 0.12);
+    ctx.shadowBlur = 24;
+    ctx.fillText('BLOODYBERRY', width / 2, height * 0.11);
 
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = 'bold 14px -apple-system, sans-serif';
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = 'bold 14px "Cinzel", sans-serif';
     ctx.shadowBlur = 0;
-    ctx.fillText('VAMPIRE SURVIVORS AUTO-SHOOTER', width / 2, height * 0.17);
+    ctx.fillText('VAMPIRE SURVIVORS AUTO-SHOOTER', width / 2, height * 0.16);
 
     // Characters Grid
-    const cardW = 170;
-    const cardH = 220;
+    const cardW = 165;
+    const cardH = 225;
     const gap = 16;
     const totalW = CHARACTERS.length * cardW + (CHARACTERS.length - 1) * gap;
     const startX = Math.max(20, width / 2 - totalW / 2);
-    const startY = height * 0.24;
+    const startY = height * 0.22;
 
     for (let i = 0; i < CHARACTERS.length; i++) {
       const char = CHARACTERS[i];
@@ -617,10 +671,10 @@ export class UIManager {
     }
 
     // Start Game Button
-    const btnW = 240;
-    const btnH = 54;
+    const btnW = 260;
+    const btnH = 56;
     const btnX = width / 2 - btnW / 2;
-    const btnY = startY + cardH + 40;
+    const btnY = startY + cardH + 38;
 
     ctx.fillStyle = this.hoveredButton === 'start' ? '#b91c1c' : '#dc2626';
     ctx.beginPath();
@@ -629,14 +683,14 @@ export class UIManager {
     ctx.strokeStyle = '#f87171';
     ctx.lineWidth = 2.5;
     ctx.shadowColor = '#dc2626';
-    ctx.shadowBlur = 15;
+    ctx.shadowBlur = 18;
     ctx.stroke();
 
     ctx.shadowBlur = 0;
     ctx.fillStyle = '#ffffff';
-    ctx.font = '900 18px -apple-system, sans-serif';
+    ctx.font = '900 19px "Cinzel", serif';
     ctx.textAlign = 'center';
-    ctx.fillText('START SURVIVAL (ENTER)', width / 2, btnY + 34);
+    ctx.fillText('START SURVIVAL (ENTER)', width / 2, btnY + 35);
 
     ctx.restore();
   }
@@ -659,11 +713,11 @@ export class UIManager {
     ctx.roundRect(x, y, w, h, 8);
     ctx.fill();
 
-    ctx.strokeStyle = isSelected ? '#a855f7' : isHovered ? '#64748b' : '#334155';
+    ctx.strokeStyle = isSelected ? '#fbbf24' : isHovered ? '#64748b' : '#334155';
     ctx.lineWidth = isSelected ? 3 : 1.5;
     if (isSelected) {
-      ctx.shadowColor = '#a855f7';
-      ctx.shadowBlur = 12;
+      ctx.shadowColor = '#d97706';
+      ctx.shadowBlur = 14;
     }
     ctx.stroke();
 
@@ -677,8 +731,7 @@ export class UIManager {
     ctx.fill();
 
     if (!isUnlocked) {
-      // Lock overlay
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
       ctx.beginPath();
       ctx.arc(px + pSize / 2, py + pSize / 2, pSize / 2, 0, Math.PI * 2);
       ctx.fill();
@@ -688,15 +741,14 @@ export class UIManager {
       ctx.textBaseline = 'middle';
       ctx.fillText('🔒', px + pSize / 2, py + pSize / 2);
     } else {
-      // Weapon icon underneath portrait
-      this.renderVectorIcon(ctx, char.startingWeapon, px + pSize / 2, py + pSize / 2, 32);
+      this.renderVectorIcon(ctx, char.startingWeapon, px + pSize / 2, py + pSize / 2, 34);
     }
 
     // Name & Title
     ctx.shadowBlur = 0;
     ctx.textAlign = 'center';
     ctx.fillStyle = isUnlocked ? '#f8fafc' : '#64748b';
-    ctx.font = 'bold 16px -apple-system, sans-serif';
+    ctx.font = 'bold 16px "Cinzel", serif';
     ctx.fillText(char.name, x + w / 2, py + pSize + 22);
 
     ctx.fillStyle = '#94a3b8';

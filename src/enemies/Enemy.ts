@@ -271,167 +271,65 @@ export class Enemy extends Entity {
   }
 
   private renderProceduralGraphic(ctx: CanvasRenderingContext2D): void {
-    const bob = Math.sin(this.animTimer) * 2;
     const isHit = this.hitFlashTimer > 0;
+    const anim = this.animTimer;
 
     switch (this.type) {
       case EnemyType.WALKER: {
-        const frame = Math.floor(this.animTimer * 1.5) % 4;
+        const frame = Math.floor(anim * 1.5) % 4;
         SpriteRenderer.getInstance().drawSprite(ctx, 'ghoul_walk', frame, 0, 0, 32, 32, 1, isHit);
         break;
       }
 
       case EnemyType.DASHER: {
-        const frame = Math.floor(this.animTimer * 2.5) % 4;
+        const frame = Math.floor(anim * 2.5) % 4;
         SpriteRenderer.getInstance().drawSprite(ctx, 'bat_fly', frame, 0, 0, 32, 32, 1, isHit);
         break;
       }
 
-      case EnemyType.BOSS_DEMON: {
-        const frame = Math.floor(this.animTimer) % 4;
-        SpriteRenderer.getInstance().drawSprite(ctx, 'demon_boss', frame, 0, 0, 68, 68, 1, isHit);
-        break;
-      }
-
       case EnemyType.SWARMER: {
-        // Giant Arachnid / Cave Spider
-        ctx.fillStyle = '#1c1917';
-        ctx.beginPath();
-        ctx.arc(0, bob, 6, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Abdomen
-        ctx.fillStyle = '#7f1d1d';
-        ctx.beginPath();
-        ctx.ellipse(-5, bob, 6, 4, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Legs
-        ctx.strokeStyle = '#292524';
-        ctx.lineWidth = 1.5;
-        for (let i = -1; i <= 1; i++) {
-          ctx.beginPath();
-          ctx.moveTo(i * 3, bob);
-          ctx.lineTo(i * 5 + 6, -6 + bob);
-          ctx.stroke();
-
-          ctx.beginPath();
-          ctx.moveTo(i * 3, bob);
-          ctx.lineTo(i * 5 + 6, 6 + bob);
-          ctx.stroke();
-        }
+        const frame = Math.floor(anim * 2.0) % 4;
+        SpriteRenderer.getInstance().drawSprite(ctx, 'spider_walk', frame, 0, 0, 26, 26, 1, isHit);
         break;
       }
 
       case EnemyType.TANK: {
-        // Heavy Armored Iron Golem
-        ctx.fillStyle = '#1e293b';
-        ctx.beginPath();
-        ctx.roundRect(-14, -18 + bob, 28, 36, 6);
-        ctx.fill();
-
-        // Rusted iron plates
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(-12, -14 + bob, 24, 12);
-        ctx.fillStyle = '#94a3b8';
-        ctx.fillRect(-10, 2 + bob, 20, 14);
-
-        // Glowing red visor
-        ctx.fillStyle = '#ef4444';
-        ctx.fillRect(-6, -10 + bob, 12, 3);
+        const frame = Math.floor(anim * 1.2) % 4;
+        SpriteRenderer.getInstance().drawSprite(ctx, 'golem_walk', frame, 0, 0, 48, 48, 1, isHit);
         break;
       }
 
       case EnemyType.MINOTAUR: {
-        // Minotaur Beast
-        ctx.fillStyle = '#451a03';
-        ctx.beginPath();
-        ctx.roundRect(-12, -14 + bob, 24, 28, 5);
-        ctx.fill();
-
-        // Horns
-        ctx.strokeStyle = '#d97706';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(6, -12 + bob);
-        ctx.quadraticCurveTo(14, -20 + bob, 16, -10 + bob);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(-6, -12 + bob);
-        ctx.quadraticCurveTo(-14, -20 + bob, -16, -10 + bob);
-        ctx.stroke();
-
-        if (this.chargeState === 'TELEGRAPH') {
-          // Fiery eyes & telegraph flash
-          ctx.fillStyle = '#ef4444';
-          ctx.beginPath();
-          ctx.arc(3, -6 + bob, 3, 0, Math.PI * 2);
-          ctx.fill();
-        }
+        const frame = Math.floor(anim * 1.8) % 4;
+        SpriteRenderer.getInstance().drawSprite(ctx, 'minotaur_walk', frame, 0, 0, 48, 48, 1, isHit);
         break;
       }
 
       case EnemyType.RANGED_SPITTER: {
-        // Gargoyle / Dark Priest
-        ctx.fillStyle = '#334155';
-        ctx.beginPath();
-        ctx.arc(0, -4 + bob, 10, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Wings
-        ctx.fillStyle = '#1e293b';
-        ctx.beginPath();
-        ctx.moveTo(-6, -8 + bob);
-        ctx.lineTo(-18, -16 + bob);
-        ctx.lineTo(-12, 4 + bob);
-        ctx.closePath();
-        ctx.fill();
-
-        // Mystic purple eye
-        ctx.fillStyle = '#c084fc';
-        ctx.beginPath();
-        ctx.arc(3, -4 + bob, 2.5, 0, Math.PI * 2);
-        ctx.fill();
+        const frame = Math.floor(anim * 1.6) % 4;
+        SpriteRenderer.getInstance().drawSprite(ctx, 'gargoyle_fly', frame, 0, 0, 34, 34, 1, isHit);
         break;
       }
 
       case EnemyType.SLIME_LARGE:
       case EnemyType.SLIME_MEDIUM:
       case EnemyType.SLIME_SMALL: {
-        // Acidic Slime with gelatinous squish
-        const squishX = 1 + Math.sin(this.animTimer * 1.5) * 0.15;
-        const squishY = 1 - Math.sin(this.animTimer * 1.5) * 0.15;
-
-        ctx.fillStyle = '#10b981';
-        ctx.beginPath();
-        ctx.ellipse(0, bob, this.radius * squishX, this.radius * squishY * 0.85, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Highlights
-        ctx.fillStyle = '#6ee7b7';
-        ctx.beginPath();
-        ctx.arc(-this.radius * 0.3, bob - this.radius * 0.3, this.radius * 0.25, 0, Math.PI * 2);
-        ctx.fill();
+        const frame = Math.floor(anim * 1.4) % 4;
+        const size = this.radius * 2.2;
+        SpriteRenderer.getInstance().drawSprite(ctx, 'slime_squish', frame, 0, 0, size, size, 1, isHit);
         break;
       }
 
       case EnemyType.GHOST: {
-        // Spectral Ghost with wavy tail
-        ctx.globalAlpha = 0.65;
-        ctx.fillStyle = '#bae6fd';
-        ctx.beginPath();
-        ctx.arc(0, -4 + bob, this.radius * 0.8, Math.PI, 0, false);
-        ctx.lineTo(this.radius * 0.8, 8 + bob);
-        ctx.quadraticCurveTo(0, 14 + bob, -this.radius * 0.8, 8 + bob);
-        ctx.closePath();
-        ctx.fill();
+        const frame = Math.floor(anim * 1.5) % 4;
+        ctx.globalAlpha = 0.72;
+        SpriteRenderer.getInstance().drawSprite(ctx, 'ghost_float', frame, 0, 0, 32, 32, 1, isHit);
+        break;
+      }
 
-        // Hollow glowing eyes
-        ctx.fillStyle = '#0369a1';
-        ctx.beginPath();
-        ctx.arc(3, -4 + bob, 2, 0, Math.PI * 2);
-        ctx.fill();
+      case EnemyType.BOSS_DEMON: {
+        const frame = Math.floor(anim) % 4;
+        SpriteRenderer.getInstance().drawSprite(ctx, 'demon_boss', frame, 0, 0, 72, 72, 1, isHit);
         break;
       }
     }
