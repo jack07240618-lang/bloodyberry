@@ -319,17 +319,34 @@ export class UIManager {
   ): void {
     ctx.save();
 
+    // 3D Card Hover & Holographic Foil
+    if (isHovered) {
+      ctx.translate(x + w / 2, y + h / 2);
+      ctx.scale(1.025, 1.025);
+      ctx.translate(-(x + w / 2), -(y + h / 2));
+    }
+
     // Card background
     ctx.fillStyle = isHovered ? '#1e1b4b' : '#0f172a';
     ctx.beginPath();
     ctx.roundRect(x, y, w, h, 8);
     ctx.fill();
 
+    // Holographic Foil Shimmer Streak on Hover
+    if (isHovered) {
+      const shimmerGrad = ctx.createLinearGradient(x, y, x + w, y + h);
+      shimmerGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+      shimmerGrad.addColorStop(0.5, 'rgba(251, 191, 36, 0.15)');
+      shimmerGrad.addColorStop(1, 'rgba(56, 189, 248, 0.12)');
+      ctx.fillStyle = shimmerGrad;
+      ctx.fill();
+    }
+
     ctx.strokeStyle = isHovered ? '#818cf8' : '#334155';
     ctx.lineWidth = isHovered ? 2.5 : 1.5;
     if (isHovered) {
       ctx.shadowColor = '#6366f1';
-      ctx.shadowBlur = 14;
+      ctx.shadowBlur = 16;
     }
     ctx.stroke();
 

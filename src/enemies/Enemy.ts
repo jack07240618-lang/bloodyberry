@@ -2,6 +2,7 @@ import { Entity } from '../entities/Entity';
 import { Vector2 } from '../core/Vector2';
 import { Player } from '../entities/Player';
 import { DropType } from '../entities/DropItem';
+import { SpriteRenderer } from '../renderer/SpriteRenderer';
 
 export enum EnemyType {
   WALKER = 'WALKER',         // Zombie / Ghoul
@@ -271,54 +272,24 @@ export class Enemy extends Entity {
 
   private renderProceduralGraphic(ctx: CanvasRenderingContext2D): void {
     const bob = Math.sin(this.animTimer) * 2;
+    const isHit = this.hitFlashTimer > 0;
 
     switch (this.type) {
       case EnemyType.WALKER: {
-        // Rotting Zombie
-        ctx.fillStyle = '#3f6212'; // Mold green
-        ctx.beginPath();
-        ctx.roundRect(-6, -10 + bob, 12, 18, 3);
-        ctx.fill();
-
-        // Shabby Tunic
-        ctx.fillStyle = '#475569';
-        ctx.fillRect(-6, -2 + bob, 12, 10);
-
-        // Eyes (One glowing red, one hollow)
-        ctx.fillStyle = '#ef4444';
-        ctx.beginPath();
-        ctx.arc(2, -7 + bob, 1.8, 0, Math.PI * 2);
-        ctx.fill();
+        const frame = Math.floor(this.animTimer * 1.5) % 4;
+        SpriteRenderer.getInstance().drawSprite(ctx, 'ghoul_walk', frame, 0, 0, 32, 32, 1, isHit);
         break;
       }
 
       case EnemyType.DASHER: {
-        // Red Vampiric Bat
-        const wingFlap = Math.sin(this.animTimer * 2) * 8;
-        ctx.fillStyle = '#831843'; // Deep wine red
-        ctx.beginPath();
-        ctx.ellipse(0, bob, 6, 8, 0, 0, Math.PI * 2);
-        ctx.fill();
+        const frame = Math.floor(this.animTimer * 2.5) % 4;
+        SpriteRenderer.getInstance().drawSprite(ctx, 'bat_fly', frame, 0, 0, 32, 32, 1, isHit);
+        break;
+      }
 
-        // Wings
-        ctx.fillStyle = '#be123c';
-        ctx.beginPath();
-        ctx.moveTo(3, bob);
-        ctx.lineTo(14, -6 + wingFlap);
-        ctx.lineTo(8, 6 + bob);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.moveTo(-3, bob);
-        ctx.lineTo(-14, -6 + wingFlap);
-        ctx.lineTo(-8, 6 + bob);
-        ctx.closePath();
-        ctx.fill();
-
-        // Glowing yellow fangs/eyes
-        ctx.fillStyle = '#fef08a';
-        ctx.fillRect(2, -2 + bob, 2, 2);
+      case EnemyType.BOSS_DEMON: {
+        const frame = Math.floor(this.animTimer) % 4;
+        SpriteRenderer.getInstance().drawSprite(ctx, 'demon_boss', frame, 0, 0, 68, 68, 1, isHit);
         break;
       }
 
@@ -460,58 +431,6 @@ export class Enemy extends Entity {
         ctx.fillStyle = '#0369a1';
         ctx.beginPath();
         ctx.arc(3, -4 + bob, 2, 0, Math.PI * 2);
-        ctx.fill();
-        break;
-      }
-
-      case EnemyType.BOSS_DEMON: {
-        // Arch-Demon Overlord
-        ctx.shadowColor = '#dc2626';
-        ctx.shadowBlur = 18;
-
-        // Muscular Crimson Torso
-        ctx.fillStyle = '#7f1d1d';
-        ctx.beginPath();
-        ctx.roundRect(-22, -26 + bob, 44, 52, 10);
-        ctx.fill();
-
-        // Massive Dark Wings
-        ctx.fillStyle = '#450a0a';
-        ctx.beginPath();
-        ctx.moveTo(14, -10 + bob);
-        ctx.lineTo(44, -32 + bob);
-        ctx.lineTo(26, 20 + bob);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.moveTo(-14, -10 + bob);
-        ctx.lineTo(-44, -32 + bob);
-        ctx.lineTo(-26, 20 + bob);
-        ctx.closePath();
-        ctx.fill();
-
-        // Crown / Horns
-        ctx.fillStyle = '#000000';
-        ctx.beginPath();
-        ctx.moveTo(12, -26 + bob);
-        ctx.lineTo(22, -44 + bob);
-        ctx.lineTo(8, -34 + bob);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.moveTo(-12, -26 + bob);
-        ctx.lineTo(-22, -44 + bob);
-        ctx.lineTo(-8, -34 + bob);
-        ctx.closePath();
-        ctx.fill();
-
-        // Blazing yellow demonic eyes
-        ctx.fillStyle = '#fef08a';
-        ctx.beginPath();
-        ctx.arc(6, -14 + bob, 3.5, 0, Math.PI * 2);
-        ctx.arc(-6, -14 + bob, 3.5, 0, Math.PI * 2);
         ctx.fill();
         break;
       }

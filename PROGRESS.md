@@ -52,3 +52,5 @@
 - [x] Milestone 6.5: Headless Simulation update and balance validation for all 12 weapons
 - [x] Milestone 6.6: Audio Volume Controls & Hit-Stop / Screen-Juice Polish Engine
 - [x] Milestone 6.7: Flashing Boss Warning Siren & Telegraph Banner Systems
+- [x] Milestone 7.0: Triple Visual Elevation: WebGL Post-Processing (Bloom + Chromatic Aberration + CRT + Shockwaves) + Multi-layer Fog/Trails/Embers + 32x32 Gothic Pixel Art Sprites + 3D Holographic Foil Cards!
+- [ ] Milestone 7.1: Continuous Gameplay & Visual Optimization

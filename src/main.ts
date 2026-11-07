@@ -13,6 +13,8 @@ import { CHARACTERS, CharacterInfo } from './persistence/CharacterSelect';
 import { UIManager, UpgradeOption } from './ui/UIManager';
 import { ALL_WEAPON_DEFINITIONS } from './weapons/WeaponRegistry';
 import { PASSIVE_DEFINITIONS } from './passives/PassiveRegistry';
+import { WebGLPostProcessor } from './renderer/WebGLPostProcessor';
+import { AmbientParticleSystem } from './systems/AmbientParticleSystem';
 
 enum GameState {
   CHARACTER_SELECT = 'CHARACTER_SELECT',
@@ -39,6 +41,8 @@ class GameEngine {
   private combatSystem: CombatSystem;
   private spawnDirector: SpawnDirector;
   private gameLoop: GameLoop;
+  private postProcessor: WebGLPostProcessor;
+  private ambientParticles: AmbientParticleSystem;
 
   // State
   private state: GameState = GameState.CHARACTER_SELECT;
@@ -72,6 +76,14 @@ class GameEngine {
       this.camera
     );
     this.spawnDirector = new SpawnDirector(this.combatSystem);
+    this.ambientParticles = new AmbientParticleSystem();
+    this.postProcessor = new WebGLPostProcessor(window.innerWidth, window.innerHeight);
+
+    const container = document.getElementById('game-container');
+    if (container && this.postProcessor.enabled) {
+      container.appendChild(this.postProcessor.glCanvas);
+    }
+
     this.player = new Player(0, 0);
 
     this.setupResizeHandler();
@@ -96,6 +108,7 @@ class GameEngine {
       this.canvas.style.height = `${h}px`;
 
       this.camera.resize(w, h);
+      this.postProcessor.resize(w, h);
     };
 
     window.addEventListener('resize', resize);
@@ -230,6 +243,10 @@ class GameEngine {
     this.player.moveDirection = this.input.getMovementVector();
     this.player.update(dt);
 
+    if (this.player.isMoving) {
+      this.ambientParticles.recordTrailPoint(this.player.id, this.player.position, 12);
+    }
+
     if (this.player.isDead) {
       this.state = GameState.GAME_OVER;
       this.sound.stopBGM();
@@ -268,6 +285,8 @@ class GameEngine {
     // Particle & Damage Text Systems
     this.particleSystem.update(dt);
     this.damageTextSystem.update(dt);
+    this.ambientParticles.update(dt, this.player.position);
+    this.postProcessor.update(dt);
   }
 
   // --- Level Up Logic ---
@@ -693,7 +712,10 @@ class GameEngine {
     // 4. Particle Effects
     this.particleSystem.render(this.ctx);
 
-    // 5. Damage Numbers
+    // 5. Ambient Fog, Embers & Weapon Trails
+    this.ambientParticles.renderFogAndTrails(this.ctx, this.camera);
+
+    // 6. Damage Numbers
     this.damageTextSystem.render(this.ctx);
 
     this.camera.restoreTransform(this.ctx);
@@ -736,6 +758,11 @@ class GameEngine {
     }
 
     this.ctx.restore();
+
+    // 7. Full-Screen WebGL Post-Processing Pass (Bloom, Chromatic Aberration & CRT Scanlines)
+    if (this.state === GameState.PLAYING) {
+      this.postProcessor.render(this.canvas, this.spawnDirector.elapsedSeconds);
+    }
   }
 
   private renderPauseOverlay(w: number, h: number): void {

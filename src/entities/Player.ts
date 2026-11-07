@@ -2,6 +2,7 @@ import { Entity } from './Entity';
 import { Vector2 } from '../core/Vector2';
 import { Weapon } from '../weapons/Weapon';
 import { PASSIVE_DEFINITIONS } from '../passives/PassiveRegistry';
+import { SpriteRenderer } from '../renderer/SpriteRenderer';
 
 export class Player extends Entity {
   // Base stats (unmodified)
@@ -261,64 +262,21 @@ export class Player extends Entity {
       ctx.globalAlpha = 0.4;
     }
 
-    // Direction flip
-    ctx.scale(this.facingDirection, 1);
+    const animFrame = this.isMoving ? Math.floor(this.walkAnimTimer) % 4 : 0;
+    const isHit = this.hurtFlashTimer > 0;
 
-    const bob = this.isMoving ? Math.sin(this.walkAnimTimer) * 2.5 : 0;
-
-    if (this.hurtFlashTimer > 0) {
-      // Red flash on damage
-      ctx.fillStyle = '#ef4444';
-      ctx.beginPath();
-      ctx.arc(0, -bob, this.radius, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      // Procedural Gothic Vampire Hunter Sprite
-
-      // Cape / Cloak flowing behind
-      ctx.fillStyle = '#1e1b4b'; // Deep midnight violet
-      ctx.beginPath();
-      ctx.moveTo(-6, -4 - bob);
-      ctx.lineTo(-14 - (this.isMoving ? 4 : 0), 12 - bob);
-      ctx.lineTo(2, 10 - bob);
-      ctx.closePath();
-      ctx.fill();
-
-      // Body coat
-      ctx.fillStyle = '#312e81'; // Dark royal blue-violet
-      ctx.beginPath();
-      ctx.roundRect(-8, -10 - bob, 16, 20, 4);
-      ctx.fill();
-
-      // Belt & Golden Buckle
-      ctx.fillStyle = '#78350f';
-      ctx.fillRect(-8, 1 - bob, 16, 3);
-      ctx.fillStyle = '#fbbf24';
-      ctx.fillRect(-2, 0 - bob, 4, 5);
-
-      // Head / Hood
-      ctx.fillStyle = '#4338ca';
-      ctx.beginPath();
-      ctx.arc(0, -12 - bob, 8, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Face shadow & Glowing Silver/Cyan eyes
-      ctx.fillStyle = '#1e1b4b';
-      ctx.beginPath();
-      ctx.arc(2, -11 - bob, 5, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = '#67e8f9';
-      ctx.beginPath();
-      ctx.arc(3, -12 - bob, 1.8, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Crimson Amulet / Pendant on chest
-      ctx.fillStyle = '#dc2626';
-      ctx.beginPath();
-      ctx.arc(1, -3 - bob, 2.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // Draw High-Res Gothic Hunter Sprite
+    SpriteRenderer.getInstance().drawSprite(
+      ctx,
+      'hunter_walk',
+      animFrame,
+      0,
+      -2,
+      36,
+      36,
+      this.facingDirection,
+      isHit
+    );
 
     ctx.restore();
 
