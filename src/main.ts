@@ -13,7 +13,6 @@ import { CHARACTERS, CharacterInfo } from './persistence/CharacterSelect';
 import { UIManager, UpgradeOption } from './ui/UIManager';
 import { ALL_WEAPON_DEFINITIONS } from './weapons/WeaponRegistry';
 import { PASSIVE_DEFINITIONS } from './passives/PassiveRegistry';
-import { WebGLPostProcessor } from './renderer/WebGLPostProcessor';
 import { AmbientParticleSystem } from './systems/AmbientParticleSystem';
 
 enum GameState {
@@ -41,7 +40,6 @@ class GameEngine {
   private combatSystem: CombatSystem;
   private spawnDirector: SpawnDirector;
   private gameLoop: GameLoop;
-  private postProcessor: WebGLPostProcessor;
   private ambientParticles: AmbientParticleSystem;
 
   // State
@@ -77,13 +75,6 @@ class GameEngine {
     );
     this.spawnDirector = new SpawnDirector(this.combatSystem);
     this.ambientParticles = new AmbientParticleSystem();
-    this.postProcessor = new WebGLPostProcessor(window.innerWidth, window.innerHeight);
-
-    const container = document.getElementById('game-container');
-    if (container && this.postProcessor.enabled) {
-      container.appendChild(this.postProcessor.glCanvas);
-    }
-
     this.player = new Player(0, 0);
 
     this.setupResizeHandler();
@@ -108,7 +99,6 @@ class GameEngine {
       this.canvas.style.height = `${h}px`;
 
       this.camera.resize(w, h);
-      this.postProcessor.resize(w, h);
     };
 
     window.addEventListener('resize', resize);
@@ -286,7 +276,6 @@ class GameEngine {
     this.particleSystem.update(dt);
     this.damageTextSystem.update(dt);
     this.ambientParticles.update(dt, this.player.position);
-    this.postProcessor.update(dt);
   }
 
   // --- Level Up Logic ---
@@ -458,7 +447,17 @@ class GameEngine {
     }
 
     this.sound.playShoot('wand');
-    this.state = GameState.PLAYING;
+
+    // Check if player has more stacked level ups
+    if (this.player.pendingLevelUps > 1) {
+      this.player.pendingLevelUps--;
+      this.levelUpOptions = this.generateUpgradeOptions();
+      this.selectedUpgradeIdx = 0;
+      this.state = GameState.LEVEL_UP;
+    } else {
+      this.player.pendingLevelUps = 0;
+      this.state = GameState.PLAYING;
+    }
   }
 
   // --- Boss Chest Logic ---
@@ -758,11 +757,6 @@ class GameEngine {
     }
 
     this.ctx.restore();
-
-    // 7. Full-Screen WebGL Post-Processing Pass (Bloom, Chromatic Aberration & CRT Scanlines)
-    if (this.state === GameState.PLAYING) {
-      this.postProcessor.render(this.canvas, this.spawnDirector.elapsedSeconds);
-    }
   }
 
   private renderPauseOverlay(w: number, h: number): void {

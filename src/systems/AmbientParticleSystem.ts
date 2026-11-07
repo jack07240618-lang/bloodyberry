@@ -11,13 +11,6 @@ export interface AmbientEmber {
   wobbleTimer: number;
 }
 
-export interface FogCloud {
-  position: Vector2;
-  radius: number;
-  alpha: number;
-  speed: number;
-}
-
 export interface WeaponTrailPoint {
   position: Vector2;
   alpha: number;
@@ -26,26 +19,28 @@ export interface WeaponTrailPoint {
 
 export class AmbientParticleSystem {
   private embers: AmbientEmber[] = [];
-  private fogClouds: FogCloud[] = [];
   private trails: Map<number, WeaponTrailPoint[]> = new Map();
 
   constructor() {
-    this.seedFog();
+    this.seedEmbers();
   }
 
-  private seedFog(): void {
-    for (let i = 0; i < 18; i++) {
-      this.fogClouds.push({
-        position: new Vector2((Math.random() - 0.5) * 1600, (Math.random() - 0.5) * 1600),
-        radius: 120 + Math.random() * 140,
-        alpha: 0.08 + Math.random() * 0.08,
-        speed: 15 + Math.random() * 25
+  private seedEmbers(): void {
+    for (let i = 0; i < 25; i++) {
+      this.embers.push({
+        position: new Vector2((Math.random() - 0.5) * 800, (Math.random() - 0.5) * 800),
+        velocity: new Vector2((Math.random() - 0.5) * 20, -25 - Math.random() * 35),
+        radius: 1.5 + Math.random() * 2,
+        alpha: 0.5 + Math.random() * 0.4,
+        color: Math.random() < 0.6 ? '#f97316' : '#fbbf24',
+        wobbleSpeed: 2 + Math.random() * 4,
+        wobbleTimer: Math.random() * 10
       });
     }
   }
 
   public addEmber(x: number, y: number, color = '#f97316'): void {
-    if (this.embers.length >= 80) return;
+    if (this.embers.length >= 60) return;
     this.embers.push({
       position: new Vector2(x + (Math.random() - 0.5) * 20, y + (Math.random() - 0.5) * 20),
       velocity: new Vector2((Math.random() - 0.5) * 20, -30 - Math.random() * 40),
@@ -76,23 +71,19 @@ export class AmbientParticleSystem {
       e.wobbleTimer += dt * e.wobbleSpeed;
       e.position.x += Math.sin(e.wobbleTimer) * 18 * dt;
       e.position.y += e.velocity.y * dt;
-      e.alpha -= dt * 0.45;
+      e.alpha -= dt * 0.35;
 
       if (e.alpha <= 0) {
-        this.embers.splice(i, 1);
+        // Respawn near player
+        e.position.set(
+          playerPos.x + (Math.random() - 0.5) * 800,
+          playerPos.y + 350 + Math.random() * 100
+        );
+        e.alpha = 0.5 + Math.random() * 0.4;
       }
     }
 
-    // 2. Update Fog drifting around player
-    for (const fog of this.fogClouds) {
-      fog.position.x += fog.speed * dt;
-      // Wrap around player window
-      if (fog.position.x - playerPos.x > 900) {
-        fog.position.x = playerPos.x - 900;
-      }
-    }
-
-    // 3. Update Weapon Trails
+    // 2. Update Weapon Trails
     for (const [id, points] of this.trails.entries()) {
       for (let i = points.length - 1; i >= 0; i--) {
         points[i].alpha -= dt * 3.5;
@@ -127,33 +118,9 @@ export class AmbientParticleSystem {
       }
     }
 
-    // 2. Render Fog
-    for (const fog of this.fogClouds) {
-      if (camera.isVisible(fog.position, fog.radius)) {
-        ctx.save();
-        ctx.globalAlpha = fog.alpha;
-        const grad = ctx.createRadialGradient(
-          fog.position.x,
-          fog.position.y,
-          fog.radius * 0.2,
-          fog.position.x,
-          fog.position.y,
-          fog.radius
-        );
-        grad.addColorStop(0, 'rgba(148, 163, 184, 0.35)');
-        grad.addColorStop(0.6, 'rgba(100, 116, 139, 0.15)');
-        grad.addColorStop(1, 'rgba(15, 23, 42, 0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(fog.position.x, fog.position.y, fog.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-    }
-
-    // 3. Render Embers
+    // 2. Render Embers
     for (const e of this.embers) {
-      if (camera.isVisible(e.position, e.radius)) {
+      if (camera.isVisible(e.position, e.radius + 10)) {
         ctx.save();
         ctx.globalAlpha = e.alpha;
         ctx.shadowColor = e.color;

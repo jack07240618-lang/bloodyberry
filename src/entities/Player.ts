@@ -29,6 +29,7 @@ export class Player extends Entity {
   public level = 1;
   public xp = 0;
   public nextLevelXp = 5;
+  public pendingLevelUps = 0;
   public gold = 0;
   public kills = 0;
   public totalDamageDealt = 0;
@@ -132,15 +133,17 @@ export class Player extends Entity {
     const scaledAmount = amount * this.xpMult;
     this.xp += scaledAmount;
 
-    if (this.xp >= this.nextLevelXp) {
+    let leveledUp = false;
+    while (this.xp >= this.nextLevelXp) {
       this.xp -= this.nextLevelXp;
       this.level++;
       // Exponential curve matching classic horde survivor formulas
       this.nextLevelXp = Math.floor(5 * Math.pow(1.18, this.level - 1) + (this.level * 3));
-      return true; // Leveled up!
+      this.pendingLevelUps++;
+      leveledUp = true;
     }
 
-    return false;
+    return leveledUp;
   }
 
   public addWeapon(weapon: Weapon): boolean {
