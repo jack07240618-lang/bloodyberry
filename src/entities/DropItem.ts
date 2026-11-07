@@ -28,6 +28,20 @@ export class DropItem extends Entity {
     this.value = value;
     this.sparkleTimer = Math.random() * Math.PI * 2;
 
+    const isXpGem = (
+      type === DropType.XP_CYAN ||
+      type === DropType.XP_GREEN ||
+      type === DropType.XP_RED ||
+      type === DropType.XP_VIOLET
+    );
+
+    // Global Infinite Magnet for all XP gems
+    if (isXpGem) {
+      this.isMagnetized = true;
+      this.magnetSpeed = 380;
+      this.maxMagnetSpeed = 950;
+    }
+
     if (type === DropType.BOSS_CHEST) {
       this.radius = 16;
     } else if (type === DropType.HEALTH_POTION || type === DropType.MAGNET || type === DropType.FREEZE_CLOCK) {
@@ -51,7 +65,17 @@ export class DropItem extends Entity {
 
     const dist = this.position.distanceTo(player.position);
 
-    if (!this.isMagnetized) {
+    const isXpGem = (
+      this.type === DropType.XP_CYAN ||
+      this.type === DropType.XP_GREEN ||
+      this.type === DropType.XP_RED ||
+      this.type === DropType.XP_VIOLET
+    );
+
+    // Infinite magnet for all XP gems regardless of distance
+    if (isXpGem) {
+      this.isMagnetized = true;
+    } else if (!this.isMagnetized) {
       if (dist <= player.pickupRadius) {
         this.isMagnetized = true;
       }
@@ -59,11 +83,11 @@ export class DropItem extends Entity {
 
     if (this.isMagnetized) {
       // Accelerate rapidly towards player
-      this.magnetSpeed = Math.min(this.maxMagnetSpeed, this.magnetSpeed + dt * 1000);
+      this.magnetSpeed = Math.min(this.maxMagnetSpeed, this.magnetSpeed + dt * 1400);
       const toPlayer = player.position.clone().sub(this.position).normalize();
       this.position.addScaled(toPlayer, this.magnetSpeed * dt);
 
-      if (dist <= player.radius + this.radius + 6) {
+      if (dist <= player.radius + this.radius + 8) {
         this.active = false;
         return true; // Collected!
       }

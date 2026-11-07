@@ -61,3 +61,4 @@
   - Full 10-archetype High-Res Spritesheet Animation Engine (Player, Ghouls, Bats, Spiders, Golems, Minotaurs, Gargoyles, Slimes, Ghosts, Demon Boss)
   - Beveled obsidian gold-framed Level-Up cards with holographic foil shimmer and embossed coin hotkeys
   - Crystal specular HP & XP meters with ornate metal brackets
+- [x] Milestone 8.1: 100% Guaranteed Enemy XP Drop & Global Infinite Distance Auto-Magnet for all gems

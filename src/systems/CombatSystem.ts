@@ -96,7 +96,7 @@ export class CombatSystem {
       if (!enemy.active) continue;
       if (!enemy.isBoss) {
         enemy.takeDamage(99999);
-        this.handleEnemyDeath(enemy, false); // pentagram kills
+        this.handleEnemyDeath(enemy, true);
       } else {
         enemy.takeDamage(1200);
         this.damageTextSystem.addDamage(enemy.position.x, enemy.position.y, 1200, true);
@@ -327,9 +327,24 @@ export class CombatSystem {
       }
     }
 
+    // Rule: Every single defeated enemy 100% drops an experience gem!
     if (dropLoot) {
-      const dropType = enemy.getDropType();
-      this.dropItems.push(new DropItem(dropType, enemy.position.x, enemy.position.y, enemy.xpValue));
+      const gemType = (enemy.xpValue >= 50)
+        ? DropType.XP_VIOLET
+        : (enemy.xpValue >= 20)
+        ? DropType.XP_RED
+        : (enemy.xpValue >= 5)
+        ? DropType.XP_GREEN
+        : DropType.XP_CYAN;
+
+      const gem = new DropItem(gemType, enemy.position.x, enemy.position.y, Math.max(1, enemy.xpValue));
+      gem.isMagnetized = true;
+      this.dropItems.push(gem);
+
+      // Boss also drops a Boss Chest!
+      if (enemy.isBoss) {
+        this.dropItems.push(new DropItem(DropType.BOSS_CHEST, enemy.position.x + 12, enemy.position.y, 1));
+      }
     }
   }
 
