@@ -55,3 +55,9 @@
 - [x] Milestone 7.0: Triple Visual Elevation: WebGL Post-Processing (Bloom + Chromatic Aberration + CRT + Shockwaves) + Multi-layer Fog/Trails/Embers + 32x32 Gothic Pixel Art Sprites + 3D Holographic Foil Cards!
 - [x] Milestone 7.1: Bugfix: Removed giant fog sphere from arena & fixed Level-Up modal occlusion by unifying rendering on single high-DPI Canvas
 - [x] Milestone 7.2: Added stacked Level-Up queue (simultaneous multi-level gains queue all upgrade choices)
+- [x] Milestone 8.0: Commercial AAA Visual Transformation:
+  - Bundled authentic Dark Fantasy "Cinzel" vector typography for titles, HUD, and cards
+  - Integrated GSAP for fluid card animations and elastic UI interaction
+  - Full 10-archetype High-Res Spritesheet Animation Engine (Player, Ghouls, Bats, Spiders, Golems, Minotaurs, Gargoyles, Slimes, Ghosts, Demon Boss)
+  - Beveled obsidian gold-framed Level-Up cards with holographic foil shimmer and embossed coin hotkeys
+  - Crystal specular HP & XP meters with ornate metal brackets
