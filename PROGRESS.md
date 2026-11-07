@@ -50,3 +50,5 @@
 - [x] Milestone 6.3: 4 Additional Classic Weapons (Whip/Bloody Tear, Axe/Death Spiral, Fire Wand/Hellfire, Runetracer/No Future)
 - [x] Milestone 6.4: Reroll, Skip, and Banish Meta Mechanics in Level-Up Modal
 - [x] Milestone 6.5: Headless Simulation update and balance validation for all 12 weapons
+- [x] Milestone 6.6: Audio Volume Controls & Hit-Stop / Screen-Juice Polish Engine
+- [x] Milestone 6.7: Flashing Boss Warning Siren & Telegraph Banner Systems

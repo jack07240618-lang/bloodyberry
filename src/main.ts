@@ -47,6 +47,7 @@ class GameEngine {
   private levelUpOptions: UpgradeOption[] = [];
   private selectedUpgradeIdx = 0;
   private chestReward: UpgradeOption | null = null;
+  private hitStopTimer = 0;
 
   constructor() {
     this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -220,6 +221,11 @@ class GameEngine {
       return;
     }
 
+    if (this.hitStopTimer > 0) {
+      this.hitStopTimer -= dt;
+      return;
+    }
+
     // Movement direction from input
     this.player.moveDirection = this.input.getMovementVector();
     this.player.update(dt);
@@ -255,7 +261,8 @@ class GameEngine {
       dt,
       this.player,
       () => this.triggerLevelUp(),
-      () => this.triggerBossChest()
+      () => this.triggerBossChest(),
+      (dur) => { this.hitStopTimer = dur; }
     );
 
     // Particle & Damage Text Systems
@@ -695,13 +702,15 @@ class GameEngine {
     this.mapSystem.renderLighting(this.ctx, this.camera, this.player);
 
     // Screen-space UI Overlays
+    const hasBoss = this.combatSystem.enemies.some(e => e.isBoss && e.active);
     this.uiManager.renderHUD(
       this.ctx,
       w,
       h,
       this.player,
       this.spawnDirector.elapsedSeconds,
-      this.combatSystem.freezeTimer > 0
+      this.combatSystem.freezeTimer > 0,
+      hasBoss
     );
 
     if (this.state === GameState.LEVEL_UP) {

@@ -116,7 +116,7 @@ export class CombatSystem {
     this.freezeTimer = duration;
   }
 
-  public update(dt: number, player: Player, onLevelUp: () => void, onBossChestOpen: () => void): void {
+  public update(dt: number, player: Player, onLevelUp: () => void, onBossChestOpen: () => void, onHitStop?: (duration: number) => void): void {
     // Screen nuke white flash decay
     if (this.screenNukeFlashTimer > 0) {
       this.screenNukeFlashTimer -= dt;
@@ -267,6 +267,10 @@ export class CombatSystem {
         // Knockback
         const kbDir = enemy.position.clone().sub(proj.position);
         enemy.applyKnockback(kbDir, 200);
+
+        if (isCrit) {
+          this.camera.triggerShake(5);
+        }
 
         if (isDead) {
           if (srcWeapon) srcWeapon.totalKills++;

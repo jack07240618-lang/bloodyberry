@@ -36,7 +36,8 @@ export class UIManager {
     height: number,
     player: Player,
     elapsedSeconds: number,
-    isFrozen: boolean
+    isFrozen: boolean,
+    hasBoss?: boolean
   ): void {
     ctx.save();
 
@@ -156,6 +157,21 @@ export class UIManager {
       ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
       ctx.lineWidth = 10;
       ctx.strokeRect(0, 0, width, height);
+    }
+
+    // Flashing Boss Warning Banner
+    if (hasBoss) {
+      const pulse = (Math.sin(Date.now() * 0.008) + 1) / 2;
+      ctx.fillStyle = `rgba(185, 28, 28, ${0.45 + pulse * 0.4})`;
+      ctx.fillRect(0, 22, width, 26);
+
+      ctx.fillStyle = '#fef08a';
+      ctx.font = '900 13px -apple-system, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = '#000000';
+      ctx.shadowBlur = 6;
+      ctx.fillText('⚠️ WARNING: ELITE OVERLORD DETECTED ⚠️', width / 2, 35);
     }
 
     ctx.restore();
