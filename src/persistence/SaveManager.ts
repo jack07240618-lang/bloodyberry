@@ -62,6 +62,9 @@ export class SaveManager {
     if (this.data.lifetimeKills >= 1000 && !this.data.unlockedCharacters.includes('pasqualina')) {
       this.data.unlockedCharacters.push('pasqualina');
     }
+    if (this.data.lifetimeKills >= 1500 && !this.data.unlockedCharacters.includes('mortaccio')) {
+      this.data.unlockedCharacters.push('mortaccio');
+    }
 
     this.save();
   }

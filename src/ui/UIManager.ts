@@ -201,7 +201,8 @@ export class UIManager {
     width: number,
     height: number,
     options: UpgradeOption[],
-    selectedIdx: number
+    selectedIdx: number,
+    player?: Player
   ): void {
     ctx.save();
 
@@ -215,19 +216,18 @@ export class UIManager {
     ctx.textAlign = 'center';
     ctx.shadowColor = '#d97706';
     ctx.shadowBlur = 18;
-    ctx.fillText('LEVEL UP!', width / 2, height * 0.16);
+    ctx.fillText('LEVEL UP!', width / 2, height * 0.14);
 
     ctx.fillStyle = '#94a3b8';
     ctx.font = '14px -apple-system, sans-serif';
     ctx.shadowBlur = 0;
-    ctx.fillText('Choose an enhancement (Press 1-4 or Click):', width / 2, height * 0.22);
+    ctx.fillText('Choose an enhancement (Press 1-4 or Click):', width / 2, height * 0.19);
 
     // Card dimensions
     const cardWidth = Math.min(460, width - 40);
-    const cardHeight = 82;
-    const cardGap = 16;
-    const totalHeight = options.length * cardHeight + (options.length - 1) * cardGap;
-    const startY = height * 0.28;
+    const cardHeight = 76;
+    const cardGap = 12;
+    const startY = height * 0.23;
 
     for (let i = 0; i < options.length; i++) {
       const opt = options[i];
@@ -236,6 +236,56 @@ export class UIManager {
       const isHovered = (i === selectedIdx) || (i === this.hoveredUpgradeIndex);
 
       this.renderUpgradeCard(ctx, cx, cy, cardWidth, cardHeight, opt, i + 1, isHovered);
+    }
+
+    // Meta Control Buttons (REROLL, SKIP, BANISH)
+    if (player) {
+      const bottomY = startY + options.length * (cardHeight + cardGap) + 16;
+      const btnW = 120;
+      const btnH = 34;
+      const btnGap = 16;
+      const totalBtnW = btnW * 3 + btnGap * 2;
+      const btnStartX = width / 2 - totalBtnW / 2;
+
+      // 1. Reroll Button
+      const rX = btnStartX;
+      ctx.fillStyle = this.hoveredButton === 'reroll' ? '#2563eb' : '#1e293b';
+      ctx.beginPath();
+      ctx.roundRect(rX, bottomY, btnW, btnH, 6);
+      ctx.fill();
+      ctx.strokeStyle = player.rerollsRemaining > 0 ? '#38bdf8' : '#475569';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = player.rerollsRemaining > 0 ? '#ffffff' : '#64748b';
+      ctx.font = 'bold 12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`🎲 REROLL (${player.rerollsRemaining}) [R]`, rX + btnW / 2, bottomY + btnH / 2);
+
+      // 2. Skip Button
+      const sX = btnStartX + btnW + btnGap;
+      ctx.fillStyle = this.hoveredButton === 'skip' ? '#059669' : '#1e293b';
+      ctx.beginPath();
+      ctx.roundRect(sX, bottomY, btnW, btnH, 6);
+      ctx.fill();
+      ctx.strokeStyle = player.skipsRemaining > 0 ? '#34d399' : '#475569';
+      ctx.stroke();
+
+      ctx.fillStyle = player.skipsRemaining > 0 ? '#ffffff' : '#64748b';
+      ctx.fillText(`⏩ SKIP (${player.skipsRemaining}) [S]`, sX + btnW / 2, bottomY + btnH / 2);
+
+      // 3. Banish Button
+      const bX = btnStartX + (btnW + btnGap) * 2;
+      ctx.fillStyle = this.hoveredButton === 'banish' ? '#b91c1c' : '#1e293b';
+      ctx.beginPath();
+      ctx.roundRect(bX, bottomY, btnW, btnH, 6);
+      ctx.fill();
+      ctx.strokeStyle = player.banishesRemaining > 0 ? '#f87171' : '#475569';
+      ctx.stroke();
+
+      ctx.fillStyle = player.banishesRemaining > 0 ? '#ffffff' : '#64748b';
+      ctx.fillText(`🚫 BANISH (${player.banishesRemaining}) [B]`, bX + btnW / 2, bottomY + btnH / 2);
     }
 
     ctx.restore();
@@ -655,6 +705,52 @@ export class UIManager {
     const r = size / 2;
 
     switch (icon) {
+      case 'whip':
+        ctx.strokeStyle = '#92400e';
+        ctx.lineWidth = 3.5;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.7, -r * 0.5);
+        ctx.quadraticCurveTo(0, r * 0.8, r * 0.6, -r * 0.2);
+        ctx.stroke();
+        ctx.fillStyle = '#dc2626';
+        ctx.beginPath();
+        ctx.arc(r * 0.6, -r * 0.2, 3, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+
+      case 'axe':
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(-2, -r * 0.8, 4, r * 1.6);
+        ctx.fillStyle = '#94a3b8';
+        ctx.beginPath();
+        ctx.arc(r * 0.3, -r * 0.3, r * 0.5, -Math.PI / 2, Math.PI / 2);
+        ctx.fill();
+        break;
+
+      case 'fire_wand':
+        ctx.strokeStyle = '#ea580c';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.6, r * 0.6);
+        ctx.lineTo(r * 0.6, -r * 0.6);
+        ctx.stroke();
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.arc(r * 0.6, -r * 0.6, 5, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+
+      case 'runetracer':
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.moveTo(0, -r * 0.7);
+        ctx.lineTo(r * 0.5, 0);
+        ctx.lineTo(0, r * 0.7);
+        ctx.lineTo(-r * 0.5, 0);
+        ctx.closePath();
+        ctx.fill();
+        break;
+
       case 'magic_wand':
         ctx.strokeStyle = '#38bdf8';
         ctx.lineWidth = 3;

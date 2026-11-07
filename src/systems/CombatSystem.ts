@@ -299,6 +299,15 @@ export class CombatSystem {
     this.sound.playEnemyDeath();
     this.particleSystem.emitDeath(enemy.position.x, enemy.position.y, '#64748b', enemy.isBoss ? 30 : 10);
 
+    // Splatter persistent ground blood decal
+    if (enemy.type === EnemyType.SLIME_LARGE || enemy.type === EnemyType.SLIME_MEDIUM || enemy.type === EnemyType.SLIME_SMALL) {
+      this.mapSystem.addBloodDecal(enemy.position.x, enemy.position.y, '#065f46', enemy.radius * 1.1);
+    } else if (enemy.isBoss) {
+      this.mapSystem.addBloodDecal(enemy.position.x, enemy.position.y, '#450a0a', 32);
+    } else {
+      this.mapSystem.addBloodDecal(enemy.position.x, enemy.position.y, '#7f1d1d', enemy.radius);
+    }
+
     // Splitter Slime mechanics
     if (enemy.type === EnemyType.SLIME_LARGE) {
       for (let s = -1; s <= 1; s += 2) {

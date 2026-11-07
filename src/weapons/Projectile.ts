@@ -9,7 +9,11 @@ export enum ProjectileType {
   LIGHTNING_BOLT = 'LIGHTNING_BOLT',
   BOOMERANG = 'BOOMERANG',
   GARLIC_AURA = 'GARLIC_AURA',
-  PENTAGRAM_WIPE = 'PENTAGRAM_WIPE'
+  PENTAGRAM_WIPE = 'PENTAGRAM_WIPE',
+  WHIP_SLASH = 'WHIP_SLASH',
+  ARCBALLISTIC_AXE = 'ARCBALLISTIC_AXE',
+  FIREBALL = 'FIREBALL',
+  RUNETRACER_LASER = 'RUNETRACER_LASER'
 }
 
 export class Projectile extends Entity {
@@ -77,9 +81,16 @@ export class Projectile extends Entity {
     }
 
     // Motion physics
-    if (this.type === 'DIRECT_BOLT' || this.type === 'PIERCING_DAGGER') {
+    if (this.type === 'DIRECT_BOLT' || this.type === 'PIERCING_DAGGER' || this.type === 'FIREBALL') {
       this.position.addScaled(this.velocity, dt);
       this.rotation = this.velocity.angle();
+    } else if (this.type === 'RUNETRACER_LASER') {
+      this.position.addScaled(this.velocity, dt);
+      this.rotation += 10 * dt;
+    } else if (this.type === 'ARCBALLISTIC_AXE') {
+      this.velocity.y += 650 * dt; // gravity
+      this.position.addScaled(this.velocity, dt);
+      this.rotation += 14 * dt;
     } else if (this.type === 'BOOMERANG') {
       if (!this.isReturning) {
         this.position.addScaled(this.velocity, dt);
@@ -209,6 +220,88 @@ export class Projectile extends Entity {
         grad.addColorStop(0, 'rgba(234, 179, 8, 0.05)');
         grad.addColorStop(1, 'rgba(234, 179, 8, 0.25)');
         ctx.fillStyle = grad;
+        ctx.fill();
+        break;
+      }
+
+      case ProjectileType.WHIP_SLASH: {
+        const slashProgress = 1 - (this.lifetime / this.maxLifetime);
+        ctx.globalAlpha = Math.max(0, 1 - slashProgress);
+        ctx.shadowColor = this.glowColor;
+        ctx.shadowBlur = 12;
+
+        ctx.strokeStyle = this.color;
+        ctx.lineWidth = 6;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, this.radius * 1.5, this.radius * 0.5, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      }
+
+      case ProjectileType.ARCBALLISTIC_AXE: {
+        ctx.rotate(this.rotation);
+        ctx.shadowColor = this.glowColor;
+        ctx.shadowBlur = 8;
+
+        // Double headed battle axe / spinning scythe
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(-2, -this.radius, 4, this.radius * 2); // handle
+
+        ctx.fillStyle = this.color;
+        // Blade 1
+        ctx.beginPath();
+        ctx.arc(this.radius * 0.4, -this.radius * 0.4, this.radius * 0.6, -Math.PI / 2, Math.PI / 2);
+        ctx.fill();
+        // Blade 2
+        ctx.beginPath();
+        ctx.arc(-this.radius * 0.4, -this.radius * 0.4, this.radius * 0.6, Math.PI / 2, -Math.PI / 2);
+        ctx.fill();
+        break;
+      }
+
+      case ProjectileType.FIREBALL: {
+        ctx.rotate(this.rotation);
+        ctx.shadowColor = '#ea580c';
+        ctx.shadowBlur = 14;
+
+        const fGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, this.radius);
+        fGrad.addColorStop(0, '#fef08a');
+        fGrad.addColorStop(0.5, '#f97316');
+        fGrad.addColorStop(1, '#dc2626');
+        ctx.fillStyle = fGrad;
+
+        ctx.beginPath();
+        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Flame comet tail
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.moveTo(-this.radius * 0.5, -this.radius * 0.6);
+        ctx.lineTo(-this.radius * 1.8, 0);
+        ctx.lineTo(-this.radius * 0.5, this.radius * 0.6);
+        ctx.closePath();
+        ctx.fill();
+        break;
+      }
+
+      case ProjectileType.RUNETRACER_LASER: {
+        ctx.rotate(this.rotation);
+        ctx.shadowColor = '#38bdf8';
+        ctx.shadowBlur = 10;
+
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -this.radius);
+        ctx.lineTo(this.radius * 0.6, 0);
+        ctx.lineTo(0, this.radius);
+        ctx.lineTo(-this.radius * 0.6, 0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(0, 0, 3, 0, Math.PI * 2);
         ctx.fill();
         break;
       }

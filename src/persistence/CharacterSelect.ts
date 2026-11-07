@@ -14,7 +14,7 @@ export const CHARACTERS: CharacterInfo[] = [
     id: 'antonio',
     name: 'Antonio',
     title: 'The Belpaese Blade',
-    startingWeapon: 'knife',
+    startingWeapon: 'whip',
     traitDescription: '+10% Max HP, +1 Natural Armor',
     unlockRequirement: 'Unlocked by default',
     color: '#3b82f6',
@@ -55,7 +55,7 @@ export const CHARACTERS: CharacterInfo[] = [
     id: 'arca',
     name: 'Arca',
     title: 'The Crimson Warlock',
-    startingWeapon: 'holy_water',
+    startingWeapon: 'fire_wand',
     traitDescription: '-15% Weapon Cooldowns, +15% Area Size',
     unlockRequirement: 'Defeat 500 total lifetime enemies',
     color: '#ef4444',
@@ -69,13 +69,27 @@ export const CHARACTERS: CharacterInfo[] = [
     id: 'pasqualina',
     name: 'Pasqualina',
     title: 'The Storm Weaver',
-    startingWeapon: 'lightning_ring',
-    traitDescription: '+20% Weapon Damage, +15% Crit Chance',
+    startingWeapon: 'runetracer',
+    traitDescription: '+20% Projectile Speed & Ricochet Force',
     unlockRequirement: 'Defeat 1000 total lifetime enemies',
     color: '#f59e0b',
     applyTraits: (player) => {
       player.damageMult *= 1.2;
       player.critChance += 0.15;
+      player.recalculateStats();
+    }
+  },
+  {
+    id: 'mortaccio',
+    name: 'Mortaccio',
+    title: 'The Risen Scythe',
+    startingWeapon: 'axe',
+    traitDescription: '+1 Additional Projectile & +20% Damage',
+    unlockRequirement: 'Defeat 1500 total lifetime enemies',
+    color: '#64748b',
+    applyTraits: (player) => {
+      player.projectileCountBonus += 1;
+      player.damageMult *= 1.2;
       player.recalculateStats();
     }
   }

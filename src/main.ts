@@ -168,6 +168,7 @@ class GameEngine {
     this.spawnDirector = new SpawnDirector(this.combatSystem);
 
     this.camera.position.set(0, 0);
+    this.sound.playBGM('BATTLE');
     this.state = GameState.PLAYING;
   }
 
@@ -198,6 +199,7 @@ class GameEngine {
 
       case GameState.GAME_OVER:
         if (this.input.wasKeyPressed('Enter') || this.input.wasKeyPressed('Space')) {
+          this.sound.playBGM('TITLE');
           this.state = GameState.CHARACTER_SELECT;
         }
         break;
@@ -224,9 +226,18 @@ class GameEngine {
 
     if (this.player.isDead) {
       this.state = GameState.GAME_OVER;
+      this.sound.stopBGM();
       this.sound.playGameOver();
       this.saveManager.recordRun(this.player.timeSurvived, this.player.kills, this.player.gold);
       return;
+    }
+
+    // Dynamic Boss BGM switch
+    const hasBoss = this.combatSystem.enemies.some(e => e.isBoss && e.active);
+    if (hasBoss) {
+      this.sound.playBGM('BOSS');
+    } else {
+      this.sound.playBGM('BATTLE');
     }
 
     // Camera follow player with smooth interpolation
@@ -234,7 +245,7 @@ class GameEngine {
     this.camera.update(dt);
 
     // Map & Destructibles
-    this.mapSystem.update(this.player.position);
+    this.mapSystem.update(this.player.position, dt);
 
     // Spawn director
     this.spawnDirector.update(dt, this.player);
@@ -264,6 +275,7 @@ class GameEngine {
 
     // 1. Existing weapon upgrades
     for (const w of this.player.weapons) {
+      if (this.player.banishedItemIds.has(w.id)) continue;
       if (w.level < w.maxLevel) {
         pool.push({
           type: 'WEAPON',
@@ -279,6 +291,7 @@ class GameEngine {
     // 2. New weapons (if slots available)
     if (this.player.weapons.length < this.player.maxWeaponSlots) {
       for (const [id, def] of Object.entries(ALL_WEAPON_DEFINITIONS)) {
+        if (this.player.banishedItemIds.has(id)) continue;
         if (!this.player.getWeapon(id)) {
           pool.push({
             type: 'WEAPON',
@@ -294,6 +307,7 @@ class GameEngine {
 
     // 3. Existing passives upgrades
     for (const [id, lvl] of this.player.passives.entries()) {
+      if (this.player.banishedItemIds.has(id)) continue;
       const def = PASSIVE_DEFINITIONS[id];
       if (def && lvl < def.maxLevel) {
         pool.push({
@@ -310,6 +324,7 @@ class GameEngine {
     // 4. New passives (if slots available)
     if (this.player.passives.size < this.player.maxPassiveSlots) {
       for (const [id, def] of Object.entries(PASSIVE_DEFINITIONS)) {
+        if (this.player.banishedItemIds.has(id)) continue;
         if (!this.player.hasPassive(id)) {
           pool.push({
             type: 'PASSIVE',
@@ -351,6 +366,32 @@ class GameEngine {
   }
 
   private updateLevelUpInput(): void {
+    if (this.input.wasKeyPressed('KeyR') && this.player.rerollsRemaining > 0) {
+      this.player.rerollsRemaining--;
+      this.sound.playShoot('wand');
+      this.levelUpOptions = this.generateUpgradeOptions();
+      this.selectedUpgradeIdx = 0;
+      return;
+    }
+
+    if (this.input.wasKeyPressed('KeyS') && this.player.skipsRemaining > 0) {
+      this.player.skipsRemaining--;
+      this.player.gainXp(35);
+      this.sound.playGemPickup();
+      this.state = GameState.PLAYING;
+      return;
+    }
+
+    if (this.input.wasKeyPressed('KeyB') && this.player.banishesRemaining > 0 && this.levelUpOptions[this.selectedUpgradeIdx]) {
+      const opt = this.levelUpOptions[this.selectedUpgradeIdx];
+      this.player.banishesRemaining--;
+      this.player.banishedItemIds.add(opt.id);
+      this.sound.playExplosion(0.2, 500);
+      this.levelUpOptions = this.generateUpgradeOptions();
+      this.selectedUpgradeIdx = 0;
+      return;
+    }
+
     if (this.input.wasKeyPressed('Digit1') && this.levelUpOptions[0]) {
       this.selectUpgrade(0);
     } else if (this.input.wasKeyPressed('Digit2') && this.levelUpOptions[1]) {
@@ -359,9 +400,9 @@ class GameEngine {
       this.selectUpgrade(2);
     } else if (this.input.wasKeyPressed('Digit4') && this.levelUpOptions[3]) {
       this.selectUpgrade(3);
-    } else if (this.input.wasKeyPressed('ArrowDown') || this.input.wasKeyPressed('KeyS')) {
+    } else if (this.input.wasKeyPressed('ArrowDown')) {
       this.selectedUpgradeIdx = (this.selectedUpgradeIdx + 1) % this.levelUpOptions.length;
-    } else if (this.input.wasKeyPressed('ArrowUp') || this.input.wasKeyPressed('KeyW')) {
+    } else if (this.input.wasKeyPressed('ArrowUp')) {
       this.selectedUpgradeIdx = (this.selectedUpgradeIdx - 1 + this.levelUpOptions.length) % this.levelUpOptions.length;
     } else if (this.input.wasKeyPressed('Enter') || this.input.wasKeyPressed('Space')) {
       this.selectUpgrade(this.selectedUpgradeIdx);
@@ -444,23 +485,67 @@ class GameEngine {
   // --- Mouse / Touch Interactivity ---
   private updateLevelUpHover(mx: number, my: number): void {
     const cardWidth = Math.min(460, this.camera.viewportWidth - 40);
-    const cardHeight = 82;
-    const cardGap = 16;
-    const startY = this.camera.viewportHeight * 0.28;
+    const cardHeight = 76;
+    const cardGap = 12;
+    const startY = this.camera.viewportHeight * 0.23;
     const cx = this.camera.viewportWidth / 2 - cardWidth / 2;
 
     this.uiManager.hoveredUpgradeIndex = -1;
+    this.uiManager.hoveredButton = null;
+
     for (let i = 0; i < this.levelUpOptions.length; i++) {
       const cy = startY + i * (cardHeight + cardGap);
       if (mx >= cx && mx <= cx + cardWidth && my >= cy && my <= cy + cardHeight) {
         this.uiManager.hoveredUpgradeIndex = i;
         this.selectedUpgradeIdx = i;
-        break;
+        return;
+      }
+    }
+
+    // Check bottom action buttons (Reroll, Skip, Banish)
+    const bottomY = startY + this.levelUpOptions.length * (cardHeight + cardGap) + 16;
+    const btnW = 120;
+    const btnH = 34;
+    const btnGap = 16;
+    const totalBtnW = btnW * 3 + btnGap * 2;
+    const btnStartX = this.camera.viewportWidth / 2 - totalBtnW / 2;
+
+    if (my >= bottomY && my <= bottomY + btnH) {
+      if (mx >= btnStartX && mx <= btnStartX + btnW) {
+        this.uiManager.hoveredButton = 'reroll';
+      } else if (mx >= btnStartX + btnW + btnGap && mx <= btnStartX + btnW * 2 + btnGap) {
+        this.uiManager.hoveredButton = 'skip';
+      } else if (mx >= btnStartX + (btnW + btnGap) * 2 && mx <= btnStartX + (btnW + btnGap) * 2 + btnW) {
+        this.uiManager.hoveredButton = 'banish';
       }
     }
   }
 
   private handleLevelUpClick(mx: number, my: number): void {
+    if (this.uiManager.hoveredButton === 'reroll' && this.player.rerollsRemaining > 0) {
+      this.player.rerollsRemaining--;
+      this.sound.playShoot('wand');
+      this.levelUpOptions = this.generateUpgradeOptions();
+      this.selectedUpgradeIdx = 0;
+      return;
+    }
+    if (this.uiManager.hoveredButton === 'skip' && this.player.skipsRemaining > 0) {
+      this.player.skipsRemaining--;
+      this.player.gainXp(35);
+      this.sound.playGemPickup();
+      this.state = GameState.PLAYING;
+      return;
+    }
+    if (this.uiManager.hoveredButton === 'banish' && this.player.banishesRemaining > 0 && this.levelUpOptions[this.selectedUpgradeIdx]) {
+      const opt = this.levelUpOptions[this.selectedUpgradeIdx];
+      this.player.banishesRemaining--;
+      this.player.banishedItemIds.add(opt.id);
+      this.sound.playExplosion(0.2, 500);
+      this.levelUpOptions = this.generateUpgradeOptions();
+      this.selectedUpgradeIdx = 0;
+      return;
+    }
+
     if (this.uiManager.hoveredUpgradeIndex >= 0) {
       this.selectUpgrade(this.uiManager.hoveredUpgradeIndex);
     }
@@ -525,6 +610,7 @@ class GameEngine {
 
   private handleGameOverClick(mx: number, my: number): void {
     if (this.uiManager.hoveredButton === 'restart') {
+      this.sound.playBGM('TITLE');
       this.state = GameState.CHARACTER_SELECT;
     }
   }
@@ -605,6 +691,9 @@ class GameEngine {
 
     this.camera.restoreTransform(this.ctx);
 
+    // Dynamic Darkness Vignette & Torch Illumination
+    this.mapSystem.renderLighting(this.ctx, this.camera, this.player);
+
     // Screen-space UI Overlays
     this.uiManager.renderHUD(
       this.ctx,
@@ -621,7 +710,8 @@ class GameEngine {
         w,
         h,
         this.levelUpOptions,
-        this.selectedUpgradeIdx
+        this.selectedUpgradeIdx,
+        this.player
       );
     } else if (this.state === GameState.CHEST_REWARD) {
       this.uiManager.renderBossChestModal(

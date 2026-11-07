@@ -7,6 +7,10 @@ import { ChainLightning } from './implementations/ChainLightning';
 import { CrossBoomerang } from './implementations/CrossBoomerang';
 import { GarlicAura } from './implementations/GarlicAura';
 import { Pentagram } from './implementations/Pentagram';
+import { Whip } from './implementations/Whip';
+import { Axe } from './implementations/Axe';
+import { FireWand } from './implementations/FireWand';
+import { Runetracer } from './implementations/Runetracer';
 
 export interface WeaponDefinition {
   id: string;
@@ -18,6 +22,14 @@ export interface WeaponDefinition {
 }
 
 export const ALL_WEAPON_DEFINITIONS: Record<string, WeaponDefinition> = {
+  whip: {
+    id: 'whip',
+    name: 'Whip',
+    description: 'Strikes horizontally in front and behind.',
+    evolutionPassive: 'hollow_heart',
+    evolvedName: 'Bloody Tear',
+    create: () => new Whip()
+  },
   magic_wand: {
     id: 'magic_wand',
     name: 'Magic Wand',
@@ -33,6 +45,30 @@ export const ALL_WEAPON_DEFINITIONS: Record<string, WeaponDefinition> = {
     evolutionPassive: 'wings',
     evolvedName: 'Thousand Edge',
     create: () => new PiercingDagger()
+  },
+  axe: {
+    id: 'axe',
+    name: 'Axe',
+    description: 'Hurls axes in a high arc dealing heavy damage.',
+    evolutionPassive: 'spinach',
+    evolvedName: 'Death Spiral',
+    create: () => new Axe()
+  },
+  fire_wand: {
+    id: 'fire_wand',
+    name: 'Fire Wand',
+    description: 'Launches heavy fireballs dealing catastrophic damage.',
+    evolutionPassive: 'spinach',
+    evolvedName: 'Hellfire',
+    create: () => new FireWand()
+  },
+  runetracer: {
+    id: 'runetracer',
+    name: 'Runetracer',
+    description: 'Emits piercing lasers that ricochet off screen boundaries.',
+    evolutionPassive: 'armor',
+    evolvedName: 'NO FUTURE',
+    create: () => new Runetracer()
   },
   spinning_orbs: {
     id: 'spinning_orbs',

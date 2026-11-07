@@ -33,11 +33,17 @@ export class Player extends Entity {
   public totalDamageDealt = 0;
   public timeSurvived = 0;
 
-  // Equipment slots
+  // Inventory & Slots
   public readonly maxWeaponSlots = 6;
   public readonly maxPassiveSlots = 6;
   public weapons: Weapon[] = [];
   public passives: Map<string, number> = new Map(); // passiveId -> level (1-5)
+
+  // Meta Level-Up Manipulations
+  public rerollsRemaining = 2;
+  public skipsRemaining = 1;
+  public banishesRemaining = 2;
+  public banishedItemIds: Set<string> = new Set();
 
   // Combat status & feedback
   public iFrameDuration = 0.45;
