@@ -54,6 +54,7 @@ export class MapSystem {
   private readonly tileSize = 64;
   private bloodDecals: BloodDecal[] = [];
   private biomeAtlases: HTMLCanvasElement[][] = [];
+  private bossEclipseFactor = 0;
 
   constructor() {
     this.buildTileAtlas();
@@ -537,53 +538,66 @@ export class MapSystem {
     door.pulseTimer += 0.05;
 
     // 1. Ground Shadow & Stone Threshold Steps
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+    // 1. Deep Ground Ambient Occlusion & 3D Beveled Stone Plinth
+    const aoGrad = ctx.createRadialGradient(0, 18, 4, 0, 18, 46);
+    aoGrad.addColorStop(0, 'rgba(0, 0, 0, 0.88)');
+    aoGrad.addColorStop(0.65, 'rgba(0, 0, 0, 0.45)');
+    aoGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = aoGrad;
     ctx.beginPath();
-    ctx.ellipse(0, 20, 34, 11, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 18, 46, 16, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(-28, 14, 56, 5);
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(-25, 11, 50, 4);
+    ctx.fillStyle = '#09080f';
+    ctx.fillRect(-30, 13, 60, 7);
+    ctx.fillStyle = '#181526';
+    ctx.fillRect(-29, 13, 58, 5);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+    ctx.fillRect(-29, 13, 58, 1.5);
 
-    // 2. Mysterious Swirl Portal Glow (Uniform neutral silver-arcane mist — never reveals room type!)
+    // 2. Volumetric Portal Spill Glow
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const glowR = 44 + Math.sin(door.pulseTimer * 2) * 4;
-    const pGrad = ctx.createRadialGradient(0, -10, 4, 0, -10, glowR);
-    pGrad.addColorStop(0, 'rgba(241, 245, 249, 0.85)');
-    pGrad.addColorStop(0.45, 'rgba(148, 163, 184, 0.35)');
+    const glowR = 52 + Math.sin(door.pulseTimer * 2) * 5;
+    const pGrad = ctx.createRadialGradient(0, -8, 3, 0, -8, glowR);
+    pGrad.addColorStop(0, 'rgba(233, 213, 255, 0.72)');
+    pGrad.addColorStop(0.45, 'rgba(139, 92, 246, 0.32)');
     pGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = pGrad;
     ctx.beginPath();
-    ctx.arc(0, -10, glowR, 0, Math.PI * 2);
+    ctx.arc(0, -8, glowR, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    // 3. Heavy Carved Gothic Cathedral Stone Archway Frame & Keystone
-    ctx.fillStyle = '#141122';
+    // 3. 3D Shaded Stone Archway Pylons & Voussoirs (No thin sketch strokes)
+    const archGrad = ctx.createLinearGradient(-32, -48, 32, 16);
+    archGrad.addColorStop(0, '#2a243d');
+    archGrad.addColorStop(0.5, '#171424');
+    archGrad.addColorStop(1, '#090710');
+    ctx.fillStyle = archGrad;
     ctx.beginPath();
-    ctx.moveTo(-30, 15);
-    ctx.lineTo(-30, -20);
-    ctx.arc(0, -20, 30, Math.PI, 0);
-    ctx.lineTo(30, 15);
+    ctx.moveTo(-32, 15);
+    ctx.lineTo(-32, -20);
+    ctx.arc(0, -20, 32, Math.PI, 0);
+    ctx.lineTo(32, 15);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = '#d97706';
-    ctx.lineWidth = 2;
-    ctx.stroke();
 
-    // Twin Carved Gothic Columns & Runic Inscriptions
-    ctx.fillStyle = '#1e1b36';
-    ctx.fillRect(-32, -20, 8, 35);
-    ctx.fillRect(24, -20, 8, 35);
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 1.2;
-    ctx.strokeRect(-32, -20, 8, 35);
-    ctx.strokeRect(24, -20, 8, 35);
+    // Stone Pylon Relief Blocks
+    for (const side of [-1, 1]) {
+      const bx = side < 0 ? -34 : 24;
+      for (let row = 0; row < 4; row++) {
+        const by = -20 + row * 8.5;
+        ctx.fillStyle = row % 2 === 0 ? '#1e1a2e' : '#151221';
+        ctx.fillRect(bx, by, 10, 8);
+        ctx.fillStyle = '#332d4d';
+        ctx.fillRect(bx, by, 10, 1.5);
+        ctx.fillStyle = '#08060e';
+        ctx.fillRect(bx, by + 6.5, 10, 1.5);
+      }
+    }
 
-    // 4. Inner Dimensional Rift & Swirling Arcane Astrolabe Vortex (深渊星界裂隙与多重符文漩涡)
+    // 4. Inner Volumetric Dimensional Singularity & Swirling Plasma Clouds
     ctx.save();
     ctx.beginPath();
     ctx.moveTo(-22, 13);
@@ -591,63 +605,55 @@ export class MapSystem {
     ctx.arc(0, -18, 22, Math.PI, 0);
     ctx.lineTo(22, 13);
     ctx.closePath();
-    ctx.fillStyle = '#05030c';
+    ctx.fillStyle = '#020107';
     ctx.fill();
     ctx.clip();
 
     ctx.globalCompositeOperation = 'lighter';
-    const vortexGrad = ctx.createRadialGradient(0, -6, 2, 0, -6, 28);
-    vortexGrad.addColorStop(0, '#ffffff');
-    vortexGrad.addColorStop(0.35, 'rgba(196, 181, 253, 0.88)');
-    vortexGrad.addColorStop(0.7, 'rgba(109, 40, 217, 0.48)');
-    vortexGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = vortexGrad;
-    ctx.beginPath();
-    ctx.arc(0, -6, 28, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 4 Logarithmic Spiral Dimensional Tendrils
-    for (let s = 0; s < 4; s++) {
-      const baseAng = door.pulseTimer * 1.8 + (s * Math.PI) / 2;
-      ctx.strokeStyle = s % 2 === 0 ? 'rgba(221, 214, 254, 0.75)' : 'rgba(251, 191, 36, 0.65)';
-      ctx.lineWidth = 1.8;
+    for (let c = 0; c < 6; c++) {
+      const ang = door.pulseTimer * 1.4 + (c * Math.PI) / 3;
+      const cx = Math.cos(ang) * 9;
+      const cy = -8 + Math.sin(ang) * 11;
+      const cGrad = ctx.createRadialGradient(cx, cy, 1, cx, cy, 20);
+      cGrad.addColorStop(0, c % 2 === 0 ? 'rgba(221, 214, 254, 0.55)' : 'rgba(251, 191, 36, 0.42)');
+      cGrad.addColorStop(0.55, c % 2 === 0 ? 'rgba(124, 58, 237, 0.28)' : 'rgba(185, 28, 28, 0.22)');
+      cGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = cGrad;
       ctx.beginPath();
-      for (let t = 0; t <= 1; t += 0.1) {
-        const rad = t * 22;
-        const a = baseAng + t * 2.4;
-        const px = Math.cos(a) * rad;
-        const py = -6 + Math.sin(a) * rad * 1.15;
-        if (t === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
-      ctx.stroke();
+      ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+      ctx.fill();
     }
 
-    // Converging Dimensional Motes
-    for (let m = 0; m < 6; m++) {
-      const mProg = ((door.pulseTimer * 0.9 + m * 0.17) % 1);
-      const mRad = (1 - mProg) * 22;
-      const mAng = -door.pulseTimer * 2.2 + m * 1.05;
-      ctx.fillStyle = '#ffffff';
-      ctx.globalAlpha = mProg * 0.9;
+    // Event Horizon Core
+    ctx.globalCompositeOperation = 'source-over';
+    const voidCore = ctx.createRadialGradient(0, -8, 1, 0, -8, 11);
+    voidCore.addColorStop(0, '#010004');
+    voidCore.addColorStop(0.65, 'rgba(4, 2, 12, 0.85)');
+    voidCore.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = voidCore;
+    ctx.beginPath();
+    ctx.arc(0, -8, 11, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Volumetric Rising Energy Motes
+    ctx.globalCompositeOperation = 'lighter';
+    for (let m = 0; m < 8; m++) {
+      const mProg = (door.pulseTimer * 0.75 + m * 0.125) % 1;
+      const mRad = (1 - mProg) * 20;
+      const mAng = -door.pulseTimer * 1.9 + m * 0.9;
+      const mx = Math.cos(mAng) * mRad;
+      const my = -8 + Math.sin(mAng) * mRad * 1.15;
+      const mGlow = ctx.createRadialGradient(mx, my, 0.2, mx, my, 4.5);
+      mGlow.addColorStop(0, '#ffffff');
+      mGlow.addColorStop(0.45, m % 2 === 0 ? '#e9d5ff' : '#fde047');
+      mGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = mGlow;
+      ctx.globalAlpha = Math.sin(mProg * Math.PI) * 0.95;
       ctx.beginPath();
-      ctx.arc(Math.cos(mAng) * mRad, -6 + Math.sin(mAng) * mRad, 1.5, 0, Math.PI * 2);
+      ctx.arc(mx, my, 4.5, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
-
-    // Top Keystone Block & Winged Crest
-    ctx.fillStyle = '#f59e0b';
-    ctx.beginPath();
-    ctx.moveTo(0, -54);
-    ctx.lineTo(8, -45);
-    ctx.lineTo(0, -38);
-    ctx.lineTo(-8, -45);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#fef08a';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
 
     ctx.restore();
   }
@@ -783,25 +789,60 @@ export class MapSystem {
 
     ctx.save();
 
-    // 1. Multi-Stop Layered Atmospheric Darkness Vignette Centered on Player
+    // Check if any Boss is active or spawning to drive oppressive dynamic eclipse lighting & shadow
+    let activeBossCount = 0;
+    let anyBossEnraged = false;
+    if (combatSystem) {
+      for (const e of combatSystem.enemies) {
+        if (e.active && e.isBoss) {
+          activeBossCount++;
+          if (e.bossPhase === 2) anyBossEnraged = true;
+        }
+      }
+    }
+    const targetEclipse = activeBossCount > 0 ? Math.min(1.25, 0.85 + (activeBossCount - 1) * 0.2) : 0;
+    this.bossEclipseFactor += (targetEclipse - this.bossEclipseFactor) * 0.06;
+    const eclipse = Math.max(0, Math.min(1.25, this.bossEclipseFactor));
+
+    // 1. Multi-Stop Layered Atmospheric Darkness Vignette Centered on Player (Deepens dramatically during Boss Eclipse!)
     const playerScreenX = player.position.x - camera.position.x + halfW;
     const playerScreenY = player.position.y - camera.position.y + halfH;
 
+    const innerClearR = Math.max(58, 85 - eclipse * 22);
+    const outerDarkR = Math.max(w, h) * (0.74 - eclipse * 0.10);
     const vignette = ctx.createRadialGradient(
       playerScreenX,
       playerScreenY,
-      85,
+      innerClearR,
       playerScreenX,
       playerScreenY,
-      Math.max(w, h) * 0.74
+      outerDarkR
     );
     vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vignette.addColorStop(0.38, 'rgba(8, 6, 20, 0.22)');
-    vignette.addColorStop(0.70, 'rgba(5, 3, 14, 0.54)');
-    vignette.addColorStop(1, 'rgba(2, 1, 6, 0.84)');
+    vignette.addColorStop(0.36, `rgba(7, 4, 18, ${(0.22 + eclipse * 0.22).toFixed(3)})`);
+    vignette.addColorStop(0.68, `rgba(4, 2, 12, ${(0.54 + eclipse * 0.24).toFixed(3)})`);
+    vignette.addColorStop(1, `rgba(1, 0, 5, ${Math.min(0.96, 0.84 + eclipse * 0.11).toFixed(3)})`);
 
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, w, h);
+
+    // 1b. Boss Abyssal Peripheral Shadow Rings (Darkens the room around each Boss before the additive light pass)
+    if (combatSystem && eclipse > 0.02) {
+      for (const enemy of combatSystem.enemies) {
+        if (!enemy.active || !enemy.isBoss || !camera.isVisible(enemy.position, 280)) continue;
+        const bsx = enemy.position.x - camera.position.x + halfW;
+        const bsy = enemy.position.y - camera.position.y + halfH;
+        const shadowRing = ctx.createRadialGradient(bsx, bsy, 42, bsx, bsy, 240);
+        shadowRing.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        shadowRing.addColorStop(0.55, 'rgba(2, 1, 7, 0.42)');
+        shadowRing.addColorStop(0.85, 'rgba(2, 1, 7, 0.22)');
+        shadowRing.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = shadowRing;
+        ctx.beginPath();
+        ctx.arc(bsx, bsy, 240, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
 
     // 2. Additive Multi-Layered Dynamic Point Lights ('lighter')
     ctx.globalCompositeOperation = 'lighter';
@@ -825,6 +866,32 @@ export class MapSystem {
     ctx.arc(playerScreenX, playerScreenY, 95, 0, Math.PI * 2);
     ctx.fill();
 
+    // 2a-ii. North Sanctuary Portal Volumetric Point Light (Casts atmospheric glow onto the north wall & floor)
+    const portalWorldPos = new Vector2(0, -372);
+    if (camera.isVisible(portalWorldPos, 240)) {
+      const psx = portalWorldPos.x - camera.position.x + halfW;
+      const psy = portalWorldPos.y - camera.position.y + halfH;
+      const isRoomLocked = combatSystem && combatSystem.enemies.some(e => e.active);
+      const timeNow = performance.now() * 0.001;
+      const pPulse = 0.88 + Math.sin(timeNow * 3.2) * 0.12;
+      const pRad = (isRoomLocked ? 145 : 215) * pPulse;
+      const portalLight = ctx.createRadialGradient(psx, psy, 6, psx, psy + 18, pRad);
+      if (isRoomLocked) {
+        portalLight.addColorStop(0, 'rgba(248, 113, 113, 0.24)');
+        portalLight.addColorStop(0.45, 'rgba(185, 28, 28, 0.12)');
+        portalLight.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      } else {
+        portalLight.addColorStop(0, 'rgba(243, 232, 255, 0.34)');
+        portalLight.addColorStop(0.38, 'rgba(168, 85, 247, 0.18)');
+        portalLight.addColorStop(0.72, 'rgba(251, 191, 36, 0.08)');
+        portalLight.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      }
+      ctx.fillStyle = portalLight;
+      ctx.beginPath();
+      ctx.arc(psx, psy + 18, pRad, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // 2b. Flickering Torch Brazier Volumetric Point Lights (Core + Atmospheric Scatter)
     for (const d of this.destructibles) {
       if (!d.active || !camera.isVisible(d.position, 160)) continue;
@@ -843,7 +910,7 @@ export class MapSystem {
       ctx.fill();
     }
 
-    // 2c. Dynamic Projectile & Boss Point Lights
+    // 2c. Dynamic Projectile & Boss Volumetric Lighting & God-Ray Spotlights
     if (combatSystem) {
       // Limit to up to 24 active projectiles on screen for locked 60 FPS
       let lightCount = 0;
@@ -869,19 +936,52 @@ export class MapSystem {
         ctx.restore();
       }
 
-      // Boss Crimson Hellfire Point Light
+      // Boss Volumetric Rim-Light, Variant Hellfire Pool & Overhead Eclipse Spotlight Shaft
+      const bossPalettes = [
+        { core: 'rgba(254, 202, 202, 0.36)', mid: 'rgba(220, 38, 38, 0.22)', outer: 'rgba(127, 29, 29, 0.08)' },
+        { core: 'rgba(233, 213, 255, 0.36)', mid: 'rgba(147, 51, 234, 0.22)', outer: 'rgba(88, 28, 135, 0.08)' },
+        { core: 'rgba(254, 240, 138, 0.34)', mid: 'rgba(234, 88, 12, 0.20)', outer: 'rgba(154, 52, 18, 0.08)' },
+        { core: 'rgba(167, 243, 208, 0.34)', mid: 'rgba(16, 185, 129, 0.20)', outer: 'rgba(6, 95, 70, 0.08)' }
+      ];
+
       for (const enemy of combatSystem.enemies) {
-        if (!enemy.active || !enemy.isBoss || !camera.isVisible(enemy.position, 180)) continue;
+        if (!enemy.active || !enemy.isBoss || !camera.isVisible(enemy.position, 260)) continue;
         const sx = enemy.position.x - camera.position.x + halfW;
         const sy = enemy.position.y - camera.position.y + halfH;
-        const bGlow = ctx.createRadialGradient(sx, sy, 8, sx, sy, 160);
-        bGlow.addColorStop(0, 'rgba(239, 68, 68, 0.28)');
-        bGlow.addColorStop(0.6, 'rgba(153, 27, 27, 0.10)');
+        const pal = bossPalettes[enemy.bossVariant % bossPalettes.length];
+        const isP2 = enemy.bossPhase === 2 || anyBossEnraged;
+        const pulse = 0.88 + Math.sin(enemy.animTimer * 3.6) * 0.12;
+        const lightR = (isP2 ? 235 : 195) * pulse;
+
+        // 1. Wide Volumetric Boss Light Pool
+        const bGlow = ctx.createRadialGradient(sx, sy, 6, sx, sy, lightR);
+        bGlow.addColorStop(0, isP2 ? 'rgba(254, 240, 138, 0.42)' : pal.core);
+        bGlow.addColorStop(0.38, isP2 ? 'rgba(239, 68, 68, 0.26)' : pal.mid);
+        bGlow.addColorStop(0.75, pal.outer);
         bGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = bGlow;
         ctx.beginPath();
-        ctx.arc(sx, sy, 160, 0, Math.PI * 2);
+        ctx.arc(sx, sy, lightR, 0, Math.PI * 2);
         ctx.fill();
+
+        // 2. Angled Overhead Eclipse Spotlight Shaft descending onto each Boss
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(-0.22);
+        const shaftGrad = ctx.createLinearGradient(0, -280, 0, 45);
+        shaftGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        shaftGrad.addColorStop(0.55, isP2 ? 'rgba(251, 191, 36, 0.09)' : 'rgba(220, 38, 38, 0.07)');
+        shaftGrad.addColorStop(0.88, isP2 ? 'rgba(239, 68, 68, 0.16)' : pal.mid);
+        shaftGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = shaftGrad;
+        ctx.beginPath();
+        ctx.moveTo(-24, -280);
+        ctx.lineTo(24, -280);
+        ctx.lineTo(68, 45);
+        ctx.lineTo(-68, 45);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
       }
     }
 

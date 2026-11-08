@@ -9,7 +9,7 @@ import { SaveManager } from '../persistence/SaveManager';
 import { SpriteRenderer } from '../renderer/SpriteRenderer';
 import { SkillTag, TAG_METADATA } from '../systems/BuildSystem';
 import { CompanionSystem } from '../systems/CompanionSystem';
-import { i18n, t, getCharacterText, getWeaponDisplayName, getBossText } from '../core/I18n';
+import { i18n, t, getCharacterText, getWeaponDisplayName } from '../core/I18n';
 
 export interface UpgradeOption {
   type: 'WEAPON' | 'PASSIVE' | 'EVOLUTION';
@@ -406,421 +406,39 @@ export class UIManager {
     // 5. Bottom-Center Minimalist 3D Beveled Skill Medallions
     this.renderActiveSkillsBar(ctx, width, height, player, companionSystem);
 
-    // 6. Top-Center Screen-Space Boss Exclusive HUD (3D Obsidian-Gold Gauge & Phase 2 Lava Enrage)
-    if (this.bossHudSlide > 0.005) {
-      this.renderScreenSpaceBossHUD(ctx, width, activeBoss || null);
-    }
-
-    // 7. Full-Screen Crimson Boss Encounter Warning Banner & Vignette Pulse
+    // 6. Pure Optical Eclipse Vignette Pulse on Boss Arrival (No intrusive big text or oversized HUD bars)
     if (this.bossWarningTimer > 0) {
-      this.renderBossWarningBanner(ctx, width, height);
+      this.renderBossEclipseLightingPulse(ctx, width, height);
     }
 
     ctx.restore();
   }
 
   /**
-   * 屏幕正上方（Screen-Space HUD）全屏级 Boss 专属血条与尊号头衔
+   * Boss 降临瞬间的纯光影深渊蚀变暗角（无任何大字横幅或冗余 UI，纯粹依靠光影呼吸营造压迫感）
    */
-  private renderScreenSpaceBossHUD(ctx: CanvasRenderingContext2D, width: number, activeBoss: Enemy | null): void {
-    const slideEase = 1 - Math.pow(1 - this.bossHudSlide, 3);
-    const yOffset = (1 - slideEase) * -86;
-    const isShattering = this.bossSlainShatterTimer > 0 && !activeBoss;
-    const shatterProg = isShattering ? 1 - this.bossSlainShatterTimer / 0.95 : 0;
-    const alpha = isShattering ? Math.max(0, 1 - Math.pow(shatterProg, 1.4)) : slideEase;
-
-    const isEnraged = this.lastKnownBossPhase === 2 || this.lastKnownBossHpRatio <= 0.5;
-    const isHitFlashing = activeBoss ? activeBoss.hitFlashTimer > 0 : false;
-    const timeSec = performance.now() * 0.001;
-
-    // 高频狂暴震颤 + 受击钝重抖动
-    const enrageTremorX = isEnraged && !isShattering ? Math.sin(timeSec * 46) * 1.15 : 0;
-    const enrageTremorY = isEnraged && !isShattering ? Math.cos(timeSec * 52) * 0.85 : 0;
-    const hitShakeX = isHitFlashing ? (Math.random() - 0.5) * 4.5 : 0;
-    const hitShakeY = isHitFlashing ? (Math.random() - 0.5) * 3.2 : 0;
-
-    const barW = Math.min(460, Math.max(420, width * 0.36));
-    const barH = 16;
-    const cx = width / 2 + enrageTremorX + hitShakeX;
-    const barX = cx - barW / 2;
-    const barY = 98 + yOffset + enrageTremorY + hitShakeY;
-
-    ctx.save();
-    ctx.globalAlpha = alpha;
-
-    // 1. 顶部暗黑渐变氛围背板衬底 (Subtle Obsidian Header Backdrop)
-    const backGrad = ctx.createRadialGradient(cx, barY - 12, 10, cx, barY - 8, barW * 0.68);
-    backGrad.addColorStop(0, isEnraged ? 'rgba(69, 10, 10, 0.72)' : 'rgba(9, 13, 22, 0.76)');
-    backGrad.addColorStop(0.65, 'rgba(9, 13, 22, 0.38)');
-    backGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = backGrad;
-    ctx.fillRect(cx - barW * 0.7, barY - 52, barW * 1.4, 88);
-
-    // 2. Boss 专属名号与副标题（现代无衬线/大写字阶 + 暗金/绯红微光渐变）
-    const bossText = getBossText(this.lastKnownBossVariant);
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    // 主名号微光渐变
-    const titleGrad = ctx.createLinearGradient(cx - 140, barY - 38, cx + 140, barY - 22);
-    if (isEnraged) {
-      titleGrad.addColorStop(0, '#fde047');
-      titleGrad.addColorStop(0.5, '#ffffff');
-      titleGrad.addColorStop(1, '#f97316');
-    } else {
-      titleGrad.addColorStop(0, '#f8fafc');
-      titleGrad.addColorStop(0.5, '#fde68a');
-      titleGrad.addColorStop(1, '#fca5a5');
-    }
-    ctx.font = `700 15px ${UI_FONT}`;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.fillText(bossText.name, cx + 1, barY - 30);
-    ctx.fillStyle = titleGrad;
-    ctx.fillText(bossText.name, cx, barY - 31);
-
-    // 副标题与装饰细线
-    ctx.font = `600 10px ${UI_FONT}`;
-    ctx.fillStyle = isEnraged ? '#fb923c' : '#94a3b8';
-    const subLabel = isEnraged
-      ? `${bossText.title}  ·  ${t('二阶段 · 狂暴觉醒', 'PHASE II · ENRAGED')}`
-      : bossText.title;
-    ctx.fillText(subLabel, cx, barY - 14);
-
-    const subHalfW = Math.min(180, ctx.measureText(subLabel).width * 0.5 + 16);
-    ctx.strokeStyle = isEnraged ? 'rgba(251, 146, 60, 0.45)' : 'rgba(251, 191, 36, 0.32)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(cx - subHalfW - 44, barY - 14);
-    ctx.lineTo(cx - subHalfW, barY - 14);
-    ctx.moveTo(cx + subHalfW, barY - 14);
-    ctx.lineTo(cx + subHalfW + 44, barY - 14);
-    ctx.stroke();
-
-    // 3. 二阶段狂暴：外框呼吸烈焰粒子与熔岩热浪光晕 (Phase 2 Breathing Flame Particles)
-    if (isEnraged && !isShattering) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      const flamePulse = 0.65 + Math.sin(timeSec * 8) * 0.35;
-      const auraGrad = ctx.createLinearGradient(barX, barY - 10, barX, barY + barH + 10);
-      auraGrad.addColorStop(0, `rgba(251, 191, 36, ${0.28 * flamePulse})`);
-      auraGrad.addColorStop(0.5, `rgba(239, 68, 68, ${0.36 * flamePulse})`);
-      auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = auraGrad;
-      ctx.beginPath();
-      ctx.roundRect(barX - 8, barY - 6, barW + 16, barH + 12, 8);
-      ctx.fill();
-
-      // Procedural breathing embers rising along the top edge of the Boss bar
-      for (let i = 0; i < 14; i++) {
-        const seed = i * 37.3;
-        const cycle = (timeSec * (1.4 + (i % 4) * 0.35) + seed) % 1;
-        const fx = barX + 14 + ((i * (barW - 28)) / 13) + Math.sin(timeSec * 5 + i) * 6;
-        const fy = barY + 2 - cycle * 22;
-        const fr = (1 - cycle) * (2.2 + (i % 2) * 1.2);
-        ctx.fillStyle = i % 2 === 0 ? '#fef08a' : '#f97316';
-        ctx.globalAlpha = alpha * (1 - cycle) * 0.85;
-        ctx.beginPath();
-        ctx.arc(fx, fy, fr, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
-    // 4. 高精 3D 浮雕黑曜鎏金血条外框与凹槽底座
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
-    ctx.beginPath();
-    ctx.roundRect(barX - 5, barY + 3, barW + 10, barH + 6, 5);
-    ctx.fill();
-
-    const outerGrad = ctx.createLinearGradient(0, barY - 4, 0, barY + barH + 4);
-    outerGrad.addColorStop(0, isEnraged ? '#fef08a' : '#475569');
-    outerGrad.addColorStop(0.45, '#0f172a');
-    outerGrad.addColorStop(1, '#020617');
-    ctx.fillStyle = outerGrad;
-    ctx.beginPath();
-    ctx.roundRect(barX - 4, barY - 4, barW + 8, barH + 8, 5);
-    ctx.fill();
-
-    ctx.strokeStyle = isEnraged ? '#f59e0b' : '#d97706';
-    ctx.lineWidth = isEnraged ? 1.8 : 1.4;
-    ctx.stroke();
-
-    // 内凹深渊暗槽
-    ctx.fillStyle = '#04060c';
-    ctx.beginPath();
-    ctx.roundRect(barX, barY, barW, barH, 3);
-    ctx.fill();
-
-    // 4a. 白金受击延迟残影槽 (Lag Gauge — 赋予强烈的“削肉”钝重感)
-    const hpRatio = this.lastKnownBossHpRatio;
-    const lagRatio = this.lastKnownBossLagRatio;
-    if (lagRatio > hpRatio + 0.002 && !isShattering) {
-      const lagGrad = ctx.createLinearGradient(0, barY, 0, barY + barH);
-      lagGrad.addColorStop(0, '#ffffff');
-      lagGrad.addColorStop(0.45, '#fef08a');
-      lagGrad.addColorStop(1, '#f59e0b');
-      ctx.fillStyle = lagGrad;
-      ctx.beginPath();
-      ctx.roundRect(barX, barY, barW * lagRatio, barH, 3);
-      ctx.fill();
-    }
-
-    // 4b. 主血条流体填充（一阶段深绯红流体 -> 二阶段 <50% 炽热熔岩金 Orange-Gold Lava）
-    const fillW = barW * hpRatio;
-    if (fillW > 0.5 && !isShattering) {
-      const fillGrad = ctx.createLinearGradient(0, barY, 0, barY + barH);
-      if (isEnraged) {
-        // Phase 2: Orange-Gold Lava
-        fillGrad.addColorStop(0, '#fef08a');
-        fillGrad.addColorStop(0.28, '#fbbf24');
-        fillGrad.addColorStop(0.68, '#f97316');
-        fillGrad.addColorStop(1, '#9a3412');
-      } else {
-        // Phase 1: Deep Crimson Fluid
-        fillGrad.addColorStop(0, '#fecaca');
-        fillGrad.addColorStop(0.28, '#ef4444');
-        fillGrad.addColorStop(0.75, '#991b1b');
-        fillGrad.addColorStop(1, '#450a0a');
-      }
-      ctx.fillStyle = fillGrad;
-      ctx.beginPath();
-      ctx.roundRect(barX, barY, fillW, barH, 3);
-      ctx.fill();
-
-      // 圆柱玻璃高光反光带
-      ctx.fillStyle = isHitFlashing ? 'rgba(255, 255, 255, 0.72)' : 'rgba(255, 255, 255, 0.34)';
-      ctx.beginPath();
-      ctx.roundRect(barX, barY, fillW, barH * 0.36, 2);
-      ctx.fill();
-    }
-
-    // 4c. 25% / 75% 暗金刻度线 与 50% 立体金属菱形锁扣刻度 (Phase 2 Threshold Lock)
-    ctx.strokeStyle = 'rgba(4, 6, 12, 0.85)';
-    ctx.lineWidth = 1.4;
-    for (const mark of [0.25, 0.5, 0.75]) {
-      const mx = barX + barW * mark;
-      ctx.beginPath();
-      ctx.moveTo(mx, barY);
-      ctx.lineTo(mx, barY + barH);
-      ctx.stroke();
-    }
-
-    // 50% 立体金属菱形锁扣
-    const lockX = barX + barW * 0.5;
-    const lockY = barY + barH / 2;
-    ctx.fillStyle = '#090d16';
-    ctx.strokeStyle = isEnraged ? '#fef08a' : '#fbbf24';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(lockX, lockY - 6.5);
-    ctx.lineTo(lockX + 5.5, lockY);
-    ctx.lineTo(lockX, lockY + 6.5);
-    ctx.lineTo(lockX - 5.5, lockY);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = isEnraged ? '#f97316' : '#ef4444';
-    ctx.beginPath();
-    ctx.arc(lockX, lockY, 2.1, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 5. 左右两端 3D 几何雕花金属护套与红宝石卡扣
-    for (const side of [-1, 1]) {
-      const capX = side < 0 ? barX - 6 : barX + barW + 6;
-      const capY = barY + barH / 2;
-
-      ctx.fillStyle = '#0f172a';
-      ctx.strokeStyle = isEnraged ? '#fef08a' : '#fbbf24';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(capX, capY - 10);
-      ctx.lineTo(capX + side * 12, capY - 4);
-      ctx.lineTo(capX + side * 16, capY);
-      ctx.lineTo(capX + side * 12, capY + 4);
-      ctx.lineTo(capX, capY + 10);
-      ctx.lineTo(capX - side * 5, capY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // 3D 切面红宝石卡扣
-      ctx.fillStyle = isEnraged ? '#fde047' : '#ef4444';
-      ctx.beginPath();
-      ctx.moveTo(capX + side * 4, capY - 4);
-      ctx.lineTo(capX + side * 8, capY);
-      ctx.lineTo(capX + side * 4, capY + 4);
-      ctx.lineTo(capX, capY);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    // 6. 中央上方精美矢量黄金双角王冠徽记
-    const crownY = barY - 47;
-    ctx.fillStyle = isEnraged ? '#fef08a' : '#fbbf24';
-    ctx.strokeStyle = '#78350f';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 11, crownY + 3);
-    ctx.lineTo(cx - 14, crownY - 6);
-    ctx.lineTo(cx - 6, crownY - 1.5);
-    ctx.lineTo(cx, crownY - 10);
-    ctx.lineTo(cx + 6, crownY - 1.5);
-    ctx.lineTo(cx + 14, crownY - 6);
-    ctx.lineTo(cx + 11, crownY + 3);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath();
-    ctx.arc(cx, crownY - 2.5, 2.2, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 7. 血条中央精确生命数值读数
-    if (!isShattering) {
-      ctx.font = `600 10px ${MONO_FONT}`;
-      ctx.fillStyle = '#f8fafc';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const pctText = `${Math.ceil(hpRatio * 100)}%`;
-      ctx.fillText(
-        `${Math.ceil(this.lastKnownBossHp)} / ${this.lastKnownBossMaxHp}  (${pctText})`,
-        cx,
-        barY + barH / 2 + 0.5
-      );
-    }
-
-    // 8. Boss 击杀时的血条碎裂消散粒子演出 (Shatter Decrescendo Shards)
-    if (isShattering) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      const shardCount = 18;
-      for (let s = 0; s < shardCount; s++) {
-        const ratio = s / (shardCount - 1);
-        const startX = barX + ratio * barW;
-        const dirX = (ratio - 0.5) * 160 + Math.sin(s * 3.1) * 40;
-        const dirY = -35 - (s % 4) * 18 + shatterProg * shatterProg * 140;
-        const sx = startX + dirX * shatterProg;
-        const sy = barY + barH / 2 + dirY * shatterProg;
-        const rot = shatterProg * (s % 2 === 0 ? 5 : -5);
-
-        ctx.save();
-        ctx.translate(sx, sy);
-        ctx.rotate(rot);
-        ctx.fillStyle = s % 2 === 0 ? '#fef08a' : '#f97316';
-        ctx.beginPath();
-        ctx.moveTo(0, -6);
-        ctx.lineTo(7, 4);
-        ctx.lineTo(-6, 5);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
-      }
-      ctx.restore();
-    }
-
-    ctx.restore();
-  }
-
-  /**
-   * Boss 登场全屏猩红警报横幅与呼吸暗角演出 (1.8s Duration)
-   */
-  private renderBossWarningBanner(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  private renderBossEclipseLightingPulse(ctx: CanvasRenderingContext2D, width: number, height: number): void {
     const totalDur = 1.8;
     const elapsed = totalDur - this.bossWarningTimer;
     const prog = Math.max(0, Math.min(1, elapsed / totalDur));
-
-    // 入场展开 (0~0.18) -> 持续呼吸闪烁 (0.18~0.80) -> 向两侧高速撕裂消散 (0.80~1.0)
-    let openScale = 1;
-    let splitOffset = 0;
-    let alpha = 1;
-    if (prog < 0.16) {
-      openScale = Math.pow(prog / 0.16, 0.5);
-      alpha = prog / 0.16;
-    } else if (prog > 0.78) {
-      const outT = (prog - 0.78) / 0.22;
-      splitOffset = Math.pow(outT, 1.8) * (width * 0.65);
-      openScale = 1 - outT * 0.65;
-      alpha = 1 - outT;
-    }
+    const envelope = Math.sin(prog * Math.PI);
+    const pulse = 0.65 + Math.sin(elapsed * Math.PI * 3.5) * 0.35;
 
     ctx.save();
-
-    // 1. 全屏猩红呼吸暗角 (Crimson Vignette Pulse)
-    const pulse = 0.55 + Math.sin(elapsed * Math.PI * 5.5) * 0.45;
     const vigGrad = ctx.createRadialGradient(
       width / 2,
       height / 2,
-      Math.min(width, height) * 0.26,
+      Math.min(width, height) * 0.22,
       width / 2,
       height / 2,
-      Math.max(width, height) * 0.75
+      Math.max(width, height) * 0.72
     );
     vigGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vigGrad.addColorStop(0.65, `rgba(127, 29, 29, ${0.24 * pulse * alpha})`);
-    vigGrad.addColorStop(1, `rgba(220, 38, 38, ${0.52 * pulse * alpha})`);
+    vigGrad.addColorStop(0.58, `rgba(18, 4, 12, ${0.38 * envelope * pulse})`);
+    vigGrad.addColorStop(0.84, `rgba(69, 10, 10, ${0.56 * envelope * pulse})`);
+    vigGrad.addColorStop(1, `rgba(2, 1, 6, ${0.82 * envelope})`);
     ctx.fillStyle = vigGrad;
     ctx.fillRect(0, 0, width, height);
-
-    // 2. 中央半透明黑曜警报带 + 双向鎏金警戒线
-    const bannerY = height * 0.34;
-    const bannerH = 86 * openScale;
-
-    ctx.globalAlpha = alpha;
-    const bandGrad = ctx.createLinearGradient(0, bannerY - bannerH / 2, 0, bannerY + bannerH / 2);
-    bandGrad.addColorStop(0, 'rgba(9, 13, 22, 0.82)');
-    bandGrad.addColorStop(0.5, 'rgba(45, 7, 14, 0.92)');
-    bandGrad.addColorStop(1, 'rgba(9, 13, 22, 0.82)');
-    ctx.fillStyle = bandGrad;
-    ctx.fillRect(0, bannerY - bannerH / 2, width, bannerH);
-
-    // 上下双向金线与警戒斜纹
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, bannerY - bannerH / 2);
-    ctx.lineTo(width, bannerY - bannerH / 2);
-    ctx.moveTo(0, bannerY + bannerH / 2);
-    ctx.lineTo(width, bannerY + bannerH / 2);
-    ctx.stroke();
-
-    // 左右流动警戒斜条纹 (Hazard Chevron Stripes)
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, bannerY - bannerH / 2, width, bannerH);
-    ctx.clip();
-    ctx.fillStyle = 'rgba(239, 68, 68, 0.16)';
-    const stripeShift = (elapsed * 180) % 48;
-    for (let sx = -96 + stripeShift; sx < width + 96; sx += 48) {
-      ctx.beginPath();
-      ctx.moveTo(sx, bannerY - bannerH / 2);
-      ctx.lineTo(sx + 20, bannerY - bannerH / 2);
-      ctx.lineTo(sx - 12, bannerY + bannerH / 2);
-      ctx.lineTo(sx - 32, bannerY + bannerH / 2);
-      ctx.closePath();
-      ctx.fill();
-    }
-
-    // 3. 闪烁呈现 ⚠️ BOSS ENCOUNTER ⚠️ 与 Boss 专属大字（消散阶段向两侧分离滑出）
-    const bossText = getBossText(this.lastKnownBossVariant);
-    const warnFlash = Math.sin(elapsed * 22) > -0.25 ? '#fef08a' : '#ef4444';
-
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `700 13px ${MONO_FONT}`;
-    ctx.fillStyle = warnFlash;
-    ctx.fillText(
-      t('⚠️  首领降临 · BOSS ENCOUNTER  ⚠️', '⚠️  BOSS ENCOUNTER  ⚠️'),
-      width / 2 - splitOffset,
-      bannerY - 17
-    );
-
-    ctx.font = `700 26px ${UI_FONT}`;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(bossText.name, width / 2 + splitOffset, bannerY + 13);
-
-    ctx.restore();
     ctx.restore();
   }
 

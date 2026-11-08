@@ -698,80 +698,101 @@ export class Enemy extends Entity {
     ctx.translate(this.position.x, this.position.y);
 
     // =========================================================================
-    // SOUL KNIGHT (元气骑士) ENEMY SUMMONING PORTAL ANIMATION
+    // SOUL KNIGHT (元气骑士) ENEMY & BOSS SUMMONING LIGHT/SHADOW PHENOMENON
     // =========================================================================
     if (this.spawnTimer > 0) {
       const spawnProgress = Math.max(0, Math.min(1, 1 - this.spawnTimer / this.maxSpawnTimer));
-      const portalColor = this.isBoss ? '#fbbf24' : '#c084fc';
-      const crossColor = this.isBoss ? '#ef4444' : '#f43f5e';
       const r = this.radius * 1.35;
 
-      // 1. Rotating Dark-Arcane Summoning Circle & Pulsing '✖' Cross Reticle on Ground
+      if (this.isBoss) {
+        // Boss 降临：深渊蚀变暗影扩散池 + 穹顶体积光柱（无简笔线条，纯光影体积感）
+        const shadowSpread = r * (0.8 + spawnProgress * 2.4);
+        const abyssGrad = ctx.createRadialGradient(0, this.radius * 0.65, 2, 0, this.radius * 0.65, shadowSpread);
+        abyssGrad.addColorStop(0, 'rgba(2, 1, 8, 0.94)');
+        abyssGrad.addColorStop(0.55, 'rgba(8, 3, 18, 0.76)');
+        abyssGrad.addColorStop(0.85, 'rgba(45, 7, 14, 0.32)');
+        abyssGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = abyssGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, this.radius * 0.65, shadowSpread, shadowSpread * 0.56, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 地面熔岩暗金蚀环光晕
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const rimR = r * (0.65 + spawnProgress * 1.15);
+        const rimGrad = ctx.createRadialGradient(0, this.radius * 0.65, rimR * 0.45, 0, this.radius * 0.65, rimR * 1.25);
+        rimGrad.addColorStop(0, 'rgba(220, 38, 38, 0.48)');
+        rimGrad.addColorStop(0.5, 'rgba(251, 191, 36, 0.35)');
+        rimGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = rimGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, this.radius * 0.65, rimR * 1.25, rimR * 0.68, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      } else {
+        // 普通怪物召唤光阵
+        const portalColor = '#c084fc';
+        const crossColor = '#f43f5e';
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.scale(1, 0.55);
+        ctx.translate(0, this.radius * 1.2);
+
+        const ringScale = spawnProgress < 0.3 ? spawnProgress / 0.3 : 1.0 + Math.sin(spawnProgress * Math.PI * 3) * 0.08;
+        ctx.rotate(this.animTimer * 1.4);
+        ctx.strokeStyle = portalColor;
+        ctx.lineWidth = 2.2;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * ringScale, 0, Math.PI * 2);
+        ctx.stroke();
+
+        const crossLen = r * 0.62 * ringScale;
+        ctx.strokeStyle = crossColor;
+        ctx.lineWidth = 2.6;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-crossLen, -crossLen);
+        ctx.lineTo(crossLen, crossLen);
+        ctx.moveTo(crossLen, -crossLen);
+        ctx.lineTo(-crossLen, crossLen);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 2. Rising Volumetric Portal Energy Pillar & Converging Particles
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.scale(1, 0.55); // 2.5D ground perspective
-      ctx.translate(0, this.radius * 1.2);
-
-      const ringScale = spawnProgress < 0.3 ? spawnProgress / 0.3 : 1.0 + Math.sin(spawnProgress * Math.PI * 3) * 0.08;
-      ctx.rotate(this.animTimer * 1.4);
-      ctx.strokeStyle = portalColor;
-      ctx.lineWidth = 2.4;
-      ctx.beginPath();
-      ctx.arc(0, 0, r * ringScale, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.setLineDash([6, 4]);
-      ctx.strokeStyle = crossColor;
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.arc(0, 0, r * 0.72 * ringScale, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Soul Knight Signature '✖' Summoning Cross-Mark inside Circle
-      const crossLen = r * 0.68 * ringScale;
-      ctx.strokeStyle = crossColor;
-      ctx.lineWidth = 3.2;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(-crossLen, -crossLen);
-      ctx.lineTo(crossLen, crossLen);
-      ctx.moveTo(crossLen, -crossLen);
-      ctx.lineTo(-crossLen, crossLen);
-      ctx.stroke();
-      ctx.restore();
-
-      // 2. Rising Vertical Portal Energy Pillar & Converging Particles
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      const beamAlpha = Math.sin(spawnProgress * Math.PI) * 0.65;
-      const beamW = this.radius * (1.2 - spawnProgress * 0.45);
-      const beamH = this.radius * 3.6;
-      const beamGrad = ctx.createLinearGradient(0, this.radius, 0, -beamH);
-      beamGrad.addColorStop(0, this.isBoss ? 'rgba(239, 68, 68, 0.75)' : 'rgba(192, 132, 252, 0.72)');
-      beamGrad.addColorStop(0.5, this.isBoss ? 'rgba(251, 191, 36, 0.35)' : 'rgba(244, 63, 94, 0.32)');
+      const beamAlpha = Math.sin(spawnProgress * Math.PI) * (this.isBoss ? 0.85 : 0.65);
+      const beamW = this.radius * (this.isBoss ? 1.65 - spawnProgress * 0.45 : 1.2 - spawnProgress * 0.45);
+      const beamH = this.radius * (this.isBoss ? 5.2 : 3.6);
+      const beamGrad = ctx.createLinearGradient(-beamW, 0, beamW, 0);
+      beamGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      beamGrad.addColorStop(0.28, this.isBoss ? 'rgba(185, 28, 28, 0.45)' : 'rgba(192, 132, 252, 0.35)');
+      beamGrad.addColorStop(0.5, this.isBoss ? 'rgba(254, 240, 138, 0.85)' : 'rgba(244, 63, 94, 0.68)');
+      beamGrad.addColorStop(0.72, this.isBoss ? 'rgba(185, 28, 28, 0.45)' : 'rgba(192, 132, 252, 0.35)');
       beamGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.globalAlpha = beamAlpha;
       ctx.fillStyle = beamGrad;
       ctx.fillRect(-beamW, -beamH, beamW * 2, beamH + this.radius);
 
-      // Rising portal sparks
-      for (let s = 0; s < 4; s++) {
-        const sparkT = (spawnProgress * 2 + s * 0.25) % 1;
-        const sx = Math.sin(s * 2.1 + spawnProgress * 8) * (this.radius * 0.75);
-        const sy = this.radius * 0.6 - sparkT * (this.radius * 2.8);
-        ctx.fillStyle = '#ffffff';
-        ctx.globalAlpha = (1 - sparkT) * 0.85;
+      // Rising volumetric ember motes
+      const moteCount = this.isBoss ? 8 : 4;
+      for (let s = 0; s < moteCount; s++) {
+        const sparkT = (spawnProgress * 2.2 + s * (1 / moteCount)) % 1;
+        const sx = Math.sin(s * 2.1 + spawnProgress * 8) * (this.radius * (this.isBoss ? 1.15 : 0.75));
+        const sy = this.radius * 0.6 - sparkT * (this.radius * (this.isBoss ? 3.8 : 2.8));
+        ctx.fillStyle = s % 2 === 0 ? '#fef08a' : '#ffffff';
+        ctx.globalAlpha = (1 - sparkT) * 0.88;
         ctx.beginPath();
-        ctx.arc(sx, sy, 2.2, 0, Math.PI * 2);
+        ctx.arc(sx, sy, this.isBoss ? 2.6 * (1 - sparkT * 0.4) : 2.0, 0, Math.PI * 2);
         ctx.fill();
       }
       ctx.restore();
 
-      // 3. Elastic Materialization of Enemy Sprite during second half of spawn (0.35 -> 1.0)
+      // 3. Elastic Materialization of Enemy Sprite during second half of spawn (0.32 -> 1.0)
       if (spawnProgress > 0.32) {
         const emergeT = Math.min(1, (spawnProgress - 0.32) / 0.68);
-        // Elastic ease-out pop-in
         const stretchY = emergeT < 0.7 ? 1.45 - (emergeT / 0.7) * 0.55 : 0.9 + ((emergeT - 0.7) / 0.3) * 0.1;
         const stretchX = emergeT < 0.7 ? 0.35 + (emergeT / 0.7) * 0.75 : 1.1 - ((emergeT - 0.7) / 0.3) * 0.1;
         const dropOffsetY = (1 - Math.pow(emergeT, 0.65)) * -22;
@@ -782,7 +803,7 @@ export class Enemy extends Entity {
         ctx.globalAlpha = Math.min(1, emergeT * 1.35);
         const prevFlash = this.hitFlashTimer;
         if (emergeT < 0.55) {
-          this.hitFlashTimer = 0.1; // White-hot teleport silhouette on arrival!
+          this.hitFlashTimer = 0.1;
         }
         this.renderProceduralGraphic(ctx);
         this.hitFlashTimer = prevFlash;
@@ -793,11 +814,24 @@ export class Enemy extends Entity {
       return;
     }
 
-    // Directional Ground Shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.52)';
-    ctx.beginPath();
-    ctx.ellipse(2, this.radius * 0.95, this.radius * 1.05, this.radius * 0.45, 0.1, 0, Math.PI * 2);
-    ctx.fill();
+    // Directional Ground Shadow (Bosses cast a wide, oppressive abyssal eclipse shadow that swallows nearby floor light)
+    if (this.isBoss) {
+      const eclipseR = this.bossPhase === 2 ? this.radius * 3.1 : this.radius * 2.6;
+      const eclipseGrad = ctx.createRadialGradient(0, this.radius * 0.75, this.radius * 0.2, 0, this.radius * 0.75, eclipseR);
+      eclipseGrad.addColorStop(0, 'rgba(1, 0, 5, 0.92)');
+      eclipseGrad.addColorStop(0.48, 'rgba(4, 2, 12, 0.74)');
+      eclipseGrad.addColorStop(0.78, 'rgba(15, 4, 14, 0.36)');
+      eclipseGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = eclipseGrad;
+      ctx.beginPath();
+      ctx.ellipse(0, this.radius * 0.75, eclipseR, eclipseR * 0.54, 0, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.52)';
+      ctx.beginPath();
+      ctx.ellipse(2, this.radius * 0.95, this.radius * 1.05, this.radius * 0.45, 0.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     // Minotaur Charge Telegraph Indicator (Glowing Red Line + Warning Ring)
     if (this.type === EnemyType.MINOTAUR && this.chargeState === 'TELEGRAPH') {
@@ -812,30 +846,44 @@ export class Enemy extends Entity {
       ctx.restore();
     }
 
-    // Boss Demonic Ground Aura & Soul Knight Skill Telegraphs
+    // Boss Volumetric Rim-Light Halo, Rising Shadow-Embers & Skill Telegraphs
     if (this.isBoss) {
-      const auraR = this.bossPhase === 2 ? this.radius * 2.3 : this.radius * 1.9;
-      const auraGrad = ctx.createRadialGradient(0, 10, 4, 0, 10, auraR);
-      auraGrad.addColorStop(0, this.bossPhase === 2 ? 'rgba(251, 191, 36, 0.48)' : 'rgba(220, 38, 38, 0.35)');
-      auraGrad.addColorStop(0.55, 'rgba(220, 38, 38, 0.18)');
+      const pulse = 0.86 + Math.sin(this.animTimer * 3.2) * 0.14;
+      const auraR = (this.bossPhase === 2 ? this.radius * 2.35 : this.radius * 1.95) * pulse;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const auraGrad = ctx.createRadialGradient(0, 8, 4, 0, 8, auraR);
+      if (this.bossPhase === 2) {
+        auraGrad.addColorStop(0, 'rgba(254, 240, 138, 0.46)');
+        auraGrad.addColorStop(0.42, 'rgba(249, 115, 22, 0.30)');
+        auraGrad.addColorStop(0.75, 'rgba(185, 28, 28, 0.14)');
+      } else {
+        auraGrad.addColorStop(0, 'rgba(239, 68, 68, 0.36)');
+        auraGrad.addColorStop(0.5, 'rgba(153, 27, 27, 0.18)');
+        auraGrad.addColorStop(0.82, 'rgba(88, 28, 135, 0.08)');
+      }
       auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = auraGrad;
       ctx.beginPath();
-      ctx.ellipse(0, 10, auraR, auraR * 0.52, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 8, auraR, auraR * 0.54, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Enrage Rotating Runic Ring (Phase 2)
-      if (this.bossPhase === 2) {
-        ctx.save();
-        ctx.rotate(this.animTimer * 0.4);
-        ctx.strokeStyle = 'rgba(251, 191, 36, 0.65)';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([10, 6]);
+      // Rising volumetric embers & shadow sparks around the Boss body
+      const emberCount = this.bossPhase === 2 ? 7 : 4;
+      for (let eIdx = 0; eIdx < emberCount; eIdx++) {
+        const cycle = (this.animTimer * 0.55 + eIdx * (1 / emberCount)) % 1;
+        const angle = eIdx * 1.7 + this.animTimer * 0.9;
+        const dist = this.radius * (0.45 + Math.sin(eIdx * 2.3) * 0.45);
+        const ex = Math.cos(angle) * dist;
+        const ey = this.radius * 0.55 - cycle * (this.radius * 2.1);
+        const er = (1 - cycle) * (this.bossPhase === 2 ? 3.2 : 2.4);
+        ctx.fillStyle = eIdx % 2 === 0 ? '#fde047' : '#ef4444';
+        ctx.globalAlpha = Math.sin(cycle * Math.PI) * 0.72;
         ctx.beginPath();
-        ctx.arc(0, 4, this.radius * 1.45, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.restore();
+        ctx.arc(ex, ey, er, 0, Math.PI * 2);
+        ctx.fill();
       }
+      ctx.restore();
 
       // 0b. Heavy Ground-Slam Tectonic Shockwave & Radial Cracks (落地重砸与二阶段狂暴震地冲击波)
       if (this.bossSlamWaveTimer > 0) {
@@ -1204,149 +1252,64 @@ export class Enemy extends Entity {
   }
 
   /**
-   * 首领级 3D 浮雕黑曜鎏金血条（含延迟受击白金残影条、二阶段狂暴双翼王冠、50%狂暴锁扣与宝石端帽）
+   * 极简克制的首领微缩血条（无浮夸大边框、王冠或文字，适配同屏多 Boss 战斗，保留受击白金残影反馈）
    */
   private renderBossHealthBar(ctx: CanvasRenderingContext2D): void {
-    const barWidth = 104;
-    const barHeight = 9;
+    const barWidth = 64;
+    const barHeight = 4.5;
     const barX = this.position.x - barWidth / 2;
-    const barY = this.position.y - this.radius - 26;
+    const barY = this.position.y - this.radius - 18;
     const isEnraged = this.bossPhase === 2;
 
-    // 受击震动微偏移
-    const shakeX = this.hitFlashTimer > 0 ? (Math.random() - 0.5) * 3.5 : 0;
-    const shakeY = this.hitFlashTimer > 0 ? (Math.random() - 0.5) * 2.5 : 0;
+    const shakeX = this.hitFlashTimer > 0 ? (Math.random() - 0.5) * 2.5 : 0;
+    const shakeY = this.hitFlashTimer > 0 ? (Math.random() - 0.5) * 1.8 : 0;
 
     ctx.save();
     ctx.translate(shakeX, shakeY);
 
-    // 1. 3D 悬浮深邃暗影与外层暗金/绯红呼吸光晕
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.82)';
-    ctx.beginPath();
-    ctx.roundRect(barX - 4, barY + 2.5, barWidth + 8, barHeight + 6, 4);
-    ctx.fill();
+    // 1. 柔和悬浮底影
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+    ctx.fillRect(barX - 1.5, barY + 1.5, barWidth + 3, barHeight + 2);
 
-    // 2. 立体斜切黑曜金属外框底座
-    const frameGrad = ctx.createLinearGradient(0, barY - 3, 0, barY + barHeight + 3);
-    frameGrad.addColorStop(0, isEnraged ? '#fef08a' : '#64748b');
-    frameGrad.addColorStop(0.5, '#0f172a');
-    frameGrad.addColorStop(1, '#020617');
-    ctx.fillStyle = frameGrad;
-    ctx.beginPath();
-    ctx.roundRect(barX - 3, barY - 3, barWidth + 6, barHeight + 6, 3.5);
-    ctx.fill();
+    // 2. 极简黑曜暗槽与细线外框
+    ctx.fillStyle = '#05070e';
+    ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+    ctx.strokeStyle = isEnraged ? 'rgba(251, 191, 36, 0.75)' : 'rgba(148, 163, 184, 0.45)';
+    ctx.lineWidth = 0.9;
+    ctx.strokeRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
 
-    ctx.strokeStyle = isEnraged ? '#f59e0b' : '#fbbf24';
-    ctx.lineWidth = isEnraged ? 1.8 : 1.4;
-    ctx.stroke();
-
-    // 3. 内凹暗槽
-    ctx.fillStyle = '#04060c';
-    ctx.fillRect(barX, barY, barWidth, barHeight);
-
-    // 3a. 延迟追赶的受击白金残影条 (Delayed White-Gold Impact Lag Gauge — 凸显打击分量感)
+    // 3. 延迟受击白金残影条
     const lagPct = Math.max(0, Math.min(1, this.displayLagHp / this.maxHp));
     const pct = Math.max(0, Math.min(1, this.hp / this.maxHp));
-    if (lagPct > pct + 0.005) {
-      const lagGrad = ctx.createLinearGradient(0, barY, 0, barY + barHeight);
-      lagGrad.addColorStop(0, '#ffffff');
-      lagGrad.addColorStop(0.5, '#fef08a');
-      lagGrad.addColorStop(1, '#f59e0b');
-      ctx.fillStyle = lagGrad;
+    if (lagPct > pct + 0.004) {
+      ctx.fillStyle = 'rgba(254, 240, 138, 0.88)';
       ctx.fillRect(barX, barY, barWidth * lagPct, barHeight);
     }
 
-    // 3b. 主血量 4 段立体圆柱流体填充
+    // 4. 主血量填充
     const fillW = barWidth * pct;
     if (fillW > 0.5) {
       const bossGrad = ctx.createLinearGradient(0, barY, 0, barY + barHeight);
       if (isEnraged) {
         bossGrad.addColorStop(0, '#fef08a');
-        bossGrad.addColorStop(0.3, '#f97316');
-        bossGrad.addColorStop(0.75, '#dc2626');
-        bossGrad.addColorStop(1, '#450a0a');
+        bossGrad.addColorStop(0.45, '#f97316');
+        bossGrad.addColorStop(1, '#9a3412');
       } else {
         bossGrad.addColorStop(0, '#fca5a5');
-        bossGrad.addColorStop(0.28, '#ef4444');
-        bossGrad.addColorStop(0.75, '#991b1b');
-        bossGrad.addColorStop(1, '#450a0a');
+        bossGrad.addColorStop(0.4, '#ef4444');
+        bossGrad.addColorStop(1, '#7f1d1d');
       }
       ctx.fillStyle = bossGrad;
       ctx.fillRect(barX, barY, fillW, barHeight);
 
-      // 玻璃管顶部高光带
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
-      ctx.fillRect(barX, barY, fillW, 2.4);
+      // 1px 顶部微高光
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.32)';
+      ctx.fillRect(barX, barY, fillW, 1.2);
     }
 
-    // 4. 25% / 50% / 75% 立体金属刻度分割线 & 50% 狂暴阶段菱形锁扣
-    ctx.strokeStyle = 'rgba(9, 13, 22, 0.88)';
-    ctx.lineWidth = 1.2;
-    for (let k = 1; k <= 3; k++) {
-      const tx = barX + (barWidth * k) / 4;
-      ctx.beginPath();
-      ctx.moveTo(tx, barY);
-      ctx.lineTo(tx, barY + barHeight);
-      ctx.stroke();
-    }
-
-    // 50% 中点二阶段狂暴小菱形标记
-    const midX = barX + barWidth * 0.5;
-    const midY = barY + barHeight / 2;
-    ctx.fillStyle = isEnraged ? '#fef08a' : '#94a3b8';
-    ctx.beginPath();
-    ctx.moveTo(midX, midY - 3);
-    ctx.lineTo(midX + 2.5, midY);
-    ctx.lineTo(midX, midY + 3);
-    ctx.lineTo(midX - 2.5, midY);
-    ctx.closePath();
-    ctx.fill();
-
-    // 5. 左右两端立体双翼切面红宝石端帽
-    for (const side of [-1, 1]) {
-      const ex = side < 0 ? barX - 5 : barX + barWidth + 5;
-      const ey = barY + barHeight / 2;
-      ctx.fillStyle = '#0f172a';
-      ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(ex, ey - 5.5);
-      ctx.lineTo(ex + side * 6, ey);
-      ctx.lineTo(ex, ey + 5.5);
-      ctx.lineTo(ex - side * 4, ey);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = isEnraged ? '#fde047' : '#ef4444';
-      ctx.beginPath();
-      ctx.arc(ex, ey, 2.2, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // 6. 顶部中央纯矢量立体黄金双角王冠徽记
-    const cx = this.position.x;
-    const cy = barY - 8;
-    ctx.fillStyle = isEnraged ? '#fef08a' : '#fbbf24';
-    ctx.strokeStyle = '#78350f';
-    ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    ctx.moveTo(cx - 8, cy + 2.5);
-    ctx.lineTo(cx - 10, cy - 5.5);
-    ctx.lineTo(cx - 4.5, cy - 1.2);
-    ctx.lineTo(cx, cy - 8.5);
-    ctx.lineTo(cx + 4.5, cy - 1.2);
-    ctx.lineTo(cx + 10, cy - 5.5);
-    ctx.lineTo(cx + 8, cy + 2.5);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-
-    // 王冠中心镶嵌红宝石
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath();
-    ctx.arc(cx, cy - 2, 1.8, 0, Math.PI * 2);
-    ctx.fill();
+    // 5. 50% 阶段极细分割线
+    ctx.fillStyle = 'rgba(5, 7, 14, 0.85)';
+    ctx.fillRect(barX + barWidth * 0.5 - 0.5, barY, 1, barHeight);
 
     ctx.restore();
   }

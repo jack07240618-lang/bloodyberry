@@ -1107,18 +1107,21 @@ export class CombatSystem {
 
   public handleEnemyDeath(enemy: Enemy, dropLoot = true, triggerKillHooks = true): void {
     if (enemy.isBoss) {
+      const otherBossesAlive = this.enemies.some(e => e !== enemy && e.active && e.isBoss);
       this.sound.playBossSlain();
       this.particleSystem.emitBossSlainBurst(enemy.position.x, enemy.position.y);
-      this.camera.triggerShake(18);
+      this.camera.triggerShake(otherBossesAlive ? 12 : 18);
       this.bossSlainWaveTimer = 0.85;
       this.bossSlainPosition.copy(enemy.position);
       if (this.activeHitStopCallback) {
-        this.activeHitStopCallback(0.3);
+        this.activeHitStopCallback(otherBossesAlive ? 0.10 : 0.3);
       }
-      // Clear hostile bullets on Boss defeat for cinematic relief
-      for (const ep of this.enemyProjectiles) {
-        if (!ep.isReflected) {
-          ep.active = false;
+      // Clear hostile bullets when the final Boss in the room is defeated
+      if (!otherBossesAlive) {
+        for (const ep of this.enemyProjectiles) {
+          if (!ep.isReflected) {
+            ep.active = false;
+          }
         }
       }
     } else {
