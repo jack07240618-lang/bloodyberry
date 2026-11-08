@@ -705,25 +705,25 @@ export class Enemy extends Entity {
       const r = this.radius * 1.35;
 
       if (this.isBoss) {
-        // Boss 降临：适度收敛的蚀变暗影池 + 柔和穹顶聚光柱（不刺眼、不过度压暗四周）
-        const shadowSpread = r * (0.75 + spawnProgress * 1.85);
+        // Boss 降临：深渊蚀变暗影扩散池 + 穹顶体积光柱（无简笔线条，纯光影体积感）
+        const shadowSpread = r * (0.8 + spawnProgress * 2.4);
         const abyssGrad = ctx.createRadialGradient(0, this.radius * 0.65, 2, 0, this.radius * 0.65, shadowSpread);
-        abyssGrad.addColorStop(0, 'rgba(2, 1, 8, 0.58)');
-        abyssGrad.addColorStop(0.55, 'rgba(8, 3, 18, 0.42)');
-        abyssGrad.addColorStop(0.85, 'rgba(45, 7, 14, 0.18)');
+        abyssGrad.addColorStop(0, 'rgba(2, 1, 8, 0.94)');
+        abyssGrad.addColorStop(0.55, 'rgba(8, 3, 18, 0.76)');
+        abyssGrad.addColorStop(0.85, 'rgba(45, 7, 14, 0.32)');
         abyssGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = abyssGrad;
         ctx.beginPath();
         ctx.ellipse(0, this.radius * 0.65, shadowSpread, shadowSpread * 0.56, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // 地面熔岩暗金蚀环柔光晕
+        // 地面熔岩暗金蚀环光晕
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const rimR = r * (0.65 + spawnProgress * 1.05);
+        const rimR = r * (0.65 + spawnProgress * 1.15);
         const rimGrad = ctx.createRadialGradient(0, this.radius * 0.65, rimR * 0.45, 0, this.radius * 0.65, rimR * 1.25);
-        rimGrad.addColorStop(0, 'rgba(220, 38, 38, 0.28)');
-        rimGrad.addColorStop(0.5, 'rgba(251, 191, 36, 0.20)');
+        rimGrad.addColorStop(0, 'rgba(220, 38, 38, 0.48)');
+        rimGrad.addColorStop(0.5, 'rgba(251, 191, 36, 0.35)');
         rimGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = rimGrad;
         ctx.beginPath();
@@ -763,14 +763,14 @@ export class Enemy extends Entity {
       // 2. Rising Volumetric Portal Energy Pillar & Converging Particles
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      const beamAlpha = Math.sin(spawnProgress * Math.PI) * (this.isBoss ? 0.52 : 0.65);
-      const beamW = this.radius * (this.isBoss ? 1.55 - spawnProgress * 0.42 : 1.2 - spawnProgress * 0.45);
-      const beamH = this.radius * (this.isBoss ? 4.8 : 3.6);
+      const beamAlpha = Math.sin(spawnProgress * Math.PI) * (this.isBoss ? 0.85 : 0.65);
+      const beamW = this.radius * (this.isBoss ? 1.65 - spawnProgress * 0.45 : 1.2 - spawnProgress * 0.45);
+      const beamH = this.radius * (this.isBoss ? 5.2 : 3.6);
       const beamGrad = ctx.createLinearGradient(-beamW, 0, beamW, 0);
       beamGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-      beamGrad.addColorStop(0.28, this.isBoss ? 'rgba(185, 28, 28, 0.32)' : 'rgba(192, 132, 252, 0.35)');
-      beamGrad.addColorStop(0.5, this.isBoss ? 'rgba(254, 240, 138, 0.62)' : 'rgba(244, 63, 94, 0.68)');
-      beamGrad.addColorStop(0.72, this.isBoss ? 'rgba(185, 28, 28, 0.32)' : 'rgba(192, 132, 252, 0.35)');
+      beamGrad.addColorStop(0.28, this.isBoss ? 'rgba(185, 28, 28, 0.45)' : 'rgba(192, 132, 252, 0.35)');
+      beamGrad.addColorStop(0.5, this.isBoss ? 'rgba(254, 240, 138, 0.85)' : 'rgba(244, 63, 94, 0.68)');
+      beamGrad.addColorStop(0.72, this.isBoss ? 'rgba(185, 28, 28, 0.45)' : 'rgba(192, 132, 252, 0.35)');
       beamGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.globalAlpha = beamAlpha;
       ctx.fillStyle = beamGrad;
@@ -814,13 +814,13 @@ export class Enemy extends Entity {
       return;
     }
 
-    // Directional Ground Shadow (Bosses cast a refined abyssal shadow that grounds them without overly darkening the room)
+    // Directional Ground Shadow (Bosses cast a wide, oppressive abyssal eclipse shadow that swallows nearby floor light)
     if (this.isBoss) {
-      const eclipseR = this.bossPhase === 2 ? this.radius * 2.4 : this.radius * 2.1;
+      const eclipseR = this.bossPhase === 2 ? this.radius * 3.1 : this.radius * 2.6;
       const eclipseGrad = ctx.createRadialGradient(0, this.radius * 0.75, this.radius * 0.2, 0, this.radius * 0.75, eclipseR);
-      eclipseGrad.addColorStop(0, 'rgba(1, 0, 5, 0.62)');
-      eclipseGrad.addColorStop(0.48, 'rgba(4, 2, 12, 0.42)');
-      eclipseGrad.addColorStop(0.78, 'rgba(15, 4, 14, 0.18)');
+      eclipseGrad.addColorStop(0, 'rgba(1, 0, 5, 0.92)');
+      eclipseGrad.addColorStop(0.48, 'rgba(4, 2, 12, 0.74)');
+      eclipseGrad.addColorStop(0.78, 'rgba(15, 4, 14, 0.36)');
       eclipseGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = eclipseGrad;
       ctx.beginPath();
@@ -846,21 +846,21 @@ export class Enemy extends Entity {
       ctx.restore();
     }
 
-    // Boss Volumetric Rim-Light Halo, Rising Shadow-Embers & Skill Telegraphs (Softened so Boss spotlight isn't blinding)
+    // Boss Volumetric Rim-Light Halo, Rising Shadow-Embers & Skill Telegraphs
     if (this.isBoss) {
-      const pulse = 0.88 + Math.sin(this.animTimer * 3.2) * 0.12;
-      const auraR = (this.bossPhase === 2 ? this.radius * 2.1 : this.radius * 1.8) * pulse;
+      const pulse = 0.86 + Math.sin(this.animTimer * 3.2) * 0.14;
+      const auraR = (this.bossPhase === 2 ? this.radius * 2.35 : this.radius * 1.95) * pulse;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       const auraGrad = ctx.createRadialGradient(0, 8, 4, 0, 8, auraR);
       if (this.bossPhase === 2) {
-        auraGrad.addColorStop(0, 'rgba(254, 240, 138, 0.24)');
-        auraGrad.addColorStop(0.42, 'rgba(249, 115, 22, 0.15)');
-        auraGrad.addColorStop(0.75, 'rgba(185, 28, 28, 0.07)');
+        auraGrad.addColorStop(0, 'rgba(254, 240, 138, 0.46)');
+        auraGrad.addColorStop(0.42, 'rgba(249, 115, 22, 0.30)');
+        auraGrad.addColorStop(0.75, 'rgba(185, 28, 28, 0.14)');
       } else {
-        auraGrad.addColorStop(0, 'rgba(239, 68, 68, 0.18)');
-        auraGrad.addColorStop(0.5, 'rgba(153, 27, 27, 0.10)');
-        auraGrad.addColorStop(0.82, 'rgba(88, 28, 135, 0.045)');
+        auraGrad.addColorStop(0, 'rgba(239, 68, 68, 0.36)');
+        auraGrad.addColorStop(0.5, 'rgba(153, 27, 27, 0.18)');
+        auraGrad.addColorStop(0.82, 'rgba(88, 28, 135, 0.08)');
       }
       auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = auraGrad;

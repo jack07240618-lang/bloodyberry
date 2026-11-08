@@ -428,15 +428,15 @@ export class UIManager {
     const vigGrad = ctx.createRadialGradient(
       width / 2,
       height / 2,
-      Math.min(width, height) * 0.28,
+      Math.min(width, height) * 0.22,
       width / 2,
       height / 2,
-      Math.max(width, height) * 0.76
+      Math.max(width, height) * 0.72
     );
     vigGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vigGrad.addColorStop(0.58, `rgba(18, 4, 12, ${0.18 * envelope * pulse})`);
-    vigGrad.addColorStop(0.84, `rgba(69, 10, 10, ${0.28 * envelope * pulse})`);
-    vigGrad.addColorStop(1, `rgba(2, 1, 6, ${0.42 * envelope})`);
+    vigGrad.addColorStop(0.58, `rgba(18, 4, 12, ${0.38 * envelope * pulse})`);
+    vigGrad.addColorStop(0.84, `rgba(69, 10, 10, ${0.56 * envelope * pulse})`);
+    vigGrad.addColorStop(1, `rgba(2, 1, 6, ${0.82 * envelope})`);
     ctx.fillStyle = vigGrad;
     ctx.fillRect(0, 0, width, height);
     ctx.restore();

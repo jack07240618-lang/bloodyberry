@@ -800,16 +800,16 @@ export class MapSystem {
         }
       }
     }
-    const targetEclipse = activeBossCount > 0 ? Math.min(0.32, 0.20 + (activeBossCount - 1) * 0.06) : 0;
+    const targetEclipse = activeBossCount > 0 ? Math.min(1.25, 0.85 + (activeBossCount - 1) * 0.2) : 0;
     this.bossEclipseFactor += (targetEclipse - this.bossEclipseFactor) * 0.06;
-    const eclipse = Math.max(0, Math.min(0.32, this.bossEclipseFactor));
+    const eclipse = Math.max(0, Math.min(1.25, this.bossEclipseFactor));
 
-    // 1. Multi-Stop Layered Atmospheric Darkness Vignette Centered on Player (Balanced so surrounding room stays well-lit during Boss fights)
+    // 1. Multi-Stop Layered Atmospheric Darkness Vignette Centered on Player (Deepens dramatically during Boss Eclipse!)
     const playerScreenX = player.position.x - camera.position.x + halfW;
     const playerScreenY = player.position.y - camera.position.y + halfH;
 
-    const innerClearR = Math.max(76, 85 - eclipse * 14);
-    const outerDarkR = Math.max(w, h) * (0.76 - eclipse * 0.04);
+    const innerClearR = Math.max(58, 85 - eclipse * 22);
+    const outerDarkR = Math.max(w, h) * (0.74 - eclipse * 0.10);
     const vignette = ctx.createRadialGradient(
       playerScreenX,
       playerScreenY,
@@ -819,27 +819,27 @@ export class MapSystem {
       outerDarkR
     );
     vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vignette.addColorStop(0.36, `rgba(7, 4, 18, ${(0.18 + eclipse * 0.10).toFixed(3)})`);
-    vignette.addColorStop(0.68, `rgba(4, 2, 12, ${(0.44 + eclipse * 0.12).toFixed(3)})`);
-    vignette.addColorStop(1, `rgba(1, 0, 5, ${Math.min(0.82, 0.74 + eclipse * 0.08).toFixed(3)})`);
+    vignette.addColorStop(0.36, `rgba(7, 4, 18, ${(0.22 + eclipse * 0.22).toFixed(3)})`);
+    vignette.addColorStop(0.68, `rgba(4, 2, 12, ${(0.54 + eclipse * 0.24).toFixed(3)})`);
+    vignette.addColorStop(1, `rgba(1, 0, 5, ${Math.min(0.96, 0.84 + eclipse * 0.11).toFixed(3)})`);
 
     ctx.fillStyle = vignette;
     ctx.fillRect(0, 0, w, h);
 
-    // 1b. Boss Abyssal Peripheral Shadow Rings (Softened so surrounding room remains clearly visible)
+    // 1b. Boss Abyssal Peripheral Shadow Rings (Darkens the room around each Boss before the additive light pass)
     if (combatSystem && eclipse > 0.02) {
       for (const enemy of combatSystem.enemies) {
         if (!enemy.active || !enemy.isBoss || !camera.isVisible(enemy.position, 280)) continue;
         const bsx = enemy.position.x - camera.position.x + halfW;
         const bsy = enemy.position.y - camera.position.y + halfH;
-        const shadowRing = ctx.createRadialGradient(bsx, bsy, 48, bsx, bsy, 220);
+        const shadowRing = ctx.createRadialGradient(bsx, bsy, 42, bsx, bsy, 240);
         shadowRing.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        shadowRing.addColorStop(0.55, 'rgba(2, 1, 7, 0.14)');
-        shadowRing.addColorStop(0.85, 'rgba(2, 1, 7, 0.07)');
+        shadowRing.addColorStop(0.55, 'rgba(2, 1, 7, 0.42)');
+        shadowRing.addColorStop(0.85, 'rgba(2, 1, 7, 0.22)');
         shadowRing.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = shadowRing;
         ctx.beginPath();
-        ctx.arc(bsx, bsy, 220, 0, Math.PI * 2);
+        ctx.arc(bsx, bsy, 240, 0, Math.PI * 2);
         ctx.fill();
       }
     }
@@ -936,12 +936,12 @@ export class MapSystem {
         ctx.restore();
       }
 
-      // Boss Volumetric Rim-Light, Variant Hellfire Pool & Overhead Eclipse Spotlight Shaft (Attenuated so Boss is bathed in a refined spotlight without blinding glare)
+      // Boss Volumetric Rim-Light, Variant Hellfire Pool & Overhead Eclipse Spotlight Shaft
       const bossPalettes = [
-        { core: 'rgba(254, 202, 202, 0.21)', mid: 'rgba(220, 38, 38, 0.12)', outer: 'rgba(127, 29, 29, 0.045)' },
-        { core: 'rgba(233, 213, 255, 0.21)', mid: 'rgba(147, 51, 234, 0.12)', outer: 'rgba(88, 28, 135, 0.045)' },
-        { core: 'rgba(254, 240, 138, 0.20)', mid: 'rgba(234, 88, 12, 0.11)', outer: 'rgba(154, 52, 18, 0.045)' },
-        { core: 'rgba(167, 243, 208, 0.20)', mid: 'rgba(16, 185, 129, 0.11)', outer: 'rgba(6, 95, 70, 0.045)' }
+        { core: 'rgba(254, 202, 202, 0.36)', mid: 'rgba(220, 38, 38, 0.22)', outer: 'rgba(127, 29, 29, 0.08)' },
+        { core: 'rgba(233, 213, 255, 0.36)', mid: 'rgba(147, 51, 234, 0.22)', outer: 'rgba(88, 28, 135, 0.08)' },
+        { core: 'rgba(254, 240, 138, 0.34)', mid: 'rgba(234, 88, 12, 0.20)', outer: 'rgba(154, 52, 18, 0.08)' },
+        { core: 'rgba(167, 243, 208, 0.34)', mid: 'rgba(16, 185, 129, 0.20)', outer: 'rgba(6, 95, 70, 0.08)' }
       ];
 
       for (const enemy of combatSystem.enemies) {
@@ -950,13 +950,13 @@ export class MapSystem {
         const sy = enemy.position.y - camera.position.y + halfH;
         const pal = bossPalettes[enemy.bossVariant % bossPalettes.length];
         const isP2 = enemy.bossPhase === 2 || anyBossEnraged;
-        const pulse = 0.90 + Math.sin(enemy.animTimer * 3.6) * 0.10;
-        const lightR = (isP2 ? 215 : 185) * pulse;
+        const pulse = 0.88 + Math.sin(enemy.animTimer * 3.6) * 0.12;
+        const lightR = (isP2 ? 235 : 195) * pulse;
 
-        // 1. Wide Volumetric Boss Light Pool (Refined non-glaring intensity)
+        // 1. Wide Volumetric Boss Light Pool
         const bGlow = ctx.createRadialGradient(sx, sy, 6, sx, sy, lightR);
-        bGlow.addColorStop(0, isP2 ? 'rgba(254, 240, 138, 0.25)' : pal.core);
-        bGlow.addColorStop(0.38, isP2 ? 'rgba(239, 68, 68, 0.15)' : pal.mid);
+        bGlow.addColorStop(0, isP2 ? 'rgba(254, 240, 138, 0.42)' : pal.core);
+        bGlow.addColorStop(0.38, isP2 ? 'rgba(239, 68, 68, 0.26)' : pal.mid);
         bGlow.addColorStop(0.75, pal.outer);
         bGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = bGlow;
@@ -964,14 +964,14 @@ export class MapSystem {
         ctx.arc(sx, sy, lightR, 0, Math.PI * 2);
         ctx.fill();
 
-        // 2. Angled Overhead Eclipse Spotlight Shaft descending onto each Boss (Softened feathered cone)
+        // 2. Angled Overhead Eclipse Spotlight Shaft descending onto each Boss
         ctx.save();
         ctx.translate(sx, sy);
         ctx.rotate(-0.22);
         const shaftGrad = ctx.createLinearGradient(0, -280, 0, 45);
         shaftGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        shaftGrad.addColorStop(0.55, isP2 ? 'rgba(251, 191, 36, 0.052)' : 'rgba(220, 38, 38, 0.042)');
-        shaftGrad.addColorStop(0.88, isP2 ? 'rgba(239, 68, 68, 0.095)' : 'rgba(220, 38, 38, 0.075)');
+        shaftGrad.addColorStop(0.55, isP2 ? 'rgba(251, 191, 36, 0.09)' : 'rgba(220, 38, 38, 0.07)');
+        shaftGrad.addColorStop(0.88, isP2 ? 'rgba(239, 68, 68, 0.16)' : pal.mid);
         shaftGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = shaftGrad;
         ctx.beginPath();

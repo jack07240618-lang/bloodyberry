@@ -44,6 +44,7 @@ export class SoundSynthesizer {
   private currentTrack: BGMTrack = 'NONE';
   private bgmTimerId: number | null = null;
   private bgmStep = 0;
+  private savedBattleStep = 0;
   private bgmBpm = 130;
 
   constructor() {}
@@ -141,18 +142,17 @@ export class SoundSynthesizer {
   }
 
   private computeTargetBpm(track: BGMTrack, style: BGMStyle): number {
+    if (track === 'TITLE') return 95;
+    if (track === 'BOSS') return 148;
     const baseBpmMap: Record<BGMStyle, number> = {
-      BAROQUE: 134,            // Ⅰ. 哥特交响
+      BAROQUE: 136,            // Ⅰ. 哥特交响
       SYNTHWAVE: 126,          // Ⅱ. 暗潮脉动
       CINEMATIC_EPIC: 128,     // Ⅲ. 电影史诗
       GOTHIC_REQUIEM: 122,     // Ⅳ. 哥特安魂曲
       DARK_INDUSTRIAL: 132,    // Ⅴ. 冷冽暗潮
       CINEMATIC_NOCTURNE: 118  // Ⅵ. 电影夜曲
     };
-    const base = baseBpmMap[style] || 128;
-    if (track === 'TITLE') return Math.round(base * 0.84);
-    if (track === 'BOSS') return base + 6;
-    return base;
+    return baseBpmMap[style] || 132;
   }
 
   private updateBGMTempoInterval(): void {
@@ -172,23 +172,22 @@ export class SoundSynthesizer {
   public playBGM(track: BGMTrack): void {
     if (this.currentTrack === track) return;
 
-    const wasInGameplay = this.currentTrack === 'BATTLE' || this.currentTrack === 'BOSS';
-    const isNowInGameplay = track === 'BATTLE' || track === 'BOSS';
-
-    this.currentTrack = track;
-
-    if (track === 'NONE') {
-      this.stopBGM();
-      return;
-    }
-
-    this.initContext();
-    if (!this.ctx) return;
-
-    // 在局内战斗与 Boss 战之间切换时，保持当前曲目的播放进度不断流，确保六首 BGM 顺序完整播放并循环
-    if (!wasInGameplay || !isNowInGameplay) {
+    // 切入 Boss 战时保存当前普通战斗曲目的进度，立即从头奏响 148 BPM 专属 Boss 登场交响曲；Boss 击败后恢复六首曲目顺序播放进度
+    if (this.currentTrack === 'BATTLE' && track === 'BOSS') {
+      this.savedBattleStep = this.bgmStep;
+      this.bgmStep = 0;
+    } else if (this.currentTrack === 'BOSS' && track === 'BATTLE') {
+      this.bgmStep = this.savedBattleStep;
+    } else {
       this.bgmStep = 0;
     }
+
+    this.currentTrack = track;
+    this.stopBGM();
+
+    if (track === 'NONE') return;
+    this.initContext();
+    if (!this.ctx) return;
 
     this.updateBGMTempoInterval();
   }
@@ -203,13 +202,6 @@ export class SoundSynthesizer {
   private tickBGM(): void {
     if (!this.ctx || !this.bgmGain || this.isMuted) return;
 
-    // 当一首曲目完整播放完一次（128 个十六分音符步长 = 完整 8 小节乐段）后，自动按顺序切换到下一首（1->2->3->4->5->6->1 循环往复）
-    if (this.bgmStep > 0 && this.bgmStep % 128 === 0) {
-      const curIdx = BGM_STYLE_ORDER.indexOf(this.bgmStyle);
-      this.bgmStyle = BGM_STYLE_ORDER[(curIdx + 1) % BGM_STYLE_ORDER.length];
-      this.updateBGMTempoInterval();
-    }
-
     const t = this.ctx.currentTime;
     const step128 = this.bgmStep % 128; // 8-bar full musical structure per song
     const step = this.bgmStep % 64;
@@ -220,8 +212,58 @@ export class SoundSynthesizer {
     const D3 = 146.83, Eb3 = 155.56, E3 = 164.81, F3 = 174.61, G3 = 196.0, A3 = 220.0, Bb3 = 233.08, C4 = 261.63, Cs4 = 277.18;
     const D4 = 293.66, Eb4 = 311.13, E4 = 329.63, F4 = 349.23, G4 = 392.0, A4 = 440.0, Bb4 = 466.16, C5 = 523.25, Cs5 = 554.37, D5 = 587.33, E5 = 659.25, F5 = 698.46, G5 = 783.99, A5 = 880.0;
 
+    if (this.currentTrack === 'TITLE') {
+      // Rich atmospheric prelude with warm pad chords + crystal harp arpeggio
+      if (step128 % 16 === 0) {
+        const chordProg = [
+          [D3, F3, A3],
+          [Bb2, D3, F3],
+          [G2 * 2, Bb3, D4],
+          [A2 * 2, Cs4, E4]
+        ];
+        const chord = chordProg[Math.floor(step128 / 16) % chordProg.length];
+        for (const n of chord) {
+          this.playWarmPadNote(n, 1.35, 0.055);
+        }
+      }
+      if (step % 4 === 2) {
+        const notes = [A3, D4, F4, E4, D4, C4, A3, G3, F3, A3, D4, G4, F4, E4, D4, Cs4];
+        const n = notes[Math.floor(step128 / 4) % notes.length];
+        this.playFMBellNote(n, 0.48, 0.08);
+      }
+      return;
+    }
+
+    if (this.currentTrack === 'BOSS') {
+      // High-intensity Boss Encounter Symphony (Restored from previous stage!)
+      const bossBass = [D2, D2, D3, D2, Bb2, Bb2, C3, C3, G2, G2, Bb2, G2, A2, A2, Cs3, A2];
+      const bassNote = bossBass[Math.floor(step128 / 2) % bossBass.length];
+      this.playFilteredBassNote(bassNote, 0.16, 0.19, 950);
+
+      if (step % 4 === 0) this.playDrumKick(t);
+      if (step % 8 === 4) this.playDrumSnare(t);
+      if (step % 2 === 1) this.playDrumHiHat(t);
+
+      // Baroque / Synth Boss Lead Phrase (A + B sections over 128 steps)
+      if (step % 2 === 0) {
+        const phraseA = [D4, F4, A4, D5, Cs4 * 2, A4, F4, E4, Bb3 * 2, D4, F4, Bb4, A4, G4, F4, E4];
+        const phraseB = [G4, Bb4, D5, F5, E5, D5, C5, Bb4, A4, Cs4 * 2, E5, A4, G4, F4, E4, D4];
+        const activePhrase = step128 < 64 ? phraseA : phraseB;
+        const n = activePhrase[Math.floor(step128 / 2) % activePhrase.length];
+        this.playVibratoLeadNote(n, 0.16, 'sawtooth', 0.085);
+      }
+      return;
+    }
+
+    // 当一首战斗曲目完整播放完一次（128 个十六分音符步长 = 完整 8 小节乐段）后，自动按顺序切换到下一首（1->2->3->4->5->6->1 循环往复）
+    if (this.bgmStep > 1 && (this.bgmStep - 1) % 128 === 0) {
+      const curIdx = BGM_STYLE_ORDER.indexOf(this.bgmStyle);
+      this.bgmStyle = BGM_STYLE_ORDER[(curIdx + 1) % BGM_STYLE_ORDER.length];
+      this.updateBGMTempoInterval();
+    }
+
     const style = this.getEffectiveBGMStyle();
-    const isBoss = this.currentTrack === 'BOSS';
+    const isBoss = false;
 
     // =========================================================================
     // 6-TRACK SEQUENTIAL PLAYLIST: Gothic Symphony, Darkwave & Cinematic Scores
