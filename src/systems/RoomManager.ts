@@ -178,6 +178,9 @@ export class RoomManager {
   private roundsSinceShop = 99;
   private roundsSinceEvent = 99;
 
+  // 穹顶三束丁达尔体积光的对称斜射方向（-1: 左上角斜射向右下角；+1: 右上角斜射向左下角，每关随机对称切换）
+  public currentRayDirSign: 1 | -1 = -1;
+
   constructor(private combatSystem: CombatSystem) {
     this.reset();
   }
@@ -229,6 +232,16 @@ export class RoomManager {
     const biomeIndex = (roomNumber - 1) % 5;
     this.combatSystem.mapSystem.currentBiomeIndex = biomeIndex;
     this.combatSystem.sound.setBiomeBGMHint(biomeIndex);
+
+    // 随机对称切换本关屋顶三条光线的斜射方向（-1: 左上->右下，+1: 右上->左下；相邻关卡高概率对称翻转）
+    if (roomNumber === 1) {
+      this.currentRayDirSign = Math.random() < 0.5 ? -1 : 1;
+    } else {
+      this.currentRayDirSign =
+        Math.random() < 0.75
+          ? (this.currentRayDirSign === -1 ? 1 : -1)
+          : (Math.random() < 0.5 ? -1 : 1);
+    }
     // 8 套差异化房间地刺、掩体、火盆与机关小布局（确保每个房间的地刺与内部小布局各不相同）
     const layoutPattern =
       type === RoomType.ELITE
@@ -1523,6 +1536,7 @@ export class RoomManager {
 
   /**
    * 第一层（地面层）：在穹顶三束光线落点处绘制石砖地面漫反射光池与哥特三联窗棂柔光斑（位于角色与怪物脚下）
+   * 支持随关卡对称随机切换方向（dir === -1: 左上至右下；dir === 1: 右上至左下）
    */
   private renderFloorGodRayCaustics(
     ctx: CanvasRenderingContext2D,
@@ -1530,6 +1544,7 @@ export class RoomManager {
     hh: number,
     theme: { rayTop: string; rayMid: string }
   ): void {
+    const dir = this.currentRayDirSign;
     const shafts = [
       { landX: -275, landY: 65, scale: 0.95, phase: 0.0 },
       { landX: 18, landY: -5, scale: 1.12, phase: 1.7 },
@@ -1544,13 +1559,14 @@ export class RoomManager {
 
     for (let i = 0; i < shafts.length; i++) {
       const s = shafts[i];
+      const symLandX = s.landX * -dir;
       const breathe = 0.85 + Math.sin(this.elapsedSeconds * 0.95 + s.phase) * 0.15;
       const rx = 115 * s.scale;
       const ry = 64 * s.scale;
 
       ctx.save();
-      ctx.translate(s.landX, s.landY);
-      ctx.rotate(-0.18);
+      ctx.translate(symLandX, s.landY);
+      ctx.rotate(0.18 * dir);
 
       // 1. 地面宽幅柔和漫反射光池 (Soft Ground Bounce Pool)
       ctx.save();
@@ -1567,12 +1583,12 @@ export class RoomManager {
 
       // 2. 哥特高窗三联窗格投射在地面上的柔化光印 (3 Soft Lancet Window Pane Caustics)
       for (let pane = -1; pane <= 1; pane++) {
-        const px = pane * 34 * s.scale;
+        const px = pane * 34 * s.scale * -dir;
         const py = pane * 6;
         const panePulse = 0.8 + Math.sin(this.elapsedSeconds * 1.3 + s.phase + pane * 1.1) * 0.2;
         ctx.save();
         ctx.translate(px, py);
-        ctx.rotate(-0.42);
+        ctx.rotate(0.42 * dir);
         ctx.scale(16 * s.scale, 38 * s.scale);
         const paneGrad = ctx.createRadialGradient(0, 0, 0.05, 0, 0, 1.0);
         paneGrad.addColorStop(0, `rgba(${theme.rayTop}, ${(0.068 * panePulse).toFixed(4)})`);
@@ -1593,13 +1609,14 @@ export class RoomManager {
 
   /**
    * 第二层（空中体积光层，在角色与怪物之上渲染）：
-   * 渲染从屋顶高窗斜射而下的三条自然柔化丁达尔体积光束（无生硬多边形边缘，含窗棂分束光缕、高窗入射光晕与悬浮微尘）
+   * 渲染从屋顶高窗斜射而下的三条自然柔化丁达尔体积光束（支持左上->右下与右上->左下随机对称切换）
    */
   public renderCeilingGodRaysOverlay(ctx: CanvasRenderingContext2D): void {
     const hw = this.halfWidth;
     const hh = this.halfHeight;
     const theme = this.getCurrentBiomeRayTheme();
     const t = this.elapsedSeconds;
+    const dir = this.currentRayDirSign;
 
     const shafts = [
       { landX: -275, landY: 65, scale: 0.95, phase: 0.0 },
@@ -1616,13 +1633,14 @@ export class RoomManager {
 
     for (let i = 0; i < shafts.length; i++) {
       const s = shafts[i];
+      const symLandX = s.landX * -dir;
       const breathe = 0.88 + Math.sin(t * 0.95 + s.phase) * 0.12;
-      const swayAngle = -0.42 + Math.sin(t * 0.35 + s.phase) * 0.012;
+      const swayAngle = 0.42 * dir + Math.sin(t * 0.35 + s.phase) * 0.012;
       const shaftHalfLen = 340 * s.scale;
       const shaftHalfW = 78 * s.scale;
 
       ctx.save();
-      ctx.translate(s.landX, s.landY);
+      ctx.translate(symLandX, s.landY);
       ctx.rotate(swayAngle);
 
       // 1. 外层宽幅柔化大气散射光幕（使用二维椭圆径向衰减，四面边缘 100% 羽化柔和，绝无生硬多边形切边）
@@ -1650,15 +1668,16 @@ export class RoomManager {
 
       for (let sr = 0; sr < subRays.length; sr++) {
         const sub = subRays[sr];
+        const symOffsetX = sub.offsetX * -dir;
         const shimmer = 0.72 + Math.sin(t * sub.speed + s.phase + sr * 1.45) * 0.28;
         const alphaTop = 0.068 * sub.alphaMult * shimmer;
         const alphaMid = 0.036 * sub.alphaMult * shimmer;
 
         ctx.save();
         // 轻微扇形发散角，使光束从屋顶窄窗向下自然微微散开
-        const fanAngle = (sub.offsetX / 32) * 0.035;
+        const fanAngle = (symOffsetX / 32) * 0.035;
         ctx.rotate(fanAngle);
-        ctx.translate(sub.offsetX * s.scale, -shaftHalfLen * 0.62 * sub.lenScale);
+        ctx.translate(symOffsetX * s.scale, -shaftHalfLen * 0.62 * sub.lenScale);
         ctx.scale(sub.width * s.scale, shaftHalfLen * sub.lenScale);
 
         const subGrad = ctx.createRadialGradient(0, -0.38, 0.01, 0, 0, 1.0);

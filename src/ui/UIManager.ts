@@ -428,15 +428,15 @@ export class UIManager {
     const vigGrad = ctx.createRadialGradient(
       width / 2,
       height / 2,
-      Math.min(width, height) * 0.22,
+      Math.min(width, height) * 0.28,
       width / 2,
       height / 2,
-      Math.max(width, height) * 0.72
+      Math.max(width, height) * 0.76
     );
     vigGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    vigGrad.addColorStop(0.58, `rgba(18, 4, 12, ${0.38 * envelope * pulse})`);
-    vigGrad.addColorStop(0.84, `rgba(69, 10, 10, ${0.56 * envelope * pulse})`);
-    vigGrad.addColorStop(1, `rgba(2, 1, 6, ${0.82 * envelope})`);
+    vigGrad.addColorStop(0.58, `rgba(18, 4, 12, ${0.18 * envelope * pulse})`);
+    vigGrad.addColorStop(0.84, `rgba(69, 10, 10, ${0.28 * envelope * pulse})`);
+    vigGrad.addColorStop(1, `rgba(2, 1, 6, ${0.42 * envelope})`);
     ctx.fillStyle = vigGrad;
     ctx.fillRect(0, 0, width, height);
     ctx.restore();
@@ -1715,12 +1715,12 @@ export class UIManager {
     ctx.fillText(t('背景音乐', 'BGM Style'), panelX + 28, row3Y);
 
     const bgmLabels: Record<string, { zh: string; en: string }> = {
-      BAROQUE: { zh: '♪ 哥特交响 (默认)', en: '♪ Gothic Symphony (Default)' },
-      DEFAULT: { zh: '♪ 经典原版 Classic', en: '♪ Classic Original' },
-      SYNTHWAVE: { zh: '♪ 暗潮电音 Synthwave', en: '♪ Dark Synthwave' },
-      ETHEREAL: { zh: '♪ 空灵星界 Ethereal', en: '♪ Ethereal Fantasy' },
-      CHIPTUNE_PRO: { zh: '♪ 16位街机 Chiptune', en: '♪ 16-Bit Arcade' },
-      AUTO: { zh: '♪ 随场景智能轮换', en: '♪ Auto-Biome Cycle' }
+      BAROQUE: { zh: '♪ Ⅰ. 哥特交响 (默认)', en: '♪ I. Gothic Symphony' },
+      SYNTHWAVE: { zh: '♪ Ⅱ. 暗潮脉动 Darkwave', en: '♪ II. Darkwave Pulse' },
+      CINEMATIC_EPIC: { zh: '♪ Ⅲ. 电影交响 · 史诗', en: '♪ III. Cinematic Epic' },
+      GOTHIC_REQUIEM: { zh: '♪ Ⅳ. 哥特安魂曲', en: '♪ IV. Gothic Requiem' },
+      DARK_INDUSTRIAL: { zh: '♪ Ⅴ. 冷冽暗潮 EBM', en: '♪ V. Cold Darkwave' },
+      CINEMATIC_NOCTURNE: { zh: '♪ Ⅵ. 电影夜曲 · 星界', en: '♪ VI. Cinematic Nocturne' }
     };
     const curStyle = this.sound.bgmStyle || 'BAROQUE';
     const bgmLabel = bgmLabels[curStyle] || bgmLabels.BAROQUE;
