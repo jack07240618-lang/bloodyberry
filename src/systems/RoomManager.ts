@@ -1501,31 +1501,223 @@ export class RoomManager {
       this.renderInteractable(ctx, item);
     }
 
-    // 6. 穹顶斜射丁达尔体积光束 (Volumetric Biome Light Shafts / God Rays)
+    // 6. 渲染穹顶高窗投射在石砖地面上的柔和漫反射光斑与窗棂光印 (Dappled Floor Caustic Pools)
+    this.renderFloorGodRayCaustics(ctx, hw, hh, theme);
+
+    ctx.restore();
+  }
+
+  /**
+   * 获取当前房间生态的体积光配色参数
+   */
+  private getCurrentBiomeRayTheme(): { rayTop: string; rayMid: string } {
+    const rayThemes = [
+      { rayTop: '224, 242, 254', rayMid: '251, 191, 36' }, // 0: 绯红地牢 (清冷月华 + 圣金余晖)
+      { rayTop: '224, 242, 254', rayMid: '56, 189, 248' }, // 1: 极寒冰渊 (极光冰蓝)
+      { rayTop: '220, 252, 231', rayMid: '52, 211, 153' }, // 2: 翡翠腐林 (幽林翠光)
+      { rayTop: '254, 240, 138', rayMid: '249, 115, 22' }, // 3: 炼狱熔炉 (炽金火光)
+      { rayTop: '243, 232, 255', rayMid: '192, 132, 252' }  // 4: 星界虚空 (星云紫晶)
+    ];
+    return rayThemes[this.currentRoom.biomeIndex % rayThemes.length];
+  }
+
+  /**
+   * 第一层（地面层）：在穹顶三束光线落点处绘制石砖地面漫反射光池与哥特三联窗棂柔光斑（位于角色与怪物脚下）
+   */
+  private renderFloorGodRayCaustics(
+    ctx: CanvasRenderingContext2D,
+    hw: number,
+    hh: number,
+    theme: { rayTop: string; rayMid: string }
+  ): void {
+    const shafts = [
+      { landX: -275, landY: 65, scale: 0.95, phase: 0.0 },
+      { landX: 18, landY: -5, scale: 1.12, phase: 1.7 },
+      { landX: 295, landY: 75, scale: 0.92, phase: 3.4 }
+    ];
+
     ctx.save();
+    ctx.beginPath();
+    ctx.rect(-hw, -hh, hw * 2, hh * 2);
+    ctx.clip();
     ctx.globalCompositeOperation = 'lighter';
-    const rayOffsets = [-320, 0, 310];
-    for (let i = 0; i < rayOffsets.length; i++) {
-      const rx = rayOffsets[i];
-      const breathe = 0.045 + Math.sin(this.elapsedSeconds * 1.2 + i * 1.4) * 0.015;
+
+    for (let i = 0; i < shafts.length; i++) {
+      const s = shafts[i];
+      const breathe = 0.85 + Math.sin(this.elapsedSeconds * 0.95 + s.phase) * 0.15;
+      const rx = 115 * s.scale;
+      const ry = 64 * s.scale;
+
       ctx.save();
-      ctx.translate(rx, 0);
-      ctx.rotate(-0.48);
-      const rayGrad = ctx.createLinearGradient(-55, -hh, 55, hh);
-      rayGrad.addColorStop(0, `rgba(${theme.rayTop}, ${breathe * 1.3})`);
-      rayGrad.addColorStop(0.5, `rgba(${theme.rayMid}, ${breathe * 0.7})`);
-      rayGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = rayGrad;
+      ctx.translate(s.landX, s.landY);
+      ctx.rotate(-0.18);
+
+      // 1. 地面宽幅柔和漫反射光池 (Soft Ground Bounce Pool)
+      ctx.save();
+      ctx.scale(rx, ry);
+      const poolGrad = ctx.createRadialGradient(0, 0, 0.05, 0, 0, 1.0);
+      poolGrad.addColorStop(0, `rgba(${theme.rayTop}, ${(0.075 * breathe).toFixed(4)})`);
+      poolGrad.addColorStop(0.45, `rgba(${theme.rayMid}, ${(0.042 * breathe).toFixed(4)})`);
+      poolGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = poolGrad;
       ctx.beginPath();
-      ctx.moveTo(-42, -hh * 1.2);
-      ctx.lineTo(42, -hh * 1.2);
-      ctx.lineTo(110, hh * 1.2);
-      ctx.lineTo(-110, hh * 1.2);
-      ctx.closePath();
+      ctx.arc(0, 0, 1, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
+
+      // 2. 哥特高窗三联窗格投射在地面上的柔化光印 (3 Soft Lancet Window Pane Caustics)
+      for (let pane = -1; pane <= 1; pane++) {
+        const px = pane * 34 * s.scale;
+        const py = pane * 6;
+        const panePulse = 0.8 + Math.sin(this.elapsedSeconds * 1.3 + s.phase + pane * 1.1) * 0.2;
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(-0.42);
+        ctx.scale(16 * s.scale, 38 * s.scale);
+        const paneGrad = ctx.createRadialGradient(0, 0, 0.05, 0, 0, 1.0);
+        paneGrad.addColorStop(0, `rgba(${theme.rayTop}, ${(0.068 * panePulse).toFixed(4)})`);
+        paneGrad.addColorStop(0.55, `rgba(${theme.rayMid}, ${(0.032 * panePulse).toFixed(4)})`);
+        paneGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = paneGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      ctx.restore();
     }
+
     ctx.restore();
+  }
+
+  /**
+   * 第二层（空中体积光层，在角色与怪物之上渲染）：
+   * 渲染从屋顶高窗斜射而下的三条自然柔化丁达尔体积光束（无生硬多边形边缘，含窗棂分束光缕、高窗入射光晕与悬浮微尘）
+   */
+  public renderCeilingGodRaysOverlay(ctx: CanvasRenderingContext2D): void {
+    const hw = this.halfWidth;
+    const hh = this.halfHeight;
+    const theme = this.getCurrentBiomeRayTheme();
+    const t = this.elapsedSeconds;
+
+    const shafts = [
+      { landX: -275, landY: 65, scale: 0.95, phase: 0.0 },
+      { landX: 18, landY: -5, scale: 1.12, phase: 1.7 },
+      { landX: 295, landY: 75, scale: 0.92, phase: 3.4 }
+    ];
+
+    ctx.save();
+    // 严格裁剪在房间四壁内部，避免光线穿出城墙外侧黑底
+    ctx.beginPath();
+    ctx.rect(-hw, -hh, hw * 2, hh * 2);
+    ctx.clip();
+    ctx.globalCompositeOperation = 'lighter';
+
+    for (let i = 0; i < shafts.length; i++) {
+      const s = shafts[i];
+      const breathe = 0.88 + Math.sin(t * 0.95 + s.phase) * 0.12;
+      const swayAngle = -0.42 + Math.sin(t * 0.35 + s.phase) * 0.012;
+      const shaftHalfLen = 340 * s.scale;
+      const shaftHalfW = 78 * s.scale;
+
+      ctx.save();
+      ctx.translate(s.landX, s.landY);
+      ctx.rotate(swayAngle);
+
+      // 1. 外层宽幅柔化大气散射光幕（使用二维椭圆径向衰减，四面边缘 100% 羽化柔和，绝无生硬多边形切边）
+      ctx.save();
+      ctx.translate(0, -shaftHalfLen * 0.62);
+      ctx.scale(shaftHalfW, shaftHalfLen);
+      const envGrad = ctx.createRadialGradient(0, -0.32, 0.02, 0, 0, 1.0);
+      envGrad.addColorStop(0, `rgba(${theme.rayTop}, ${(0.065 * breathe).toFixed(4)})`);
+      envGrad.addColorStop(0.42, `rgba(${theme.rayMid}, ${(0.038 * breathe).toFixed(4)})`);
+      envGrad.addColorStop(0.78, `rgba(${theme.rayMid}, ${(0.014 * breathe).toFixed(4)})`);
+      envGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = envGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // 2. 窗棂分束丁达尔光丝（每道主光束内部由 4 缕粗细错落、缓慢呼吸交织的次级光缕组成，还原真实高窗铁格透光感）
+      const subRays = [
+        { offsetX: -30, width: 22, lenScale: 0.96, alphaMult: 0.85, speed: 1.1 },
+        { offsetX: -9, width: 28, lenScale: 1.04, alphaMult: 1.15, speed: 0.85 },
+        { offsetX: 13, width: 24, lenScale: 1.0, alphaMult: 1.0, speed: 1.25 },
+        { offsetX: 32, width: 18, lenScale: 0.92, alphaMult: 0.75, speed: 0.95 }
+      ];
+
+      for (let sr = 0; sr < subRays.length; sr++) {
+        const sub = subRays[sr];
+        const shimmer = 0.72 + Math.sin(t * sub.speed + s.phase + sr * 1.45) * 0.28;
+        const alphaTop = 0.068 * sub.alphaMult * shimmer;
+        const alphaMid = 0.036 * sub.alphaMult * shimmer;
+
+        ctx.save();
+        // 轻微扇形发散角，使光束从屋顶窄窗向下自然微微散开
+        const fanAngle = (sub.offsetX / 32) * 0.035;
+        ctx.rotate(fanAngle);
+        ctx.translate(sub.offsetX * s.scale, -shaftHalfLen * 0.62 * sub.lenScale);
+        ctx.scale(sub.width * s.scale, shaftHalfLen * sub.lenScale);
+
+        const subGrad = ctx.createRadialGradient(0, -0.38, 0.01, 0, 0, 1.0);
+        subGrad.addColorStop(0, `rgba(255, 255, 255, ${(alphaTop * 1.15).toFixed(4)})`);
+        subGrad.addColorStop(0.24, `rgba(${theme.rayTop}, ${alphaTop.toFixed(4)})`);
+        subGrad.addColorStop(0.62, `rgba(${theme.rayMid}, ${alphaMid.toFixed(4)})`);
+        subGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = subGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 1, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 3. 屋顶高窗入射源头柔光晕 (High Vault Aperture Bloom)
+      ctx.save();
+      ctx.translate(0, -shaftHalfLen * 1.18);
+      ctx.scale(shaftHalfW * 0.72, 42 * s.scale);
+      const srcGrad = ctx.createRadialGradient(0, 0, 0.02, 0, 0, 1.0);
+      srcGrad.addColorStop(0, `rgba(255, 255, 255, ${(0.14 * breathe).toFixed(4)})`);
+      srcGrad.addColorStop(0.45, `rgba(${theme.rayTop}, ${(0.08 * breathe).toFixed(4)})`);
+      srcGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = srcGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, 1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // 4. 光束内部悬浮漂移的丁达尔微尘颗粒 (Illuminated Tyndall Dust Motes)
+      const moteCount = 11;
+      for (let m = 0; m < moteCount; m++) {
+        const seed = i * 31.7 + m * 13.3;
+        // 微尘在光束剖面内随微弱气流缓慢起伏漂移
+        const normY = ((t * (0.045 + (m % 3) * 0.018) + seed * 0.13) % 1);
+        const localY = -shaftHalfLen * 1.15 + normY * (shaftHalfLen * 1.25);
+        const driftX = Math.sin(t * (0.6 + (m % 4) * 0.15) + seed) * (shaftHalfW * 0.62);
+
+        // 越靠近光束中心轴与中上段，微尘被照亮得越明显；移出光束边缘则自然隐没
+        const radialNorm = Math.abs(driftX) / (shaftHalfW * 0.68);
+        const longitudinalEnvelope = Math.sin(normY * Math.PI);
+        const radialEnvelope = Math.max(0, 1 - radialNorm * radialNorm);
+        const twinkle = 0.65 + Math.sin(t * 2.4 + seed * 2.1) * 0.35;
+        const moteAlpha = longitudinalEnvelope * radialEnvelope * twinkle * 0.58;
+
+        if (moteAlpha > 0.03) {
+          const moteR = (1.6 + (m % 3) * 0.9) * s.scale;
+          const mGrad = ctx.createRadialGradient(driftX, localY, 0.1, driftX, localY, moteR * 2.4);
+          mGrad.addColorStop(0, `rgba(255, 255, 255, ${moteAlpha.toFixed(4)})`);
+          mGrad.addColorStop(0.45, `rgba(${theme.rayTop}, ${(moteAlpha * 0.65).toFixed(4)})`);
+          mGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+          ctx.fillStyle = mGrad;
+          ctx.beginPath();
+          ctx.arc(driftX, localY, moteR * 2.4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      ctx.restore();
+    }
 
     ctx.restore();
   }

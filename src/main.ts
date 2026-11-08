@@ -970,8 +970,9 @@ class GameEngine {
     // 4. Particle Effects
     this.particleSystem.render(this.ctx);
 
-    // 5. Ambient Fog, Embers & Weapon Trails
+    // 5. Ambient Fog, Embers, Weapon Trails & Overhead Volumetric Ceiling God-Rays
     this.ambientParticles.renderFogAndTrails(this.ctx, this.camera);
+    this.roomManager.renderCeilingGodRaysOverlay(this.ctx);
 
     // 6. Damage Numbers
     this.damageTextSystem.render(this.ctx);
