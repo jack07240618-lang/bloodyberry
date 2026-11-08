@@ -3,8 +3,10 @@ import { Vector2 } from '../core/Vector2';
 import { Weapon } from '../weapons/Weapon';
 import { PASSIVE_DEFINITIONS } from '../passives/PassiveRegistry';
 import { SpriteRenderer } from '../renderer/SpriteRenderer';
+import { SkillTag } from '../systems/BuildSystem';
 
 export class Player extends Entity {
+  public characterId = 'antonio';
   // Base stats (unmodified)
   public baseMaxHp = 100;
   public baseSpeed = 190;
@@ -28,7 +30,7 @@ export class Player extends Entity {
   // Progression
   public level = 1;
   public xp = 0;
-  public nextLevelXp = 5;
+  public nextLevelXp = 12;
   public pendingLevelUps = 0;
   public gold = 0;
   public kills = 0;
@@ -41,11 +43,14 @@ export class Player extends Entity {
   public weapons: Weapon[] = [];
   public passives: Map<string, number> = new Map(); // passiveId -> level (1-5)
 
-  // Meta Level-Up Manipulations
-  public rerollsRemaining = 2;
-  public skipsRemaining = 1;
-  public banishesRemaining = 2;
+  // Meta Level-Up & Room Reward Manipulations (局内微调杠杆：重随与封印/剔除)
+  public rerollsRemaining = 3;
+  public skipsRemaining = 2;
+  public banishesRemaining = 3;
   public banishedItemIds: Set<string> = new Set();
+
+  // 记录冲刺起点供示例B (OnDodge 留弹) 使用
+  public lastDashStartPosition: Vector2 = new Vector2(0, 0);
 
   // Combat status & feedback
   public iFrameDuration = 0.45;
@@ -59,6 +64,19 @@ export class Player extends Entity {
   public walkAnimTimer = 0;
   public isMoving = false;
   private hpRegenAccumulator = 0;
+
+  // Active Skill 1: Shadow Dash (Spacebar)
+  public dashCooldown = 0;
+  public maxDashCooldown = 2.4;
+  public dashActiveTimer = 0;
+  public dashDuration = 0.22;
+  public dashDirection: Vector2 = new Vector2(1, 0);
+  public dashSpeedMultiplier = 3.4;
+  public dashGhosts: { x: number; y: number; facing: number; frame: number; alpha: number }[] = [];
+
+  // Active Skill 2: Ultimate Screen-Nuke (Q / E Key - Pentagram / Gorgeous Moon)
+  public ultimateCooldown = 18.0; // Starts partially charged so player can test it after 18s!
+  public maxUltimateCooldown = 35.0;
 
   constructor(x = 0, y = 0) {
     super(x, y, 14);
@@ -89,7 +107,44 @@ export class Player extends Entity {
       }
     }
 
-    // Movement
+    // Active Skill Cooldowns (Dash & Ultimate)
+    if (this.dashCooldown > 0) {
+      this.dashCooldown = Math.max(0, this.dashCooldown - dt);
+    }
+    if (this.ultimateCooldown > 0) {
+      this.ultimateCooldown = Math.max(0, this.ultimateCooldown - dt);
+    }
+
+    // Decay Dash Ghost Afterimages
+    for (let i = this.dashGhosts.length - 1; i >= 0; i--) {
+      this.dashGhosts[i].alpha -= dt * 4.2;
+      if (this.dashGhosts[i].alpha <= 0) {
+        this.dashGhosts.splice(i, 1);
+      }
+    }
+
+    // Handle Active Shadow Dash Burst
+    if (this.dashActiveTimer > 0) {
+      this.dashActiveTimer -= dt;
+      this.isMoving = true;
+      this.velocity.copy(this.dashDirection).multiplyScalar(this.moveSpeed * this.dashSpeedMultiplier);
+      this.position.addScaled(this.velocity, dt);
+      this.walkAnimTimer += dt * 18;
+
+      // Record translucent dash afterimage ghost
+      if (this.dashGhosts.length === 0 || Math.hypot(this.position.x - this.dashGhosts[0].x, this.position.y - this.dashGhosts[0].y) > 14) {
+        this.dashGhosts.unshift({
+          x: this.position.x,
+          y: this.position.y,
+          facing: this.facingDirection,
+          frame: Math.floor(this.walkAnimTimer) % 4,
+          alpha: 0.65
+        });
+      }
+      return;
+    }
+
+    // Standard Movement
     if (this.moveDirection.lengthSq() > 0.0001) {
       this.isMoving = true;
       this.velocity.copy(this.moveDirection).multiplyScalar(this.moveSpeed);
@@ -103,6 +158,42 @@ export class Player extends Entity {
       this.isMoving = false;
       this.velocity.set(0, 0);
       this.walkAnimTimer = 0;
+    }
+  }
+
+  public tryDash(): boolean {
+    if (this.isDead || this.dashCooldown > 0 || this.dashActiveTimer > 0) return false;
+
+    this.lastDashStartPosition.copy(this.position);
+
+    if (this.moveDirection.lengthSq() > 0.001) {
+      this.dashDirection.copy(this.moveDirection).normalize();
+    } else {
+      this.dashDirection.set(this.facingDirection, 0);
+    }
+
+    const dashRank = this.getPassiveLevel('wings');
+    const dashCdFactor = Math.max(0.55, 1.0 - dashRank * 0.08);
+    this.dashActiveTimer = this.dashDuration;
+    this.dashCooldown = Math.max(0.8, this.maxDashCooldown * this.cooldownMult * dashCdFactor);
+    this.iFrameTimer = Math.max(this.iFrameTimer, this.dashDuration + 0.14); // Invulnerable during dash!
+    return true;
+  }
+
+  public isUltimateReady(): boolean {
+    return !this.isDead && this.ultimateCooldown <= 0;
+  }
+
+  public triggerUltimate(): boolean {
+    if (!this.isUltimateReady()) return false;
+    this.ultimateCooldown = Math.max(15.0, this.maxUltimateCooldown * this.cooldownMult);
+    this.iFrameTimer = Math.max(this.iFrameTimer, 0.8);
+    return true;
+  }
+
+  public reduceUltimateCooldown(seconds: number): void {
+    if (this.ultimateCooldown > 0) {
+      this.ultimateCooldown = Math.max(0, this.ultimateCooldown - seconds);
     }
   }
 
@@ -137,8 +228,8 @@ export class Player extends Entity {
     while (this.xp >= this.nextLevelXp) {
       this.xp -= this.nextLevelXp;
       this.level++;
-      // Exponential curve matching classic horde survivor formulas
-      this.nextLevelXp = Math.floor(5 * Math.pow(1.18, this.level - 1) + (this.level * 3));
+      // Balanced progression curve so player power ramps steadily across floors
+      this.nextLevelXp = Math.floor(12 * Math.pow(1.24, this.level - 1) + (this.level * 7));
       this.pendingLevelUps++;
       leveledUp = true;
     }
@@ -182,101 +273,149 @@ export class Player extends Entity {
     return this.passives.get(passiveId) || 0;
   }
 
-  public recalculateStats(): void {
-    let speedBonus = 0;
-    let damageBonus = 0;
-    let cdReduction = 0;
-    let projBonus = 0;
-    let xpBonus = 0;
-    let hpBonus = 0;
-    let armorBonus = 0;
-    let regenBonus = 0;
-    let pickupBonus = 0;
-    let cloverBonus = 0;
+  public getWeaponsByTag(tag: SkillTag): Weapon[] {
+    return this.weapons.filter(w => w.hasTag(tag));
+  }
 
-    for (const [id, lvl] of this.passives.entries()) {
-      switch (id) {
-        case 'spinach':
-          damageBonus += lvl * 0.1;
-          break;
-        case 'wings':
-          speedBonus += lvl * 0.1;
-          break;
-        case 'empty_tome':
-          cdReduction += lvl * 0.08;
-          break;
-        case 'duplicator':
-          projBonus += lvl * 1;
-          break;
-        case 'crown':
-          xpBonus += lvl * 0.15;
-          break;
-        case 'hollow_heart':
-          hpBonus += lvl * 0.2;
-          break;
-        case 'armor':
-          armorBonus += lvl * 1;
-          break;
-        case 'pummarola':
-          regenBonus += lvl * 0.6;
-          break;
-        case 'attractorb':
-          pickupBonus += lvl * 0.3;
-          break;
-        case 'clover':
-          cloverBonus += lvl * 0.1;
-          break;
-      }
-    }
+  public useReroll(): boolean {
+    if (this.rerollsRemaining <= 0) return false;
+    this.rerollsRemaining--;
+    return true;
+  }
+
+  public useBanish(itemId: string): boolean {
+    if (this.banishesRemaining <= 0) return false;
+    this.banishesRemaining--;
+    this.banishedItemIds.add(itemId);
+    return true;
+  }
+
+  public recalculateStats(): void {
+    // 机制驱动构筑：不再通过被动词条无脑堆叠纯攻击力/攻速百分比，而是由 BuildEventBus 触发多标签机制联动！
+    const soulRank = this.getPassiveLevel('hollow_heart');
+    const armorRank = this.getPassiveLevel('armor');
+    const attractRank = this.getPassiveLevel('attractorb');
+    const singularityRank = this.getPassiveLevel('clover');
 
     const prevMaxHp = this.maxHp;
-    this.maxHp = Math.round(this.baseMaxHp * (1 + hpBonus));
+    this.maxHp = Math.round(this.baseMaxHp + soulRank * 12);
     if (this.maxHp > prevMaxHp && prevMaxHp > 0) {
-      // Increase current HP proportionally with max HP gain
       this.hp += (this.maxHp - prevMaxHp);
     }
 
-    this.moveSpeed = this.baseSpeed * (1 + speedBonus);
-    this.damageMult = 1.0 + damageBonus;
-    this.cooldownMult = Math.max(0.3, 1.0 - cdReduction);
-    this.projectileCountBonus = projBonus;
-    this.xpMult = 1.0 + xpBonus;
-    this.armor = armorBonus;
-    this.hpRegen = 0.2 + regenBonus;
-    this.pickupRadius = this.basePickupRadius * (1 + pickupBonus);
-    this.critChance = 0.05 + cloverBonus;
-    this.luck = 1.0 + cloverBonus;
+    this.moveSpeed = this.baseSpeed;
+    this.armor = Math.max(this.armor, armorRank > 1 ? armorRank - 1 : 0);
+    this.pickupRadius = this.basePickupRadius * (1 + attractRank * 0.25);
+
+    // 【示例 C（风险与机制转化）】：若拥有“湮灭第四律令”，彻底取消随机暴击率概念（归零），转化为每第4次攻击必触发范围穿透奇点！
+    if (singularityRank > 0) {
+      this.critChance = 0;
+    }
   }
 
   public render(ctx: CanvasRenderingContext2D): void {
     if (this.isDead) return;
 
+    const spriteKey = `hero_${this.characterId}`;
+
+    // Render Dash Ghost Afterimages in World Space
+    for (const g of this.dashGhosts) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = g.alpha * 0.65;
+      SpriteRenderer.getInstance().drawSprite(
+        ctx,
+        spriteKey,
+        g.frame,
+        g.x,
+        g.y - 2,
+        40,
+        40,
+        g.facing,
+        true
+      );
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.translate(this.position.x, this.position.y);
 
-    // Subtle drop shadow underneath
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    // Soft radial aura glow beneath player feet (Golden/Purple when Ultimate is Ready!)
+    const ultReady = this.isUltimateReady();
+    const auraGrad = ctx.createRadialGradient(0, 6, 2, 0, 6, this.radius * (ultReady ? 2.8 : 2.2));
+    if (ultReady) {
+      auraGrad.addColorStop(0, 'rgba(250, 204, 21, 0.42)');
+      auraGrad.addColorStop(0.5, 'rgba(168, 85, 247, 0.22)');
+      auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    } else {
+      auraGrad.addColorStop(0, 'rgba(56, 189, 248, 0.28)');
+      auraGrad.addColorStop(0.5, 'rgba(59, 130, 246, 0.10)');
+      auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    }
+    ctx.fillStyle = auraGrad;
     ctx.beginPath();
-    ctx.ellipse(0, this.radius + 1, this.radius * 1.1, this.radius * 0.5, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 6, this.radius * (ultReady ? 2.8 : 2.2), this.radius * (ultReady ? 1.4 : 1.1), 0, 0, Math.PI * 2);
     ctx.fill();
 
+    // Gothic Hunter's Sacred Compass Ring beneath feet (unified reliquary filigree)
+    ctx.save();
+    ctx.scale(1, 0.52);
+    ctx.translate(0, 14);
+    ctx.strokeStyle = ultReady ? 'rgba(251, 191, 36, 0.55)' : 'rgba(125, 211, 252, 0.32)';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius * 1.65, 0, Math.PI * 2);
+    ctx.stroke();
+    for (let c = 0; c < 4; c++) {
+      const cAng = (c * Math.PI) / 2 + (this.walkAnimTimer * 0.08);
+      const cx = Math.cos(cAng) * this.radius * 1.65;
+      const cy = Math.sin(cAng) * this.radius * 1.65;
+      ctx.fillStyle = ultReady ? '#fde047' : '#bae6fd';
+      ctx.beginPath();
+      ctx.arc(cx, cy, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // Directional Ground Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+    ctx.beginPath();
+    ctx.ellipse(3, this.radius + 1, this.radius * 1.15, this.radius * 0.48, 0.12, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Render Continuous Sacred Golden Orbit Ring when King Bible / Holy Shield is equipped!
+    const shieldWeapon = this.getWeapon('spinning_orbs');
+    if (shieldWeapon) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const orbitR = shieldWeapon.area * this.areaMult;
+      ctx.strokeStyle = shieldWeapon.isEvolved ? 'rgba(244, 63, 94, 0.35)' : 'rgba(251, 191, 36, 0.28)';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([10, 6]);
+      ctx.beginPath();
+      ctx.arc(0, 0, orbitR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
     // Invulnerability blinking
-    if (this.iFrameTimer > 0 && Math.floor(this.iFrameTimer * 20) % 2 === 0) {
+    if (this.iFrameTimer > 0 && this.dashActiveTimer <= 0 && Math.floor(this.iFrameTimer * 20) % 2 === 0) {
       ctx.globalAlpha = 0.4;
     }
 
     const animFrame = this.isMoving ? Math.floor(this.walkAnimTimer) % 4 : 0;
     const isHit = this.hurtFlashTimer > 0;
 
-    // Draw High-Res Gothic Hunter Sprite
+    // Draw High-Res Gothic Hero Sprite
     SpriteRenderer.getInstance().drawSprite(
       ctx,
-      'hunter_walk',
+      spriteKey,
       animFrame,
       0,
       -2,
-      36,
-      36,
+      40,
+      40,
       this.facingDirection,
       isHit
     );
@@ -288,19 +427,94 @@ export class Player extends Entity {
   }
 
   private renderHealthBar(ctx: CanvasRenderingContext2D): void {
-    const barWidth = 32;
-    const barHeight = 4;
+    const barWidth = 42;
+    const barHeight = 6;
     const barX = this.position.x - barWidth / 2;
-    const barY = this.position.y - this.radius - 14;
+    const barY = this.position.y - this.radius - 18;
 
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+    ctx.save();
+
+    // 1. 3D Floating Drop Shadow beneath the gauge
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+    ctx.beginPath();
+    ctx.roundRect(barX - 2, barY + 1.5, barWidth + 4, barHeight + 4, 3);
+    ctx.fill();
+
+    // 2. Sculpted Metallic Outer Casing (Top Light Bevel + Bottom Bronze Shadow)
+    const caseGrad = ctx.createLinearGradient(0, barY - 2, 0, barY + barHeight + 2);
+    caseGrad.addColorStop(0, '#334155');
+    caseGrad.addColorStop(0.5, '#0f172a');
+    caseGrad.addColorStop(1, '#020617');
+    ctx.fillStyle = caseGrad;
+    ctx.beginPath();
+    ctx.roundRect(barX - 2, barY - 2, barWidth + 4, barHeight + 4, 3);
+    ctx.fill();
+
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Left & Right 3D Gold Diamond Studs
+    ctx.fillStyle = '#fde047';
+    for (const sx of [barX - 3, barX + barWidth + 3]) {
+      ctx.beginPath();
+      ctx.moveTo(sx, barY + barHeight / 2 - 2.5);
+      ctx.lineTo(sx + 2.5, barY + barHeight / 2);
+      ctx.lineTo(sx, barY + barHeight / 2 + 2.5);
+      ctx.lineTo(sx - 2.5, barY + barHeight / 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 3. Recessed Dark Inner Well
+    ctx.fillStyle = '#04060d';
+    ctx.fillRect(barX, barY, barWidth, barHeight);
 
     const hpPercent = Math.max(0, Math.min(1, this.hp / this.maxHp));
     const fillWidth = barWidth * hpPercent;
 
-    // Green to yellow to red gradient
-    ctx.fillStyle = hpPercent > 0.5 ? '#22c55e' : hpPercent > 0.25 ? '#eab308' : '#ef4444';
-    ctx.fillRect(barX, barY, fillWidth, barHeight);
+    // 4. Cylindrical 3D Liquid Glass Fill (4-stop vertical curvature gradient)
+    if (fillWidth > 0.5) {
+      const cylGrad = ctx.createLinearGradient(0, barY, 0, barY + barHeight);
+      if (hpPercent > 0.5) {
+        cylGrad.addColorStop(0, '#bbf7d0');
+        cylGrad.addColorStop(0.35, '#22c55e');
+        cylGrad.addColorStop(0.8, '#15803d');
+        cylGrad.addColorStop(1, '#052e16');
+      } else if (hpPercent > 0.25) {
+        cylGrad.addColorStop(0, '#fef08a');
+        cylGrad.addColorStop(0.35, '#f59e0b');
+        cylGrad.addColorStop(0.8, '#b45309');
+        cylGrad.addColorStop(1, '#451a03');
+      } else {
+        cylGrad.addColorStop(0, '#fecaca');
+        cylGrad.addColorStop(0.35, '#ef4444');
+        cylGrad.addColorStop(0.8, '#991b1b');
+        cylGrad.addColorStop(1, '#450a0a');
+      }
+      ctx.fillStyle = cylGrad;
+      ctx.fillRect(barX, barY, fillWidth, barHeight);
+
+      // Top Specular Glass Tube Highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
+      ctx.fillRect(barX, barY, fillWidth, 1.8);
+
+      // Glowing Liquid Meniscus Tip
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(barX + Math.max(0, fillWidth - 1.5), barY, 1.5, barHeight);
+    }
+
+    // 5. Subtle 3D Dash Stamina Micro-Bar directly under HP gauge
+    const dashReady = this.dashCooldown <= 0;
+    const dashPct = dashReady
+      ? 1
+      : 1 - Math.min(1, this.dashCooldown / Math.max(0.1, this.maxDashCooldown * this.cooldownMult));
+    const dashY = barY + barHeight + 3;
+    ctx.fillStyle = 'rgba(4, 6, 13, 0.85)';
+    ctx.fillRect(barX + 2, dashY, barWidth - 4, 2);
+    ctx.fillStyle = dashReady ? '#38bdf8' : '#0284c7';
+    ctx.fillRect(barX + 2, dashY, (barWidth - 4) * dashPct, 2);
+
+    ctx.restore();
   }
 }

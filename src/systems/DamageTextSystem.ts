@@ -77,23 +77,45 @@ export class DamageTextSystem {
     });
   }
 
+  public addStatusText(x: number, y: number, text: string, color = '#f97316', fontSize = 15): void {
+    this.items.push({
+      position: new Vector2(x, y - 22),
+      velocity: new Vector2((Math.random() - 0.5) * 30, -85),
+      text,
+      color,
+      fontSize,
+      lifetime: 0.85,
+      maxLifetime: 0.85,
+      alpha: 1.0,
+      isCrit: true
+    });
+  }
+
   public render(ctx: CanvasRenderingContext2D): void {
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
     for (const item of this.items) {
+      const progress = 1 - item.lifetime / item.maxLifetime;
+      const popScale = item.isCrit && progress < 0.2 ? 1 + (0.2 - progress) * 0.9 : 1;
+
+      ctx.save();
+      ctx.translate(item.position.x, item.position.y);
+      ctx.scale(popScale, popScale);
       ctx.globalAlpha = item.alpha;
-      ctx.font = `bold ${item.fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif`;
 
-      // Dark outline for contrast
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 3;
-      ctx.strokeText(item.text, item.position.x, item.position.y);
+      const weight = item.isCrit ? '600' : '500';
+      const size = item.isCrit ? Math.min(15, item.fontSize) : item.fontSize;
+      ctx.font = `${weight} ${size}px ui-monospace, "SF Mono", "JetBrains Mono", -apple-system, sans-serif`;
 
-      // Main text
-      ctx.fillStyle = item.color;
-      ctx.fillText(item.text, item.position.x, item.position.y);
+      // Subtle 1px dark drop shadow (Clean modern look, no thick cartoon outline)
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.78)';
+      ctx.fillText(item.text, 0, 1.2);
+
+      ctx.fillStyle = item.isCrit && item.color === '#fbbf24' ? '#fde047' : item.color;
+      ctx.fillText(item.text, 0, 0);
+      ctx.restore();
     }
 
     ctx.restore();

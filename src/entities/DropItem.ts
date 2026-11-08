@@ -139,10 +139,31 @@ export class DropItem extends Entity {
 
   private renderGem(ctx: CanvasRenderingContext2D, light: string, dark: string, size: number, bob: number): void {
     ctx.translate(0, bob);
-    ctx.shadowColor = light;
-    ctx.shadowBlur = 8;
 
-    // Rhombus / Faceted Diamond
+    // 1. Additive Radial Gem Glow Halo
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const glow = ctx.createRadialGradient(0, 0, 1, 0, 0, size * 2.1);
+    glow.addColorStop(0, light);
+    glow.addColorStop(0.5, dark);
+    glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 2.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // 2. Outer Dark Facet Rim
+    ctx.fillStyle = '#090d16';
+    ctx.beginPath();
+    ctx.moveTo(0, -(size + 1.2));
+    ctx.lineTo((size + 1.2) * 0.82, 0);
+    ctx.lineTo(0, size + 1.2);
+    ctx.lineTo(-(size + 1.2) * 0.82, 0);
+    ctx.closePath();
+    ctx.fill();
+
+    // 3. Main Rhombus / Faceted Crystal Body
     ctx.fillStyle = light;
     ctx.beginPath();
     ctx.moveTo(0, -size);
@@ -152,7 +173,7 @@ export class DropItem extends Entity {
     ctx.closePath();
     ctx.fill();
 
-    // Dark facet shading
+    // 4. Lower-Right Deep Facet Cut
     ctx.fillStyle = dark;
     ctx.beginPath();
     ctx.moveTo(0, 0);
@@ -161,10 +182,23 @@ export class DropItem extends Entity {
     ctx.closePath();
     ctx.fill();
 
-    // White highlight glint
+    // 5. Inner Crown Table Facet + Sparkling Star Glint
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = 0.75;
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 0.55);
+    ctx.lineTo(size * 0.35, 0);
+    ctx.lineTo(0, size * 0.35);
+    ctx.lineTo(-size * 0.35, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1.0;
+
+    // Animated 4-point sparkle on top-left edge
+    const glintScale = 0.6 + Math.abs(Math.sin(this.sparkleTimer * 1.5)) * 0.6;
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(-size * 0.25, -size * 0.3, size * 0.2, 0, Math.PI * 2);
+    ctx.arc(-size * 0.28, -size * 0.32, size * 0.22 * glintScale, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -243,34 +277,58 @@ export class DropItem extends Entity {
 
   private renderChest(ctx: CanvasRenderingContext2D, bob: number): void {
     ctx.translate(0, bob);
-    ctx.shadowColor = '#f59e0b';
-    ctx.shadowBlur = 16;
 
-    // Ornate Golden/Crimson Treasure Chest
-    // Base
-    ctx.fillStyle = '#78350f';
-    ctx.fillRect(-14, -6, 28, 16);
+    // 1. Vertical Golden Sunbeam Pillar behind Boss Chest
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const pillarGrad = ctx.createLinearGradient(-16, 0, 16, 0);
+    pillarGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    pillarGrad.addColorStop(0.5, 'rgba(251, 191, 36, 0.32)');
+    pillarGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = pillarGrad;
+    ctx.fillRect(-16, -120, 32, 130);
 
-    // Golden metal bands
-    ctx.fillStyle = '#fbbf24';
-    ctx.fillRect(-14, -6, 4, 16);
-    ctx.fillRect(10, -6, 4, 16);
-    ctx.fillRect(-14, -6, 28, 3);
-    ctx.fillRect(-14, 7, 28, 3);
-
-    // Lid
-    ctx.fillStyle = '#92400e';
+    // Radial Ground Halo
+    const halo = ctx.createRadialGradient(0, 2, 2, 0, 2, 30);
+    halo.addColorStop(0, 'rgba(250, 204, 21, 0.65)');
+    halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = halo;
     ctx.beginPath();
-    ctx.ellipse(0, -7, 14, 6, 0, Math.PI, 0);
+    ctx.arc(0, 2, 30, 0, Math.PI * 2);
     ctx.fill();
+    ctx.restore();
 
-    // Golden Keyhole / Lock
+    // 2. Ornate Royal Crimson-Gold Treasure Chest
+    ctx.fillStyle = '#450a0a';
+    ctx.fillRect(-15, -7, 30, 18);
+    ctx.fillStyle = '#991b1b';
+    ctx.fillRect(-13, -5, 26, 14);
+
+    // Beveled Golden Straps & Studs
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillRect(-15, -7, 4, 18);
+    ctx.fillRect(11, -7, 4, 18);
+    ctx.fillRect(-15, -7, 30, 3);
+    ctx.fillRect(-15, 8, 30, 3);
+
+    // Domed Vaulted Lid
+    ctx.fillStyle = '#b91c1c';
+    ctx.beginPath();
+    ctx.ellipse(0, -7, 15, 6.5, 0, Math.PI, 0);
+    ctx.fill();
+    ctx.strokeStyle = '#fde047';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Center Ruby Lock Escutcheon
     ctx.fillStyle = '#fef08a';
     ctx.beginPath();
-    ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
+    ctx.arc(0, 0, 4.5, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#451a03';
-    ctx.fillRect(-1, -1, 2, 4);
+    ctx.fillStyle = '#ef4444';
+    ctx.beginPath();
+    ctx.arc(0, 0, 2.2, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   private renderCoin(ctx: CanvasRenderingContext2D, bob: number): void {

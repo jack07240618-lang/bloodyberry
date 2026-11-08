@@ -114,24 +114,28 @@ export const ENEMY_CONFIGS: Record<EnemyType, EnemyConfig> = {
   [EnemyType.BOSS_DEMON]: {
     type: EnemyType.BOSS_DEMON,
     name: 'Malakor the Defiler',
-    maxHp: 2800,
-    speed: 62,
-    damage: 32,
+    maxHp: 1950,
+    speed: 96,
+    damage: 28,
     radius: 28,
-    xpValue: 100,
-    knockbackResist: 0.9,
+    xpValue: 85,
+    knockbackResist: 0.92,
     color: '#dc2626',
     isBoss: true
   }
 };
 
-export function createEnemy(type: EnemyType, x: number, y: number, waveMultiplier = 1.0): Enemy {
+export function createEnemy(type: EnemyType, x: number, y: number, waveMultiplier = 1.0, bossVariant?: number): Enemy {
   const baseConfig = ENEMY_CONFIGS[type];
   const scaledConfig: EnemyConfig = {
     ...baseConfig,
     maxHp: Math.round(baseConfig.maxHp * waveMultiplier),
-    damage: Math.round(baseConfig.damage * (1 + (waveMultiplier - 1) * 0.4))
+    damage: Math.round(baseConfig.damage * (1 + (waveMultiplier - 1) * 0.42))
   };
 
-  return new Enemy(scaledConfig, x, y);
+  const enemy = new Enemy(scaledConfig, x, y);
+  if (typeof bossVariant === 'number') {
+    enemy.bossVariant = bossVariant;
+  }
+  return enemy;
 }

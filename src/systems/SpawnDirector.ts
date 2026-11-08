@@ -11,9 +11,7 @@ export class SpawnDirector {
   private maxActiveEnemies = 450;
 
   // Wave event flags
-  private bossSpawned3Min = false;
-  private bossSpawned7Min = false;
-  private bossSpawned10Min = false;
+  private nextBossTime = 60; // Every 60 seconds a Stage Boss spawns; defeating it spawns the Mystery Door!
   private lastCircleEvent = 0;
 
   constructor(private combatSystem: CombatSystem) {}
@@ -21,9 +19,7 @@ export class SpawnDirector {
   public reset(): void {
     this.elapsedSeconds = 0;
     this.spawnTimer = 0;
-    this.bossSpawned3Min = false;
-    this.bossSpawned7Min = false;
-    this.bossSpawned10Min = false;
+    this.nextBossTime = 60;
     this.lastCircleEvent = 0;
   }
 
@@ -47,22 +43,19 @@ export class SpawnDirector {
   }
 
   private checkTimedEvents(player: Player): void {
-    // 3 Minute Mini-Boss: Dread Minotaur
-    if (this.elapsedSeconds >= 180 && !this.bossSpawned3Min) {
-      this.bossSpawned3Min = true;
-      this.spawnBossAt(player.position, EnemyType.MINOTAUR, 1.5);
-    }
+    // Stage Boss spawns every 60 seconds (1m, 2m, 3m, 4m...) to guard the next Mystery Door!
+    if (this.elapsedSeconds >= this.nextBossTime) {
+      const stageIdx = Math.floor(this.nextBossTime / 60);
+      this.nextBossTime += 60;
 
-    // 7 Minute Mini-Boss: Armored Golem King
-    if (this.elapsedSeconds >= 420 && !this.bossSpawned7Min) {
-      this.bossSpawned7Min = true;
-      this.spawnBossAt(player.position, EnemyType.TANK, 2.5);
-    }
-
-    // 10 Minute Arch-Demon: Malakor the Defiler
-    if (this.elapsedSeconds >= 600 && !this.bossSpawned10Min) {
-      this.bossSpawned10Min = true;
-      this.spawnBossAt(player.position, EnemyType.BOSS_DEMON, 3.0);
+      const bossType =
+        stageIdx % 3 === 0
+          ? EnemyType.BOSS_DEMON
+          : stageIdx % 2 === 0
+          ? EnemyType.TANK
+          : EnemyType.MINOTAUR;
+      const mult = 1.0 + stageIdx * 0.35;
+      this.spawnBossAt(player.position, bossType, mult);
     }
 
     // Encircling swarm event every 2.5 minutes (150s, 300s, 450s, etc.)

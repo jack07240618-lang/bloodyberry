@@ -1,0 +1,2320 @@
+import { Vector2 } from '../core/Vector2';
+import { Player } from '../entities/Player';
+import { CombatSystem } from './CombatSystem';
+import { EnemyType } from '../enemies/Enemy';
+import { createEnemy } from '../enemies/EnemyRegistry';
+import { DropItem, DropType } from '../entities/DropItem';
+import { Destructible } from '../entities/Destructible';
+import { Camera } from '../core/Camera';
+import { SkillTag } from './BuildSystem';
+import { t } from '../core/I18n';
+
+/**
+ * 房间状态机枚举 (Room State Machine)
+ */
+export enum RoomState {
+  UNVISITED = 'UNVISITED',         // 未探索
+  ACTIVE_LOCKED = 'ACTIVE_LOCKED', // 战斗中（所有出入口锁死）
+  CLEARED = 'CLEARED',             // 已清理（解锁出入口 + 中央生成过关奖励）
+  SPECIAL = 'SPECIAL'              // 特殊功能房（商店/铁匠 或 事件/奇遇）
+}
+
+/**
+ * 房间类型枚举 (4种基础房间类型)
+ */
+export enum RoomType {
+  COMBAT = 'COMBAT', // ⚔️ 普通战斗房
+  ELITE = 'ELITE',   // 💀 精英高危房（高难高收益）
+  SHOP = 'SHOP',     // 💰 商店/铁匠房
+  EVENT = 'EVENT'    // ❓ 事件/奇遇房
+}
+
+export interface RoomTypeMeta {
+  type: RoomType;
+  title: string;
+  subtitle: string;
+  badgeIcon: string;
+  themeColor: string;
+  glowColor: string;
+}
+
+export const ROOM_TYPE_META: Record<RoomType, RoomTypeMeta> = {
+  [RoomType.COMBAT]: {
+    type: RoomType.COMBAT,
+    title: '普通战斗房',
+    subtitle: '击败驻守怪群，获取三选一构筑遗物',
+    badgeIcon: '⚔️',
+    themeColor: '#38bdf8',
+    glowColor: 'rgba(56, 189, 248, 0.35)'
+  },
+  [RoomType.ELITE]: {
+    type: RoomType.ELITE,
+    title: '精英高危房',
+    subtitle: '高难首领挑战，必掉神话宝箱与高额金币',
+    badgeIcon: '💀',
+    themeColor: '#ef4444',
+    glowColor: 'rgba(239, 68, 68, 0.42)'
+  },
+  [RoomType.SHOP]: {
+    type: RoomType.SHOP,
+    title: '铁匠商店房',
+    subtitle: '消耗金币淬炼武器、购买构筑与重随次数',
+    badgeIcon: '💰',
+    themeColor: '#fbbf24',
+    glowColor: 'rgba(251, 191, 36, 0.38)'
+  },
+  [RoomType.EVENT]: {
+    type: RoomType.EVENT,
+    title: '奇遇事件房',
+    subtitle: '未知的命运祭坛，风险转化或神圣赐福',
+    badgeIcon: '❓',
+    themeColor: '#c084fc',
+    glowColor: 'rgba(192, 132, 252, 0.38)'
+  }
+};
+
+/**
+ * 出口门数据结构 (Door Portal)
+ */
+export interface DoorPortal {
+  id: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  targetRoomType: RoomType;
+  isOpen: boolean;
+  pulseTimer: number;
+}
+
+/**
+ * 房间中央过关奖励台 / 商店展台 / 奇遇祭坛 / 诅咒血箱互动项
+ */
+export interface RoomInteractable {
+  id: string;
+  kind:
+    | 'CLEAR_REWARD'
+    | 'SHOP_UPGRADE'
+    | 'SHOP_HEAL_REROLL'
+    | 'SHOP_RELIC_BOX'
+    | 'EVENT_BLOOD_PACT'
+    | 'EVENT_STAR_GRACE'
+    | 'CURSED_BLOOD_CHEST';
+  x: number;
+  y: number;
+  radius: number;
+  title: string;
+  subtitle: string;
+  costGold: number;
+  color: string;
+  active: boolean;
+  pulseTimer: number;
+}
+
+/**
+ * 《地牢类》战术机关陷阱数据结构 (Dungeon Traps & Tactical Hazards)
+ */
+export type TrapKind = 'SPIKE_PLATE' | 'FLAME_PILLAR' | 'EXPLOSIVE_BARREL';
+
+export interface DungeonTrap {
+  id: number;
+  kind: TrapKind;
+  x: number;
+  y: number;
+  radius: number;
+  cycleTimer: number;
+  active: boolean;
+  hp: number;
+}
+
+/**
+ * 《元气骑士》风格立体战术掩体石柱 / 方尖碑 (3D Tactical Cover Pillar)
+ */
+export interface RoomPillar {
+  x: number;
+  y: number;
+  radius: number;
+  variant: number; // 0..4 matching biome
+}
+
+/**
+ * 独立房间节点数据结构 (RoomNode)
+ */
+export interface RoomNode {
+  roomNumber: number;
+  biomeIndex: number;
+  layoutPattern: number;
+  gridX: number;
+  gridY: number;
+  type: RoomType;
+  state: RoomState;
+  width: number;
+  height: number;
+  totalWaves: number;
+  currentWave: number;
+  doors: DoorPortal[];
+  interactables: RoomInteractable[];
+  traps: DungeonTrap[];
+  pillars: RoomPillar[];
+}
+
+export class RoomManager {
+  public currentRoom!: RoomNode;
+  public roomHistory: { roomNumber: number; type: RoomType; state: RoomState }[] = [];
+  public elapsedSeconds = 0;
+
+  // 房间几何尺寸（以 (0, 0) 为房间中心）
+  public readonly halfWidth = 560;  // 总宽 1120
+  public readonly halfHeight = 390; // 总高 780
+  public readonly wallThickness = 44;
+
+  // 波次刷怪延迟计时器
+  private waveSpawnDelayTimer = 0;
+  private isSpawningWave = false;
+  private transitionBannerTimer = 0;
+  private transitionFlashAlpha = 0;
+
+  // 铁匠房(SHOP)与奇遇房(EVENT)两轮冷却追踪器：进入一次后，接下来两轮内绝不再次刷新
+  private roundsSinceShop = 99;
+  private roundsSinceEvent = 99;
+
+  constructor(private combatSystem: CombatSystem) {
+    this.reset();
+  }
+
+  public reset(): void {
+    this.elapsedSeconds = 0;
+    this.roomHistory = [];
+    this.roundsSinceShop = 99;
+    this.roundsSinceEvent = 99;
+    // 第 1 间房固定为普通战斗房，进入时由 UNVISITED 立即转为 ACTIVE_LOCKED
+    this.loadRoom(1, RoomType.COMBAT);
+  }
+
+  /**
+   * 加载并初始化指定序号与类型的独立房间
+   */
+  public loadRoom(roomNumber: number, type: RoomType, player?: Player): void {
+    // 清理上一房间的残留怪物、敌方弹幕、地面可破坏物与旧掉落物
+    this.combatSystem.enemies = [];
+    this.combatSystem.enemyProjectiles = [];
+    this.combatSystem.projectiles = [];
+    this.combatSystem.dropItems = [];
+    this.combatSystem.delayedBombs = [];
+    this.combatSystem.mapSystem.destructibles = [];
+    this.combatSystem.mapSystem.shrines = [];
+    this.combatSystem.mapSystem.mysteryDoor = null;
+
+    // 更新铁匠房与奇遇房的两轮冷却计数：进入其中一种后，两轮之内不可再次刷新该房间
+    if (type === RoomType.SHOP) {
+      this.roundsSinceShop = 0;
+      this.roundsSinceEvent++;
+    } else if (type === RoomType.EVENT) {
+      this.roundsSinceEvent = 0;
+      this.roundsSinceShop++;
+    } else {
+      this.roundsSinceShop++;
+      this.roundsSinceEvent++;
+    }
+
+    // 确定波次数：普通战斗房 2~3 波，精英房 2 波（含首领），商店/事件房 0 波
+    const isCombatRoom = type === RoomType.COMBAT || type === RoomType.ELITE;
+    const totalWaves = type === RoomType.COMBAT
+      ? (roomNumber >= 3 ? 3 : 2)
+      : type === RoomType.ELITE
+      ? 2
+      : 0;
+
+    // 5 大主题生态场景轮转 (0: 绯红地牢, 1: 极寒冰渊, 2: 翡翠腐林, 3: 炼狱熔炉, 4: 星界虚空)
+    const biomeIndex = (roomNumber - 1) % 5;
+    this.combatSystem.mapSystem.currentBiomeIndex = biomeIndex;
+    this.combatSystem.sound.setBiomeBGMHint(biomeIndex);
+    // 8 套差异化房间地刺、掩体、火盆与机关小布局（确保每个房间的地刺与内部小布局各不相同）
+    const layoutPattern =
+      type === RoomType.ELITE
+        ? 4 + (roomNumber % 2) * 3
+        : (roomNumber * 3 + Math.floor(Math.random() * 2)) % 8;
+
+    // 初始状态为 UNVISITED，随后玩家踏入房间立即触发状态切换
+    this.currentRoom = {
+      roomNumber,
+      biomeIndex,
+      layoutPattern,
+      gridX: 0,
+      gridY: -roomNumber,
+      type,
+      state: RoomState.UNVISITED,
+      width: this.halfWidth * 2,
+      height: this.halfHeight * 2,
+      totalWaves,
+      currentWave: 0,
+      doors: this.generateNextRoomDoors(roomNumber),
+      interactables: [],
+      traps: [],
+      pillars: isCombatRoom ? this.generateRoomPillars(layoutPattern, biomeIndex) : []
+    };
+
+    // 将玩家传送至房间南侧入口处
+    if (player) {
+      player.position.set(0, this.halfHeight - 95);
+      player.velocity.set(0, 0);
+    }
+
+    // 按当前房间的 layoutPattern 生成差异化的哥特火盆可破坏物 & 地牢地刺/机关小布局
+    this.spawnRoomBraziers(layoutPattern);
+    if (isCombatRoom) {
+      this.spawnRoomTrapsAndCursedChest(roomNumber, type, layoutPattern);
+    }
+
+    // 触发房间进入状态机转换
+    if (isCombatRoom) {
+      // 玩家进入未探索的战斗房间 -> 自动锁死所有出入口（ACTIVE_LOCKED），并按波次生成怪物
+      this.currentRoom.state = RoomState.ACTIVE_LOCKED;
+      for (const d of this.currentRoom.doors) {
+        d.isOpen = false;
+      }
+      this.currentRoom.currentWave = 1;
+      this.waveSpawnDelayTimer = 0.45;
+      this.isSpawningWave = true;
+    } else {
+      // 商店房或奇遇事件房 -> 状态设为 SPECIAL，直接开启出口门并布置房间中央交互设施
+      this.currentRoom.state = RoomState.SPECIAL;
+      for (const d of this.currentRoom.doors) {
+        d.isOpen = true;
+      }
+      if (type === RoomType.SHOP) {
+        this.setupShopRoom();
+      } else if (type === RoomType.EVENT) {
+        this.setupEventRoom();
+      }
+    }
+
+    this.roomHistory.push({
+      roomNumber,
+      type,
+      state: this.currentRoom.state
+    });
+
+    this.transitionBannerTimer = 2.6;
+    this.transitionFlashAlpha = 0.65;
+  }
+
+  /**
+   * 为房间北侧出口仅生成 1 扇无任何标注的随机门（普通房/精英房/铁匠房/奇遇房）
+   * 铁匠房(SHOP)与奇遇房(EVENT)在两轮之内只可能刷新一次
+   */
+  private generateNextRoomDoors(_currentRoomNum: number): DoorPortal[] {
+    const weightedPool: { type: RoomType; weight: number }[] = [
+      { type: RoomType.COMBAT, weight: 40 },
+      { type: RoomType.ELITE, weight: 26 }
+    ];
+
+    if (this.roundsSinceShop >= 2) {
+      weightedPool.push({ type: RoomType.SHOP, weight: 17 });
+    }
+    if (this.roundsSinceEvent >= 2) {
+      weightedPool.push({ type: RoomType.EVENT, weight: 17 });
+    }
+
+    const totalWeight = weightedPool.reduce((sum, item) => sum + item.weight, 0);
+    let roll = Math.random() * totalWeight;
+    let chosenType: RoomType = RoomType.COMBAT;
+    for (const entry of weightedPool) {
+      roll -= entry.weight;
+      if (roll <= 0) {
+        chosenType = entry.type;
+        break;
+      }
+    }
+
+    const doorY = -this.halfHeight + 18;
+    return [
+      {
+        id: 0,
+        x: 0,
+        y: doorY,
+        width: 112,
+        height: 58,
+        targetRoomType: chosenType,
+        isOpen: false,
+        pulseTimer: 0
+      }
+    ];
+  }
+
+  private spawnRoomBraziers(layoutPattern = 0): void {
+    const brazierLayouts: Array<Array<[number, number]>> = [
+      // Layout 0: 四角圣殿火盆
+      [[-365, -225], [365, -225], [-365, 205], [365, 205]],
+      // Layout 1: 南北迎宾回廊火盆
+      [[-180, -235], [180, -235], [-290, 195], [290, 195]],
+      // Layout 2: 东西侧翼双列火盆
+      [[-385, -110], [-385, 95], [385, -110], [385, 95]],
+      // Layout 3: 内环菱形祭祀火盆
+      [[-280, -175], [280, -175], [-340, 40], [340, 40]],
+      // Layout 4: 精英角斗场六芒火盆
+      [[-375, -220], [375, -220], [-390, 0], [390, 0], [-350, 210], [350, 210]],
+      // Layout 5: 交错斜阵火盆
+      [[-330, -210], [220, -210], [-220, 185], [330, 185]],
+      // Layout 6: 北侧高台拱卫火盆
+      [[-250, -230], [0, -235], [250, -230], [-360, 170], [360, 170]],
+      // Layout 7: 四象对称双火盆阵
+      [[-360, -180], [360, -180], [-200, -225], [200, -225], [-350, 195], [350, 195]]
+    ];
+    const coords = brazierLayouts[layoutPattern % brazierLayouts.length];
+    for (const [bx, by] of coords) {
+      this.combatSystem.mapSystem.destructibles.push(new Destructible(bx, by));
+    }
+  }
+
+  /**
+   * 按 8 套房间战术蓝图布置差异化的《地牢类》地刺阵、喷火柱、炼金炸药桶与诅咒血箱
+   */
+  private spawnRoomTrapsAndCursedChest(roomNumber: number, type: RoomType, layoutPattern = 0): void {
+    const pat = layoutPattern % 8;
+    const traps: DungeonTrap[] = [];
+    let nextId = 1;
+
+    const addSpike = (x: number, y: number, phaseOffset: number, radius = 44) => {
+      traps.push({
+        id: nextId++,
+        kind: 'SPIKE_PLATE',
+        x,
+        y,
+        radius,
+        cycleTimer: phaseOffset % 3.2,
+        active: true,
+        hp: 999
+      });
+    };
+
+    const addBarrel = (x: number, y: number, phaseOffset = 0) => {
+      traps.push({
+        id: nextId++,
+        kind: 'EXPLOSIVE_BARREL',
+        x,
+        y,
+        radius: 20,
+        cycleTimer: phaseOffset,
+        active: true,
+        hp: 1
+      });
+    };
+
+    const addFlame = (x: number, y: number, phaseOffset = 0.5) => {
+      traps.push({
+        id: nextId++,
+        kind: 'FLAME_PILLAR',
+        x,
+        y,
+        radius: 34,
+        cycleTimer: phaseOffset % 3.2,
+        active: true,
+        hp: 999
+      });
+    };
+
+    switch (pat) {
+      case 0:
+        // 布局 0：【十字回廊绞杀阵】中央十字四向地刺（顺时针轮流弹出）+ 两侧炸药桶
+        addSpike(0, -118, 0.0, 44);
+        addSpike(168, -8, 0.8, 44);
+        addSpike(0, 96, 1.6, 44);
+        addSpike(-168, -8, 2.4, 44);
+        addBarrel(-290, -90, 0.0);
+        addBarrel(290, 85, 0.9);
+        break;
+
+      case 1:
+        // 布局 1：【交错斜向地刺走廊】双排斜交地刺走廊 + 南北炸药桶 + 中央喷火柱
+        addSpike(-220, -95, 0.0, 42);
+        addSpike(-95, 55, 1.1, 42);
+        addSpike(95, -95, 0.5, 42);
+        addSpike(220, 55, 1.6, 42);
+        addBarrel(-195, 135, 0.2);
+        addBarrel(195, -165, 1.0);
+        if (roomNumber >= 2) addFlame(0, -20, 0.6);
+        break;
+
+      case 2:
+        // 布局 2：【品字形中枢处刑台】中央紧凑三连大号地刺板 + 四翼炸药桶
+        addSpike(-68, -36, 0.2, 46);
+        addSpike(68, -36, 0.2, 46);
+        addSpike(0, 58, 1.8, 46);
+        addBarrel(-250, -30, 0.0);
+        addBarrel(250, -30, 0.7);
+        addBarrel(0, -175, 1.3);
+        break;
+
+      case 3:
+        // 布局 3：【五连波浪多米诺地刺带】横贯房间中线的 S 型五连波浪地刺（依次掀起刺浪！）
+        addSpike(-260, -55, 0.0, 38);
+        addSpike(-130, 22, 0.55, 38);
+        addSpike(0, -35, 1.1, 40);
+        addSpike(130, 22, 1.65, 38);
+        addSpike(260, -55, 2.2, 38);
+        addBarrel(-170, -145, 0.3);
+        addBarrel(170, 125, 1.1);
+        break;
+
+      case 4:
+        // 布局 4：【精英角斗场·双火柱与三角地刺阵】
+        addSpike(-175, -85, 0.0, 46);
+        addSpike(175, -85, 0.0, 46);
+        addSpike(0, 45, 1.6, 48);
+        addFlame(-120, 35, 0.4);
+        addFlame(120, 35, 2.0);
+        addBarrel(-270, 110, 0.0);
+        addBarrel(270, 110, 0.8);
+        break;
+
+      case 5:
+        // 布局 5：【四象对称锁魂阵】内四角地刺 + 中央炸药桶簇 + 北侧喷火柱
+        addSpike(-185, -105, 0.0, 42);
+        addSpike(185, -105, 1.6, 42);
+        addSpike(-185, 85, 1.6, 42);
+        addSpike(185, 85, 0.0, 42);
+        addBarrel(-65, -10, 0.2);
+        addBarrel(65, -10, 0.9);
+        if (roomNumber >= 2) addFlame(0, -145, 0.8);
+        break;
+
+      case 6:
+        // 布局 6：【双翼夹击长廊】左右各两块纵向相连地刺带 + 中轴线双喷火柱
+        addSpike(-195, -75, 0.3, 42);
+        addSpike(-195, 25, 0.9, 42);
+        addSpike(195, -75, 1.9, 42);
+        addSpike(195, 25, 2.5, 42);
+        addBarrel(0, 95, 0.4);
+        addBarrel(0, -165, 1.2);
+        if (roomNumber >= 2 || type === RoomType.ELITE) {
+          addFlame(0, -35, 0.5);
+        }
+        break;
+
+      default:
+        // 布局 7：【星盘六芒地刺阵】外环四枚地刺 + 北翼双喷火柱 + 侧翼炸药桶
+        addSpike(-235, -15, 0.0, 42);
+        addSpike(235, -15, 0.0, 42);
+        addSpike(-110, -125, 1.2, 40);
+        addSpike(110, -125, 1.2, 40);
+        addSpike(0, 75, 2.2, 44);
+        addBarrel(-155, 115, 0.1);
+        addBarrel(155, 115, 0.8);
+        if (roomNumber >= 2) addFlame(0, -45, 1.4);
+        break;
+    }
+
+    this.currentRoom.traps = traps;
+
+    // 55% 概率在战斗房刷出【禁忌诅咒血箱】，位置随房间布局动态变化
+    if (Math.random() < 0.55) {
+      const chestSpots: Array<[number, number]> = [
+        [-315, 15],
+        [315, 15],
+        [-305, -125],
+        [305, -125],
+        [-310, 115],
+        [310, 115],
+        [-295, -140],
+        [295, -140]
+      ];
+      const [cx, cy] = chestSpots[pat];
+      this.currentRoom.interactables.push({
+        id: 'cursed_blood_chest',
+        kind: 'CURSED_BLOOD_CHEST',
+        x: cx,
+        y: cy,
+        radius: 32,
+        title: '✦ 禁忌诅咒血箱 ✦',
+        subtitle: '唤醒血影伏击，立得三选一构筑 + 90金币 + 1重随',
+        costGold: 0,
+        color: '#f43f5e',
+        active: true,
+        pulseTimer: 0
+      });
+    }
+  }
+
+  /**
+   * 布置商店/铁匠房设施
+   */
+  private setupShopRoom(): void {
+    this.currentRoom.interactables = [
+      {
+        id: 'shop_relic_box',
+        kind: 'SHOP_RELIC_BOX',
+        x: -210,
+        y: -20,
+        radius: 36,
+        title: '✦ 奥术构筑圣匣 ✦',
+        subtitle: '开启三选一机制遗物 + 赠送1次封印',
+        costGold: 60,
+        color: '#c084fc',
+        active: true,
+        pulseTimer: 0
+      },
+      {
+        id: 'shop_upgrade',
+        kind: 'SHOP_UPGRADE',
+        x: 0,
+        y: -20,
+        radius: 36,
+        title: '✦ 铁匠武器淬炼 ✦',
+        subtitle: '主武器直升1级 + 附加[过载]标签',
+        costGold: 50,
+        color: '#fbbf24',
+        active: true,
+        pulseTimer: 1.2
+      },
+      {
+        id: 'shop_heal_reroll',
+        kind: 'SHOP_HEAL_REROLL',
+        x: 210,
+        y: -20,
+        radius: 36,
+        title: '✦ 圣血命运药剂 ✦',
+        subtitle: '恢复 65 HP + 获得 2 次重随(Reroll)',
+        costGold: 35,
+        color: '#34d399',
+        active: true,
+        pulseTimer: 2.4
+      }
+    ];
+  }
+
+  /**
+   * 布置奇遇/事件房设施（二选一互斥祭坛）
+   */
+  private setupEventRoom(): void {
+    this.currentRoom.interactables = [
+      {
+        id: 'event_blood_pact',
+        kind: 'EVENT_BLOOD_PACT',
+        x: -155,
+        y: -15,
+        radius: 40,
+        title: '✦ 鲜血契约祭坛 ✦',
+        subtitle: '献祭20%当前生命：立即开启三选一机制构筑 + 120金币',
+        costGold: 0,
+        color: '#ef4444',
+        active: true,
+        pulseTimer: 0
+      },
+      {
+        id: 'event_star_grace',
+        kind: 'EVENT_STAR_GRACE',
+        x: 155,
+        y: -15,
+        radius: 40,
+        title: '✦ 星界律令圣泉 ✦',
+        subtitle: '完全恢复生命 + 终极技能就绪 + 重随/封印次数+2',
+        costGold: 0,
+        color: '#38bdf8',
+        active: true,
+        pulseTimer: 1.5
+      }
+    ];
+  }
+
+  /**
+   * 核心主循环更新：波次刷怪、房间清场判定、奖励台交互、出口门选择与墙壁约束
+   */
+  public update(
+    dt: number,
+    player: Player,
+    onOpenBuildRewardModal: () => void
+  ): void {
+    this.elapsedSeconds += dt;
+
+    if (this.transitionBannerTimer > 0) {
+      this.transitionBannerTimer -= dt;
+    }
+    if (this.transitionFlashAlpha > 0) {
+      this.transitionFlashAlpha = Math.max(0, this.transitionFlashAlpha - dt * 1.8);
+    }
+
+    // 1. 强制约束玩家、敌人在当前独立房间的四面城墙内部，并处理投射物墙壁反弹
+    this.constrainEntitiesToRoom(player);
+
+    // 1b. 更新《地牢类》房间战术机关（地刺翻转板、喷火柱、高危炼金炸药桶）
+    this.updateTraps(dt, player);
+
+    // 2. 若房间处于 ACTIVE_LOCKED（战斗封锁状态），管理预设波次刷怪与清场检测
+    if (this.currentRoom.state === RoomState.ACTIVE_LOCKED) {
+      if (this.isSpawningWave) {
+        this.waveSpawnDelayTimer -= dt;
+        if (this.waveSpawnDelayTimer <= 0) {
+          this.isSpawningWave = false;
+          this.spawnRoomWave(this.currentRoom.currentWave, player);
+        }
+      } else {
+        const activeEnemyCount = this.combatSystem.enemies.filter(e => e.active).length;
+        if (activeEnemyCount === 0) {
+          if (this.currentRoom.currentWave < this.currentRoom.totalWaves) {
+            // 进入下一波次（纯视觉/音效过渡，不再弹出遮挡视线的文字横幅）
+            this.currentRoom.currentWave++;
+            this.waveSpawnDelayTimer = 0.65;
+            this.isSpawningWave = true;
+          } else {
+            // 所有波次怪物均被击败 -> 房间状态切换为 CLEARED（已清理）！
+            this.onRoomCleared(player);
+          }
+        }
+      }
+    }
+
+    // 3. 更新并检测房间中央交互物（过关奖励水晶、商店商品、奇遇祭坛）
+    for (const item of this.currentRoom.interactables) {
+      if (!item.active) continue;
+      item.pulseTimer += dt * 3.2;
+
+      const dist = Math.hypot(player.position.x - item.x, player.position.y - item.y);
+      if (dist <= item.radius + player.radius) {
+        this.handleInteractableTrigger(item, player, onOpenBuildRewardModal);
+      }
+    }
+
+    // 4. 当房间已清理 (CLEARED) 或为特殊功能房 (SPECIAL) 时，检测玩家是否走进开启的出口门
+    if (this.currentRoom.state === RoomState.CLEARED || this.currentRoom.state === RoomState.SPECIAL) {
+      for (const door of this.currentRoom.doors) {
+        door.pulseTimer += dt * 3;
+        if (!door.isOpen) continue;
+
+        const inDoorX = Math.abs(player.position.x - door.x) <= door.width * 0.48;
+        const inDoorY = Math.abs(player.position.y - door.y) <= door.height * 0.65;
+        if (inDoorX && inDoorY) {
+          this.combatSystem.sound.playPortalTransition();
+          this.loadRoom(this.currentRoom.roomNumber + 1, door.targetRoomType, player);
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * 房间内所有波次怪物被击败后触发：
+   * 1. 状态变为 CLEARED
+   * 2. 解锁北侧所有通往下一房间的门
+   * 3. 在房间正中央生成过关奖励（三选一遗物/机制构筑祭坛 + 掉落物）
+   */
+  private onRoomCleared(player: Player): void {
+    this.currentRoom.state = RoomState.CLEARED;
+    for (const d of this.currentRoom.doors) {
+      d.isOpen = true;
+    }
+
+    this.combatSystem.sound.playLevelUp();
+    this.combatSystem.particleSystem.emitLevelUpFanfare(0, 0);
+    this.combatSystem.vacuumAllGems();
+
+    // 房间中央生成“过关三选一构筑水晶台”
+    this.currentRoom.interactables.push({
+      id: 'room_clear_reward',
+      kind: 'CLEAR_REWARD',
+      x: 0,
+      y: 0,
+      radius: 38,
+      title: this.currentRoom.type === RoomType.ELITE
+        ? '✦ 精英过关圣物 (三选一构筑) ✦'
+        : '✦ 房间清理圣物 (三选一构筑) ✦',
+      subtitle: '踏入光圈选择你的多维标签与机制改造词条',
+      costGold: 0,
+      color: this.currentRoom.type === RoomType.ELITE ? '#fbbf24' : '#38bdf8',
+      active: true,
+      pulseTimer: 0
+    });
+
+    // 额外掉落金币与生命补给；精英房额外掉落神话进化宝箱
+    const coinCount = this.currentRoom.type === RoomType.ELITE ? 6 : 3;
+    for (let i = 0; i < coinCount; i++) {
+      const ang = (i * Math.PI * 2) / coinCount;
+      const coin = new DropItem(DropType.GOLD_COIN, Math.cos(ang) * 65, Math.sin(ang) * 65, 15);
+      coin.isMagnetized = true;
+      this.combatSystem.dropItems.push(coin);
+    }
+
+    if (this.currentRoom.type === RoomType.ELITE) {
+      this.combatSystem.dropItems.push(new DropItem(DropType.BOSS_CHEST, 85, 0, 1));
+    }
+  }
+
+  /**
+   * 处理玩家触碰房间中央奖励、商店展台或奇遇祭坛
+   */
+  private handleInteractableTrigger(
+    item: RoomInteractable,
+    player: Player,
+    onOpenBuildRewardModal: () => void
+  ): void {
+    if (item.costGold > 0 && player.gold < item.costGold) {
+      return; // 金币不足时不触发购买
+    }
+
+    if (item.costGold > 0) {
+      player.gold -= item.costGold;
+    }
+
+    item.active = false;
+    if (item.kind === 'SHOP_UPGRADE') {
+      this.combatSystem.sound.playShrineInteract('FORGE');
+    } else if (item.kind === 'CURSED_BLOOD_CHEST' || item.kind === 'EVENT_BLOOD_PACT') {
+      this.combatSystem.sound.playShrineInteract('CURSED');
+    } else if (item.kind === 'SHOP_HEAL_REROLL') {
+      this.combatSystem.sound.playItemPickup('POTION');
+    } else {
+      this.combatSystem.sound.playShrineInteract('RELIC');
+    }
+    this.combatSystem.particleSystem.emitLevelUpFanfare(item.x, item.y);
+
+    switch (item.kind) {
+      case 'CLEAR_REWARD':
+        onOpenBuildRewardModal();
+        break;
+
+      case 'SHOP_RELIC_BOX':
+        player.banishesRemaining += 1;
+        onOpenBuildRewardModal();
+        break;
+
+      case 'SHOP_UPGRADE': {
+        const mainWep = player.weapons[0];
+        if (mainWep) {
+          mainWep.levelUp();
+          mainWep.addTag(SkillTag.OVERLOAD);
+        }
+        break;
+      }
+
+      case 'SHOP_HEAL_REROLL':
+        player.heal(65);
+        player.rerollsRemaining += 2;
+        break;
+
+      case 'EVENT_BLOOD_PACT': {
+        // 奇遇二选一：触发后关闭另一个祭坛
+        for (const other of this.currentRoom.interactables) {
+          other.active = false;
+        }
+        player.hp = Math.max(1, Math.round(player.hp * 0.8));
+        player.gold += 120;
+        if (player.weapons[0]) {
+          player.weapons[0].addTag(SkillTag.OVERLOAD);
+        }
+        onOpenBuildRewardModal();
+        break;
+      }
+
+      case 'EVENT_STAR_GRACE': {
+        for (const other of this.currentRoom.interactables) {
+          other.active = false;
+        }
+        player.heal(999);
+        player.reduceUltimateCooldown(999);
+        player.rerollsRemaining += 2;
+        player.banishesRemaining += 2;
+        break;
+      }
+
+      case 'CURSED_BLOOD_CHEST': {
+        // 触发诅咒血箱：召唤 6 只血影精锐刺客围攻，并立即奖励 1 次三选一构筑 + 90 金币 + 1 重随
+        player.gold += 90;
+        player.rerollsRemaining += 1;
+        const depth = this.currentRoom.roomNumber;
+        const mult = 1.15 + depth * 0.15;
+        for (let i = 0; i < 6; i++) {
+          const ang = (i * Math.PI * 2) / 6;
+          const ex = item.x + Math.cos(ang) * 165;
+          const ey = item.y + Math.sin(ang) * 165;
+          const ambushEnemy = createEnemy(i % 2 === 0 ? EnemyType.DASHER : EnemyType.GHOST, ex, ey, mult);
+          this.combatSystem.addEnemy(ambushEnemy);
+        }
+        this.combatSystem.camera.triggerShake(9);
+        onOpenBuildRewardModal();
+        break;
+      }
+    }
+  }
+
+  /**
+   * 更新地牢机关陷阱逻辑：地刺穿刺、喷火柱灼烧、炸药桶链式引爆
+   */
+  private updateTraps(dt: number, player: Player): void {
+    for (const trap of this.currentRoom.traps) {
+      if (!trap.active) continue;
+      const prevTimer = trap.cycleTimer;
+      trap.cycleTimer = (trap.cycleTimer + dt) % 3.2;
+
+      if (trap.kind === 'SPIKE_PLATE') {
+        // 周期 2.15s 猛烈弹出瞬間：迸发金属寒芒裂痕
+        if (prevTimer < 2.15 && trap.cycleTimer >= 2.15) {
+          this.combatSystem.particleSystem.emitHit(trap.x, trap.y, '#cbd5e1', 4);
+        }
+
+        // 周期 2.15s ~ 2.96s 之间利刺完全弹出，每 0.35s 结算一次穿刺放血伤害与十字刀光特效
+        const isSpikesUp = trap.cycleTimer >= 2.15 && trap.cycleTimer <= 2.96;
+        const crossedTick = Math.floor(prevTimer * 3.2) !== Math.floor(trap.cycleTimer * 3.2);
+        if (isSpikesUp && crossedTick) {
+          const pos = new Vector2(trap.x, trap.y);
+          const victims = this.combatSystem.spatialGrid.queryRadius(pos, trap.radius * 1.06);
+          for (const e of victims) {
+            if (!e.active || e.isSpawning()) continue;
+            e.bleedTimer = 4.5;
+            const spikeDmg = Math.round(32 + this.currentRoom.roomNumber * 9);
+            const killed = e.takeDamage(spikeDmg);
+            this.combatSystem.damageTextSystem.addDamage(e.position.x, e.position.y, spikeDmg, true);
+            this.combatSystem.particleSystem.emitSlashImpact(
+              e.position.x,
+              e.position.y,
+              -Math.PI / 2 + (Math.random() - 0.5) * 0.5,
+              '#ef4444',
+              true
+            );
+            if (killed) {
+              player.kills++;
+              this.combatSystem.handleEnemyDeath(e);
+            }
+          }
+        }
+      } else if (trap.kind === 'FLAME_PILLAR') {
+        // 周期 1.8s ~ 2.8s 喷射旋转火环
+        const isFiring = trap.cycleTimer >= 1.8 && trap.cycleTimer <= 2.8;
+        const crossedTick = Math.floor(prevTimer * 3) !== Math.floor(trap.cycleTimer * 3);
+        if (isFiring && crossedTick) {
+          const pos = new Vector2(trap.x, trap.y);
+          const fireRadius = 105;
+          const victims = this.combatSystem.spatialGrid.queryRadius(pos, fireRadius);
+          for (const e of victims) {
+            if (!e.active) continue;
+            e.burnTimer = 4.5;
+            const fireDmg = Math.round(22 + this.currentRoom.roomNumber * 6);
+            const killed = e.takeDamage(fireDmg);
+            this.combatSystem.damageTextSystem.addDamage(e.position.x, e.position.y, fireDmg, false);
+            if (killed) {
+              player.kills++;
+              this.combatSystem.handleEnemyDeath(e);
+            }
+          }
+        }
+      } else if (trap.kind === 'EXPLOSIVE_BARREL') {
+        // 检测玩家投射物或冲刺是否击中炼金炸药桶
+        let triggered = false;
+        for (const proj of this.combatSystem.projectiles) {
+          if (proj.active && Math.hypot(proj.position.x - trap.x, proj.position.y - trap.y) <= proj.radius + trap.radius) {
+            triggered = true;
+            break;
+          }
+        }
+        if (!triggered && player.dashActiveTimer > 0 && Math.hypot(player.position.x - trap.x, player.position.y - trap.y) <= player.radius + trap.radius + 16) {
+          triggered = true;
+        }
+
+        if (triggered) {
+          trap.active = false;
+          const blastPos = new Vector2(trap.x, trap.y);
+          const blastDmg = Math.round((85 + this.currentRoom.roomNumber * 25) * player.damageMult);
+          this.combatSystem.sound.playExplosion(0.55, 520);
+          this.combatSystem.camera.triggerShake(10);
+          this.combatSystem.particleSystem.emitHit(trap.x, trap.y, '#f97316', 24);
+
+          const victims = this.combatSystem.spatialGrid.queryRadius(blastPos, 150);
+          for (const e of victims) {
+            if (!e.active) continue;
+            e.burnTimer = 5.0;
+            const pushDir = e.position.clone().sub(blastPos);
+            e.applyKnockback(pushDir, 360);
+            const killed = e.takeDamage(blastDmg);
+            this.combatSystem.damageTextSystem.addDamage(e.position.x, e.position.y, blastDmg, true);
+            if (killed) {
+              player.kills++;
+              this.combatSystem.handleEnemyDeath(e);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * 生成《元气骑士》风格的 8 套房间内部立体战术掩体石柱阵列 (与 8 套地刺布局严格错位互补)
+   */
+  private generateRoomPillars(layoutPattern: number, biomeIndex: number): RoomPillar[] {
+    const r = 28;
+    const layouts: Array<Array<[number, number]>> = [
+      // Pattern 0: 四象对称圣殿柱阵 (配合中央十字地刺)
+      [
+        [-265, -145],
+        [265, -145],
+        [-265, 135],
+        [265, 135]
+      ],
+      // Pattern 1: 南北双门壁垒柱阵 (配合斜向交错地刺走廊)
+      [
+        [-310, -15],
+        [310, -15],
+        [-130, -175],
+        [130, 155]
+      ],
+      // Pattern 2: 外扩回廊六柱阵 (配合中央品字形处刑地刺台)
+      [
+        [-285, -155],
+        [285, -155],
+        [-325, 45],
+        [325, 45],
+        [-185, 175],
+        [185, 175]
+      ],
+      // Pattern 3: 交错掩体柱阵 (配合中线 S 型五连波浪地刺带)
+      [
+        [-245, -165],
+        [245, -165],
+        [-245, 145],
+        [245, 145]
+      ],
+      // Pattern 4: 首领决斗外环方尖碑 (配合角斗场双火柱与三角地刺阵)
+      [
+        [-345, -180],
+        [345, -180],
+        [-345, 175],
+        [345, 175]
+      ],
+      // Pattern 5: 十字翼卫柱阵 (配合内四角对称地刺)
+      [
+        [-315, -10],
+        [315, -10],
+        [-110, -185],
+        [110, -185]
+      ],
+      // Pattern 6: 四角重装墩柱 + 侧翼掩体 (配合左右纵向地刺带)
+      [
+        [-330, -155],
+        [330, -155],
+        [-330, 145],
+        [330, 145],
+        [-95, 15],
+        [95, 15]
+      ],
+      // Pattern 7: 宽距弧形圣堂柱阵 (配合星盘六芒地刺阵)
+      [
+        [-295, -150],
+        [295, -150],
+        [-280, 150],
+        [280, 150]
+      ]
+    ];
+
+    const coords = layouts[layoutPattern % layouts.length];
+    return coords.map(([x, y]) => ({
+      x,
+      y,
+      radius: r,
+      variant: biomeIndex
+    }));
+  }
+
+  /**
+   * 按当前房间深度与波次在房间内部生成怪物
+   */
+  private spawnRoomWave(waveIndex: number, player: Player): void {
+    const depth = this.currentRoom.roomNumber;
+    const isEliteRoom = this.currentRoom.type === RoomType.ELITE;
+    const waveMult = 1.0 + (depth - 1) * 0.28 + (waveIndex - 1) * 0.14;
+
+    // 确定普通怪物池
+    const pool: EnemyType[] = [EnemyType.WALKER, EnemyType.DASHER];
+    if (depth >= 2) pool.push(EnemyType.SWARMER, EnemyType.RANGED_SPITTER);
+    if (depth >= 3) pool.push(EnemyType.SLIME_LARGE, EnemyType.TANK);
+    if (depth >= 4) pool.push(EnemyType.GHOST, EnemyType.MINOTAUR);
+
+    const baseCount = isEliteRoom
+      ? 10 + depth * 3 + waveIndex * 3
+      : 8 + depth * 3 + waveIndex * 4;
+
+    for (let i = 0; i < baseCount; i++) {
+      const spawnPos = this.getValidRoomSpawnPos(player.position);
+      const chosenType = pool[Math.floor(Math.random() * pool.length)];
+      const enemy = createEnemy(chosenType, spawnPos.x, spawnPos.y, waveMult);
+      this.combatSystem.addEnemy(enemy);
+    }
+
+    // 精英房的最后一波，或每 3 层的最终波次，必定降临《元气骑士》级高机动多技能首领 (BOSS_DEMON)！
+    const isBossFloor = isEliteRoom || depth % 3 === 0;
+    if (isBossFloor && waveIndex === this.currentRoom.totalWaves) {
+      const bossPos = new Vector2(0, -this.halfHeight * 0.42);
+      const bossVariant = this.currentRoom.biomeIndex % 4;
+      const boss = createEnemy(
+        EnemyType.BOSS_DEMON,
+        bossPos.x,
+        bossPos.y,
+        waveMult * (isEliteRoom ? 1.15 : 1.0),
+        bossVariant
+      );
+      boss.isBoss = true;
+      this.combatSystem.addEnemy(boss);
+      this.combatSystem.camera.triggerShake(9);
+    }
+  }
+
+  private getValidRoomSpawnPos(playerPos: Vector2): Vector2 {
+    const margin = 75;
+    for (let attempt = 0; attempt < 18; attempt++) {
+      const rx = (Math.random() * 2 - 1) * (this.halfWidth - margin);
+      const ry = (Math.random() * 2 - 1) * (this.halfHeight - margin);
+      if (Math.hypot(rx - playerPos.x, ry - playerPos.y) < 190) continue;
+      let insidePillar = false;
+      for (const p of this.currentRoom.pillars) {
+        if (Math.hypot(rx - p.x, ry - p.y) < p.radius + 32) {
+          insidePillar = true;
+          break;
+        }
+      }
+      if (!insidePillar) {
+        return new Vector2(rx, ry);
+      }
+    }
+    return new Vector2(0, -this.halfHeight + margin);
+  }
+
+  /**
+   * 约束角色与敌人在房间墙壁内，处理《元气骑士》立体掩体石柱物理阻挡与弹幕遮挡
+   */
+  private constrainEntitiesToRoom(player: Player): void {
+    const minX = -this.halfWidth + player.radius + 8;
+    const maxX = this.halfWidth - player.radius - 8;
+    const minY = -this.halfHeight + player.radius + 8;
+    const maxY = this.halfHeight - player.radius - 8;
+
+    player.position.x = Math.max(minX, Math.min(maxX, player.position.x));
+    player.position.y = Math.max(minY, Math.min(maxY, player.position.y));
+
+    // 立体战术掩体石柱阻挡玩家移动
+    for (const p of this.currentRoom.pillars) {
+      const dx = player.position.x - p.x;
+      const dy = player.position.y - p.y;
+      const dist = Math.hypot(dx, dy);
+      const minDist = player.radius + p.radius;
+      if (dist < minDist && dist > 0.001) {
+        const push = (minDist - dist) / dist;
+        player.position.x += dx * push;
+        player.position.y += dy * push;
+      }
+    }
+
+    for (const enemy of this.combatSystem.enemies) {
+      if (!enemy.active) continue;
+      enemy.position.x = Math.max(-this.halfWidth + enemy.radius, Math.min(this.halfWidth - enemy.radius, enemy.position.x));
+      enemy.position.y = Math.max(-this.halfHeight + enemy.radius, Math.min(this.halfHeight - enemy.radius, enemy.position.y));
+
+      // 掩体石柱阻挡怪物移动
+      for (const p of this.currentRoom.pillars) {
+        const dx = enemy.position.x - p.x;
+        const dy = enemy.position.y - p.y;
+        const dist = Math.hypot(dx, dy);
+        const minDist = enemy.radius + p.radius;
+        if (dist < minDist && dist > 0.001) {
+          const push = (minDist - dist) / dist;
+          enemy.position.x += dx * push;
+          enemy.position.y += dy * push;
+        }
+      }
+    }
+
+    // 掩体石柱阻挡敌方普通/扇形/风车弹幕（玩家可利用石柱战术躲避 BOSS 弹幕！）
+    for (let i = this.combatSystem.enemyProjectiles.length - 1; i >= 0; i--) {
+      const ep = this.combatSystem.enemyProjectiles[i];
+      if (!ep.active || ep.visualType === 'METEOR_ZONE') continue;
+      for (const p of this.currentRoom.pillars) {
+        if (Math.hypot(ep.position.x - p.x, ep.position.y - p.y) <= ep.radius + p.radius - 2) {
+          ep.active = false;
+          this.combatSystem.particleSystem.emitHit(ep.position.x, ep.position.y, ep.color, 3);
+          break;
+        }
+      }
+    }
+
+    // 投射物触碰房间边界墙壁时的反弹检测 (Wall Ricochet for Example A & Runetracer)
+    for (const proj of this.combatSystem.projectiles) {
+      if (!proj.active) continue;
+
+      let hitWallX = false;
+      let hitWallY = false;
+
+      if (proj.position.x - proj.radius <= -this.halfWidth) {
+        proj.position.x = -this.halfWidth + proj.radius;
+        hitWallX = true;
+      } else if (proj.position.x + proj.radius >= this.halfWidth) {
+        proj.position.x = this.halfWidth - proj.radius;
+        hitWallX = true;
+      }
+
+      if (proj.position.y - proj.radius <= -this.halfHeight) {
+        proj.position.y = -this.halfHeight + proj.radius;
+        hitWallY = true;
+      } else if (proj.position.y + proj.radius >= this.halfHeight) {
+        proj.position.y = this.halfHeight - proj.radius;
+        hitWallY = true;
+      }
+
+      if (hitWallX || hitWallY) {
+        if (proj.wallBounces > 0) {
+          proj.wallBounces--;
+          if (hitWallX) proj.velocity.x *= -1;
+          if (hitWallY) proj.velocity.y *= -1;
+          proj.rotation = proj.velocity.angle();
+          // 反弹后重置已命中列表并获得轻微伤害与速度增幅
+          proj.hitEnemies.clear();
+          proj.damage = Math.round(proj.damage * 1.15);
+          this.combatSystem.particleSystem.emitHit(proj.position.x, proj.position.y, '#38bdf8', 5);
+        }
+      }
+    }
+  }
+
+  /**
+   * 渲染独立房间的 5 大生态主题城墙、地砖星盘阵纹、立体战术掩体石柱、壁挂火炬、唯一无标注神秘拱门以及圣物祭坛
+   */
+  public renderRoomArena(ctx: CanvasRenderingContext2D, _camera: Camera): void {
+    const hw = this.halfWidth;
+    const hh = this.halfHeight;
+    const wt = this.wallThickness;
+    const meta = ROOM_TYPE_META[this.currentRoom.type];
+    const isLocked = this.currentRoom.state === RoomState.ACTIVE_LOCKED;
+
+    // 5 大主题生态色彩规范 (0: 绯红地牢, 1: 极寒冰渊, 2: 翡翠腐林, 3: 炼狱熔炉, 4: 星界虚空)
+    const biomeThemes = [
+      {
+        wallBase: '#120e1f',
+        wallBrick: '#1d1730',
+        wallStroke: '#2e254a',
+        borderOuter: '#78350f',
+        borderUnlocked: '#f59e0b',
+        sigilStroke: 'rgba(217, 119, 6, 0.26)',
+        sconceCore: '#fde047',
+        sconceMid: 'rgba(251, 191, 36, 0.55)',
+        sconceOuter: 'rgba(234, 88, 12, 0.22)',
+        rayTop: '186, 230, 253',
+        rayMid: '251, 191, 36',
+        pillarTop: '#312e48',
+        pillarSide: '#181528',
+        pillarGem: '#ef4444'
+      },
+      {
+        wallBase: '#071426',
+        wallBrick: '#0f233f',
+        wallStroke: '#1e3a5f',
+        borderOuter: '#0369a1',
+        borderUnlocked: '#38bdf8',
+        sigilStroke: 'rgba(56, 189, 248, 0.28)',
+        sconceCore: '#e0f2fe',
+        sconceMid: 'rgba(56, 189, 248, 0.55)',
+        sconceOuter: 'rgba(14, 165, 233, 0.22)',
+        rayTop: '224, 242, 254',
+        rayMid: '56, 189, 248',
+        pillarTop: '#1e3a5f',
+        pillarSide: '#0c1e36',
+        pillarGem: '#38bdf8'
+      },
+      {
+        wallBase: '#081811',
+        wallBrick: '#10281d',
+        wallStroke: '#1e4632',
+        borderOuter: '#15803d',
+        borderUnlocked: '#34d399',
+        sigilStroke: 'rgba(52, 211, 153, 0.26)',
+        sconceCore: '#bbf7d0',
+        sconceMid: 'rgba(52, 211, 153, 0.52)',
+        sconceOuter: 'rgba(16, 185, 129, 0.22)',
+        rayTop: '209, 250, 229',
+        rayMid: '52, 211, 153',
+        pillarTop: '#1f4431',
+        pillarSide: '#0d2318',
+        pillarGem: '#10b981'
+      },
+      {
+        wallBase: '#1b0b07',
+        wallBrick: '#2c130d',
+        wallStroke: '#4a2016',
+        borderOuter: '#9a3412',
+        borderUnlocked: '#f97316',
+        sigilStroke: 'rgba(249, 115, 22, 0.30)',
+        sconceCore: '#fef08a',
+        sconceMid: 'rgba(249, 115, 22, 0.60)',
+        sconceOuter: 'rgba(220, 38, 38, 0.26)',
+        rayTop: '254, 240, 138',
+        rayMid: '249, 115, 22',
+        pillarTop: '#451a11',
+        pillarSide: '#240d08',
+        pillarGem: '#f97316'
+      },
+      {
+        wallBase: '#110824',
+        wallBrick: '#1d103b',
+        wallStroke: '#351d66',
+        borderOuter: '#6b21a8',
+        borderUnlocked: '#c084fc',
+        sigilStroke: 'rgba(192, 132, 252, 0.28)',
+        sconceCore: '#f5d0fe',
+        sconceMid: 'rgba(192, 132, 252, 0.55)',
+        sconceOuter: 'rgba(147, 51, 234, 0.24)',
+        rayTop: '243, 232, 255',
+        rayMid: '192, 132, 252',
+        pillarTop: '#341b61',
+        pillarSide: '#190c33',
+        pillarGem: '#c084fc'
+      }
+    ];
+    const theme = biomeThemes[this.currentRoom.biomeIndex % biomeThemes.length];
+
+    ctx.save();
+
+    // 1. 房间外部深渊暗影遮罩
+    ctx.fillStyle = 'rgba(4, 2, 10, 0.92)';
+    ctx.fillRect(-hw - 1000, -hh - 1000, (hw + 1000) * 2, 1000); // Top outside
+    ctx.fillRect(-hw - 1000, hh, (hw + 1000) * 2, 1000);         // Bottom outside
+    ctx.fillRect(-hw - 1000, -hh, 1000, hh * 2);                 // Left outside
+    ctx.fillRect(hw, -hh, 1000, hh * 2);                         // Right outside
+
+    // 2. 生态主题圣殿地砖镶嵌阵纹 (Biome Sanctuary Floor Mosaic)
+    ctx.save();
+    const rotSlow = this.elapsedSeconds * 0.08;
+    ctx.strokeStyle = theme.sigilStroke;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, 168, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = meta.glowColor;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, 152, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 12 瓣彩绘玻璃花窗叶瓣
+    ctx.save();
+    ctx.rotate(rotSlow);
+    const petals = 12;
+    for (let i = 0; i < petals; i++) {
+      const ang = (i * Math.PI * 2) / petals;
+      ctx.save();
+      ctx.rotate(ang);
+      ctx.fillStyle = i % 2 === 0 ? 'rgba(217, 119, 6, 0.05)' : 'rgba(139, 92, 246, 0.05)';
+      ctx.strokeStyle = i % 2 === 0 ? theme.sigilStroke : meta.glowColor;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(32, 0);
+      ctx.quadraticCurveTo(95, -24, 148, 0);
+      ctx.quadraticCurveTo(95, 24, 32, 0);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // 内层逆向旋转八芒星圣印
+    ctx.save();
+    ctx.rotate(-rotSlow * 1.4);
+    ctx.strokeStyle = theme.sigilStroke;
+    ctx.lineWidth = 1.5;
+    for (let s = 0; s < 2; s++) {
+      ctx.rotate(Math.PI / 4);
+      ctx.strokeRect(-74, -74, 148, 148);
+    }
+    ctx.restore();
+
+    // 地面四向石板走道引导线
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.10)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-hw + 36, -hh + 36, (hw - 36) * 2, (hh - 36) * 2);
+    ctx.restore();
+
+    // 2b. 墙体内侧立体环境光遮蔽阴影 (Interior Ambient Occlusion Wall Shadows)
+    const shadowDepth = 52;
+    const topShad = ctx.createLinearGradient(0, -hh, 0, -hh + shadowDepth);
+    topShad.addColorStop(0, 'rgba(2, 1, 8, 0.78)');
+    topShad.addColorStop(1, 'rgba(2, 1, 8, 0)');
+    ctx.fillStyle = topShad;
+    ctx.fillRect(-hw, -hh, hw * 2, shadowDepth);
+
+    const botShad = ctx.createLinearGradient(0, hh, 0, hh - shadowDepth);
+    botShad.addColorStop(0, 'rgba(2, 1, 8, 0.78)');
+    botShad.addColorStop(1, 'rgba(2, 1, 8, 0)');
+    ctx.fillStyle = botShad;
+    ctx.fillRect(-hw, hh - shadowDepth, hw * 2, shadowDepth);
+
+    const leftShad = ctx.createLinearGradient(-hw, 0, -hw + shadowDepth, 0);
+    leftShad.addColorStop(0, 'rgba(2, 1, 8, 0.78)');
+    leftShad.addColorStop(1, 'rgba(2, 1, 8, 0)');
+    ctx.fillStyle = leftShad;
+    ctx.fillRect(-hw, -hh, shadowDepth, hh * 2);
+
+    const rightShad = ctx.createLinearGradient(hw, 0, hw - shadowDepth, 0);
+    rightShad.addColorStop(0, 'rgba(2, 1, 8, 0.78)');
+    rightShad.addColorStop(1, 'rgba(2, 1, 8, 0)');
+    ctx.fillStyle = rightShad;
+    ctx.fillRect(hw - shadowDepth, -hh, shadowDepth, hh * 2);
+
+    // 3. 立体生态主题城墙与石砖砌缝 (3D Beveled Biome Masonry Walls)
+    ctx.fillStyle = theme.wallBase;
+    ctx.fillRect(-hw - wt, -hh - wt, (hw + wt) * 2, wt); // 北墙
+    ctx.fillRect(-hw - wt, hh, (hw + wt) * 2, wt);       // 南墙
+    ctx.fillRect(-hw - wt, -hh, wt, hh * 2);             // 西墙
+    ctx.fillRect(hw, -hh, wt, hh * 2);                   // 东墙
+
+    // 墙体石砖垛口浮雕细节 (Stone Battlement Crenellations)
+    ctx.fillStyle = theme.wallBrick;
+    ctx.strokeStyle = theme.wallStroke;
+    ctx.lineWidth = 1;
+    const brickStep = 64;
+    for (let bx = -hw; bx < hw; bx += brickStep) {
+      if (Math.abs(bx) > 72) {
+        ctx.fillRect(bx + 4, -hh - wt + 6, brickStep - 8, wt - 12);
+        ctx.strokeRect(bx + 4, -hh - wt + 6, brickStep - 8, wt - 12);
+      }
+      ctx.fillRect(bx + 4, hh + 6, brickStep - 8, wt - 12);
+      ctx.strokeRect(bx + 4, hh + 6, brickStep - 8, wt - 12);
+    }
+    for (let by = -hh; by < hh; by += brickStep) {
+      ctx.fillRect(-hw - wt + 6, by + 4, wt - 12, brickStep - 8);
+      ctx.strokeRect(-hw - wt + 6, by + 4, wt - 12, brickStep - 8);
+      ctx.fillRect(hw + 6, by + 4, wt - 12, brickStep - 8);
+      ctx.strokeRect(hw + 6, by + 4, wt - 12, brickStep - 8);
+    }
+
+    // 城墙双层警戒镶边
+    ctx.strokeStyle = theme.borderOuter;
+    ctx.lineWidth = 5;
+    ctx.strokeRect(-hw - 2, -hh - 2, hw * 2 + 4, hh * 2 + 4);
+
+    ctx.strokeStyle = isLocked ? '#ef4444' : theme.borderUnlocked;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-hw, -hh, hw * 2, hh * 2);
+
+    // 四角石雕柱墩与圣十字徽记 (4 Corner Bastion Pillars)
+    const corners = [
+      [-hw - wt * 0.5, -hh - wt * 0.5],
+      [hw + wt * 0.5, -hh - wt * 0.5],
+      [-hw - wt * 0.5, hh + wt * 0.5],
+      [hw + wt * 0.5, hh + wt * 0.5]
+    ];
+    for (const [cx, cy] of corners) {
+      ctx.fillStyle = theme.wallBase;
+      ctx.fillRect(cx - 26, cy - 26, 52, 52);
+      ctx.strokeStyle = theme.borderUnlocked;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cx - 26, cy - 26, 52, 52);
+      ctx.fillStyle = isLocked ? '#ef4444' : theme.pillarGem;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - 12);
+      ctx.lineTo(cx + 12, cy);
+      ctx.lineTo(cx, cy + 12);
+      ctx.lineTo(cx - 12, cy);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 城墙壁挂生态火炬光晕 (Flickering Biome Wall Sconces)
+    const sconces = [
+      [-260, -hh + 4],
+      [260, -hh + 4],
+      [-260, hh - 4],
+      [260, hh - 4],
+      [-hw + 4, -160],
+      [-hw + 4, 160],
+      [hw - 4, -160],
+      [hw - 4, 160]
+    ];
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < sconces.length; i++) {
+      const [sx, sy] = sconces[i];
+      const flicker = 0.85 + Math.sin(this.elapsedSeconds * 9 + i * 1.7) * 0.15;
+      const rGlow = 56 * flicker;
+      const g = ctx.createRadialGradient(sx, sy, 2, sx, sy, rGlow);
+      g.addColorStop(0, '#ffffff');
+      g.addColorStop(0.3, theme.sconceMid);
+      g.addColorStop(0.7, theme.sconceOuter);
+      g.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(sx, sy, rGlow, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = theme.sconceCore;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // 4. 渲染北侧唯一无标注出口拱门 (Single Unlabeled Mystery Archway)
+    for (const door of this.currentRoom.doors) {
+      this.renderDoorPortal(ctx, door);
+    }
+
+    // 4a. 渲染《元气骑士》立体战术掩体石柱 / 方尖碑 (3D Tactical Cover Pillars)
+    for (const pillar of this.currentRoom.pillars) {
+      this.renderRoomPillar(ctx, pillar, theme);
+    }
+
+    // 4b. 渲染《地牢类》房间战术机关陷阱 (Spike Plates, Flame Pillars, Explosive Barrels)
+    for (const trap of this.currentRoom.traps) {
+      if (!trap.active) continue;
+      this.renderTrap(ctx, trap);
+    }
+
+    // 5. 渲染房间中央交互圣物台（过关圣物、铁匠砧台、奇遇圣爵、诅咒血箱）
+    for (const item of this.currentRoom.interactables) {
+      if (!item.active) continue;
+      this.renderInteractable(ctx, item);
+    }
+
+    // 6. 穹顶斜射丁达尔体积光束 (Volumetric Biome Light Shafts / God Rays)
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const rayOffsets = [-320, 0, 310];
+    for (let i = 0; i < rayOffsets.length; i++) {
+      const rx = rayOffsets[i];
+      const breathe = 0.045 + Math.sin(this.elapsedSeconds * 1.2 + i * 1.4) * 0.015;
+      ctx.save();
+      ctx.translate(rx, 0);
+      ctx.rotate(-0.48);
+      const rayGrad = ctx.createLinearGradient(-55, -hh, 55, hh);
+      rayGrad.addColorStop(0, `rgba(${theme.rayTop}, ${breathe * 1.3})`);
+      rayGrad.addColorStop(0.5, `rgba(${theme.rayMid}, ${breathe * 0.7})`);
+      rayGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = rayGrad;
+      ctx.beginPath();
+      ctx.moveTo(-42, -hh * 1.2);
+      ctx.lineTo(42, -hh * 1.2);
+      ctx.lineTo(110, hh * 1.2);
+      ctx.lineTo(-110, hh * 1.2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  /**
+   * 渲染《元气骑士》风格 2.5D 立体战术掩体石柱 / 圣殿方尖碑（可阻挡走位与敌方弹幕）
+   */
+  private renderRoomPillar(
+    ctx: CanvasRenderingContext2D,
+    p: RoomPillar,
+    theme: { pillarTop: string; pillarSide: string; pillarGem: string; borderUnlocked: string }
+  ): void {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    const r = p.radius;
+
+    // 1. 地面立体环境光遮蔽投影 (2.5D Ground Drop Shadow)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.beginPath();
+    ctx.ellipse(4, 10, r * 1.15, r * 0.78, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. 底座八角石阶基石 (Stepped Plinth Base)
+    ctx.fillStyle = '#090d16';
+    ctx.fillRect(-r, -r * 0.65, r * 2, r * 1.65);
+    ctx.strokeStyle = theme.borderUnlocked;
+    ctx.lineWidth = 1.6;
+    ctx.strokeRect(-r, -r * 0.65, r * 2, r * 1.65);
+
+    // 3. 2.5D 立柱正面阴影柱身 (Vertical Column Shaft)
+    ctx.fillStyle = theme.pillarSide;
+    ctx.fillRect(-r * 0.86, -r * 1.15, r * 1.72, r * 1.9);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-r * 0.86, -r * 1.15, r * 1.72, r * 1.9);
+
+    // 4. 柱顶斜切高光台面 (Top Beveled Capital)
+    ctx.fillStyle = theme.pillarTop;
+    ctx.fillRect(-r * 0.92, -r * 1.28, r * 1.84, r * 1.18);
+    ctx.strokeStyle = theme.borderUnlocked;
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-r * 0.92, -r * 1.28, r * 1.84, r * 1.18);
+
+    // 顶部高光切面线
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.fillRect(-r * 0.88, -r * 1.25, r * 1.76, 3);
+
+    // 5. 柱心镶嵌发光能量晶核 / 符文徽记 (Glowing Biome Energy Core)
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const pulse = 0.85 + Math.sin(this.elapsedSeconds * 4 + p.x * 0.05) * 0.15;
+    const gemGrad = ctx.createRadialGradient(0, -r * 0.68, 1, 0, -r * 0.68, r * 0.72 * pulse);
+    gemGrad.addColorStop(0, '#ffffff');
+    gemGrad.addColorStop(0.45, theme.pillarGem);
+    gemGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = gemGrad;
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.68, r * 0.72 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 菱形晶石切面
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.68 - 7);
+    ctx.lineTo(6, -r * 0.68);
+    ctx.lineTo(0, -r * 0.68 + 7);
+    ctx.lineTo(-6, -r * 0.68);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    ctx.restore();
+  }
+
+  /**
+   * 渲染暗黑哥特风格地牢战术机关（精锻地刺铁板、黑曜喷火龙柱、炼金颅骨火药桶）
+   */
+  private renderTrap(ctx: CanvasRenderingContext2D, trap: DungeonTrap): void {
+    ctx.save();
+    ctx.translate(trap.x, trap.y);
+
+    if (trap.kind === 'SPIKE_PLATE') {
+      const t = trap.cycleTimer;
+      const isWarning = t >= 1.45 && t < 2.15;
+      const isUp = t >= 2.15 && t <= 2.96;
+      const isRetracting = t > 2.96 && t <= 3.2;
+      const r = trap.radius;
+
+      // 计算平滑的 4 阶段机械地刺伸缩曲线 (0 = 完全缩回, 0.24 = 预警露尖, 1.0~1.16 = 猛烈穿刺弹出)
+      let ext = 0;
+      if (isWarning) {
+        const warnProg = (t - 1.45) / 0.7;
+        ext = 0.14 + 0.14 * Math.sin(warnProg * Math.PI * 0.5);
+      } else if (isUp) {
+        const upElapsed = t - 2.15;
+        if (upElapsed < 0.09) {
+          // 弹簧瞬间暴起过冲 (Overshoot spring thrust)
+          const p = upElapsed / 0.09;
+          ext = 0.28 + 0.90 * (1 - Math.pow(1 - p, 3));
+        } else {
+          ext = 1.0 + Math.max(0, 0.18 * (1 - (upElapsed - 0.09) / 0.12));
+        }
+      } else if (isRetracting) {
+        const retProg = (t - 2.96) / 0.24;
+        ext = Math.max(0, 1 - Math.pow(retProg, 1.6));
+      }
+
+      // 预警与弹出瞬间的机械震颤偏移
+      const tremorX = isWarning ? Math.sin(this.elapsedSeconds * 58 + trap.id) * 1.3 : 0;
+      const tremorY = isWarning ? Math.cos(this.elapsedSeconds * 64 + trap.id) * 1.1 : 0;
+      ctx.translate(tremorX, tremorY);
+
+      const cut = 10; // 八角斜切边角
+      const drawOctagon = (rad: number) => {
+        ctx.beginPath();
+        ctx.moveTo(-rad + cut, -rad);
+        ctx.lineTo(rad - cut, -rad);
+        ctx.lineTo(rad, -rad + cut);
+        ctx.lineTo(rad, rad - cut);
+        ctx.lineTo(rad - cut, rad);
+        ctx.lineTo(-rad + cut, rad);
+        ctx.lineTo(-rad, rad - cut);
+        ctx.lineTo(-rad, -rad + cut);
+        ctx.closePath();
+      };
+
+      // 1. 地面深凹铸铁基座阴影与外沿斜切装甲框 (2.5D Recessed Octagonal Iron Chassis)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+      ctx.save();
+      ctx.translate(2, 4);
+      drawOctagon(r + 2);
+      ctx.fill();
+      ctx.restore();
+
+      const frameGrad = ctx.createLinearGradient(-r, -r, r, r);
+      frameGrad.addColorStop(0, '#334155');
+      frameGrad.addColorStop(0.5, '#0f172a');
+      frameGrad.addColorStop(1, '#020617');
+      ctx.fillStyle = frameGrad;
+      drawOctagon(r);
+      ctx.fill();
+
+      // 2. 内层下沉式暗黑铁格栅面板 (Recessed Grate Plate)
+      const plateGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, r * 0.95);
+      plateGrad.addColorStop(0, isUp ? '#2a0a14' : isWarning ? '#29180b' : '#131726');
+      plateGrad.addColorStop(1, '#070911');
+      ctx.fillStyle = plateGrad;
+      drawOctagon(r - 5);
+      ctx.fill();
+
+      // 机械十字排水血槽与金属网格刻线
+      ctx.strokeStyle = isUp
+        ? 'rgba(239, 68, 68, 0.42)'
+        : isWarning
+        ? 'rgba(245, 158, 11, 0.38)'
+        : 'rgba(71, 85, 105, 0.28)';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(-r + 8, 0);
+      ctx.lineTo(r - 8, 0);
+      ctx.moveTo(0, -r + 8);
+      ctx.lineTo(0, r - 8);
+      ctx.stroke();
+
+      // 外框状态辉光描边
+      ctx.strokeStyle = isUp ? '#ef4444' : isWarning ? '#f59e0b' : '#475569';
+      ctx.lineWidth = isUp ? 2.4 : 1.8;
+      drawOctagon(r - 1);
+      ctx.stroke();
+
+      // 弹出瞬间的地面气浪冲击环 (Eruption Shockwave Ring)
+      if (isUp && t - 2.15 < 0.22) {
+        const ringProg = (t - 2.15) / 0.22;
+        ctx.save();
+        ctx.globalAlpha = (1 - ringProg) * 0.75;
+        ctx.strokeStyle = '#fca5a5';
+        ctx.lineWidth = 2.2 * (1 - ringProg);
+        drawOctagon(r * (0.95 + ringProg * 0.28));
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 8 颗立体高光黄铜铆钉
+      for (const [rx, ry] of [
+        [-r + 12, -r + 5],
+        [r - 12, -r + 5],
+        [-r + 12, r - 5],
+        [r - 12, r - 5],
+        [-r + 5, -r + 12],
+        [r - 5, -r + 12],
+        [-r + 5, r - 12],
+        [r - 5, r - 12]
+      ]) {
+        ctx.fillStyle = '#b45309';
+        ctx.beginPath();
+        ctx.arc(rx, ry, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#fde68a';
+        ctx.beginPath();
+        ctx.arc(rx - 0.5, ry - 0.5, 0.9, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 3. 9 孔哥特立体三棱放血枪刺阵列 (3x3 2.5D Three-Faceted Steel Spikes)
+      const spacing = r * 0.51;
+      for (let gy = -1; gy <= 1; gy++) {
+        for (let gx = -1; gx <= 1; gx++) {
+          const sx = gx * spacing;
+          const sy = gy * spacing;
+
+          // 3a. 深渊机械矛孔底座与金属套环 (Recessed Socket & Collar)
+          ctx.fillStyle = '#02040a';
+          ctx.beginPath();
+          ctx.ellipse(sx, sy, 6.2, 4.8, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = isUp ? '#f87171' : isWarning ? '#fbbf24' : '#475569';
+          ctx.lineWidth = 1.3;
+          ctx.stroke();
+
+          // 3b. 预警状态：孔洞深处透出炽红机械蓄力微光
+          if (isWarning) {
+            const glowGrad = ctx.createRadialGradient(sx, sy, 0.5, sx, sy, 7.5);
+            glowGrad.addColorStop(0, '#fef08a');
+            glowGrad.addColorStop(0.5, 'rgba(245, 158, 11, 0.65)');
+            glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            ctx.fillStyle = glowGrad;
+            ctx.beginPath();
+            ctx.arc(sx, sy, 7.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          // 3c. 动态伸缩的立体三棱钢刺 (3D Faceted Blade with Shadow & Blood Tip)
+          if (ext > 0.02) {
+            const spikeH = 23 * ext;
+            const baseW = 5.6 * Math.min(1, 0.55 + ext * 0.45);
+            const tipY = sy - spikeH;
+
+            // 斜向地面投影 (Cast Shadow on Grate)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+            ctx.beginPath();
+            ctx.moveTo(sx - baseW * 0.6, sy + 1);
+            ctx.lineTo(sx + spikeH * 0.48, sy - spikeH * 0.25);
+            ctx.lineTo(sx + baseW * 0.9, sy + 2);
+            ctx.closePath();
+            ctx.fill();
+
+            // 左侧背光暗钢切面 (Left Dark-Steel Facet)
+            ctx.fillStyle = '#64748b';
+            ctx.beginPath();
+            ctx.moveTo(sx - baseW, sy + 1.5);
+            ctx.lineTo(sx, tipY);
+            ctx.lineTo(sx, sy + 3);
+            ctx.closePath();
+            ctx.fill();
+
+            // 右侧迎光亮银切面 (Right Polished Chrome Facet)
+            ctx.fillStyle = '#f1f5f9';
+            ctx.beginPath();
+            ctx.moveTo(sx, sy + 3);
+            ctx.lineTo(sx, tipY);
+            ctx.lineTo(sx + baseW, sy + 1.5);
+            ctx.closePath();
+            ctx.fill();
+
+            // 矛尖寒铁染血涂层 (Crimson Blood-Stained Tip)
+            if (ext > 0.35) {
+              const bloodY = tipY + spikeH * 0.42;
+              const bloodW = baseW * 0.42;
+              ctx.fillStyle = '#dc2626';
+              ctx.beginPath();
+              ctx.moveTo(sx - bloodW, bloodY);
+              ctx.lineTo(sx, tipY);
+              ctx.lineTo(sx, bloodY + 1.5);
+              ctx.closePath();
+              ctx.fill();
+
+              ctx.fillStyle = '#f87171';
+              ctx.beginPath();
+              ctx.moveTo(sx, bloodY + 1.5);
+              ctx.lineTo(sx, tipY);
+              ctx.lineTo(sx + bloodW, bloodY);
+              ctx.closePath();
+              ctx.fill();
+            }
+
+            // 中央锋利高光脊线 (Central Razor Ridge Highlight)
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = 1.1;
+            ctx.beginPath();
+            ctx.moveTo(sx, sy + 2);
+            ctx.lineTo(sx, tipY);
+            ctx.stroke();
+
+            // 完全刺出瞬间的矛尖十字寒芒闪光 (Tip Star Glint on Eruption)
+            if (isUp && t - 2.15 < 0.16 && gx === 0 && gy === 0) {
+              ctx.fillStyle = '#ffffff';
+              ctx.fillRect(sx - 6, tipY - 1, 12, 1.6);
+              ctx.fillRect(sx - 0.8, tipY - 6, 1.6, 12);
+            }
+          }
+        }
+      }
+    } else if (trap.kind === 'FLAME_PILLAR') {
+      const isFiring = trap.cycleTimer >= 1.8 && trap.cycleTimer <= 2.8;
+      if (isFiring) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const fireGrad = ctx.createRadialGradient(0, 0, 8, 0, 0, 105);
+        fireGrad.addColorStop(0, 'rgba(255, 255, 255, 0.88)');
+        fireGrad.addColorStop(0.35, 'rgba(251, 191, 36, 0.65)');
+        fireGrad.addColorStop(0.7, 'rgba(239, 68, 68, 0.35)');
+        fireGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = fireGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 105, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 4 道旋转炼狱火舌
+        for (let f = 0; f < 4; f++) {
+          const fang = this.elapsedSeconds * 5 + (f * Math.PI) / 2;
+          ctx.strokeStyle = '#fde047';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.arc(0, 0, 72, fang, fang + 0.7);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // 哥特八角黄铜熔炉柱座
+      ctx.fillStyle = '#130f24';
+      ctx.beginPath();
+      ctx.arc(0, 0, 24, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = isFiring ? '#f59e0b' : '#b45309';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // 十字喷火龙口浮雕
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(-26, -4, 52, 8);
+      ctx.fillRect(-4, -26, 8, 52);
+
+      ctx.fillStyle = isFiring ? '#ffffff' : '#ea580c';
+      ctx.beginPath();
+      ctx.arc(0, 0, 10, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (trap.kind === 'EXPLOSIVE_BARREL') {
+      const pulse = 1 + Math.sin(trap.cycleTimer * 6) * 0.05;
+      ctx.scale(pulse, pulse);
+
+      // 炼金爆破法阵警戒圈
+      ctx.strokeStyle = 'rgba(239, 68, 68, 0.20)';
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([8, 6]);
+      ctx.beginPath();
+      ctx.arc(0, 0, 145, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 地面投影
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
+      ctx.beginPath();
+      ctx.ellipse(2, 18, 16, 7, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 暗红橡木与黄铜箍炼金火药桶
+      const barrelGrad = ctx.createLinearGradient(-15, 0, 15, 0);
+      barrelGrad.addColorStop(0, '#450a0a');
+      barrelGrad.addColorStop(0.5, '#991b1b');
+      barrelGrad.addColorStop(1, '#450a0a');
+      ctx.fillStyle = barrelGrad;
+      ctx.beginPath();
+      ctx.roundRect(-15, -18, 30, 34, 6);
+      ctx.fill();
+
+      ctx.strokeStyle = '#d97706';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // 上下双道铆钉黑铁箍
+      ctx.fillStyle = '#1e293b';
+      ctx.fillRect(-15, -11, 30, 4);
+      ctx.fillRect(-15, 6, 30, 4);
+
+      // 桶身中央鎏金炼金颅骨徽记（取代生硬的 TNT 文字）
+      ctx.fillStyle = '#fbbf24';
+      ctx.beginPath();
+      ctx.arc(0, -2, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillRect(-3, 1, 6, 4);
+      ctx.fillStyle = '#450a0a';
+      ctx.fillRect(-2.5, -3, 1.8, 1.8);
+      ctx.fillRect(0.8, -3, 1.8, 1.8);
+
+      // 顶部滋滋燃烧的引信火花
+      ctx.strokeStyle = '#d97706';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(0, -18);
+      ctx.quadraticCurveTo(4, -24, 7, -23);
+      ctx.stroke();
+
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.arc(7, -23, 3 + Math.sin(this.elapsedSeconds * 20) * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * 渲染唯一的一扇无标注哥特尖拱神秘传送门（不显示任何房间名字、图标或颜色剧透，玩家踏入前完全未知）
+   */
+  private renderDoorPortal(ctx: CanvasRenderingContext2D, door: DoorPortal): void {
+    ctx.save();
+    ctx.translate(door.x, door.y);
+
+    const w = door.width;
+    const h = door.height;
+
+    // 1. 哥特双柱浮雕石拱门基座 (Sculpted Twin-Pillar Gothic Archway)
+    ctx.fillStyle = '#0b0816';
+    ctx.beginPath();
+    ctx.roundRect(-w / 2 - 12, -h / 2 - 8, w + 24, h + 14, 10);
+    ctx.fill();
+
+    // 左右哥特石柱与鎏金柱头
+    ctx.fillStyle = '#1e1836';
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 2;
+    ctx.fillRect(-w / 2 - 12, -h / 2 - 6, 14, h + 12);
+    ctx.strokeRect(-w / 2 - 12, -h / 2 - 6, 14, h + 12);
+    ctx.fillRect(w / 2 - 2, -h / 2 - 6, 14, h + 12);
+    ctx.strokeRect(w / 2 - 2, -h / 2 - 6, 14, h + 12);
+
+    // 拱门顶部鎏金拱心石 (Keystone Crest)
+    ctx.fillStyle = '#f59e0b';
+    ctx.beginPath();
+    ctx.moveTo(0, -h / 2 - 14);
+    ctx.lineTo(10, -h / 2 - 4);
+    ctx.lineTo(0, -h / 2 + 4);
+    ctx.lineTo(-10, -h / 2 - 4);
+    ctx.closePath();
+    ctx.fill();
+
+    if (door.isOpen) {
+      // 开启状态：统一神秘银紫星界漩涡与星盘（绝不透露下个房间类型，无任何文字标注）
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const pulse = 0.88 + Math.sin(door.pulseTimer) * 0.12;
+      const grad = ctx.createRadialGradient(0, 0, 4, 0, 0, (w / 2) * pulse);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.42, '#c4b5fd');
+      grad.addColorStop(0.75, 'rgba(139, 92, 246, 0.45)');
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.ellipse(0, 2, w * 0.44 * pulse, h * 0.44 * pulse, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 漩涡内部双层逆向旋转星盘（纯图形，零文字）
+      ctx.strokeStyle = 'rgba(248, 250, 252, 0.82)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(0, 2, 15 + Math.sin(door.pulseTimer * 2) * 2, door.pulseTimer, door.pulseTimer + Math.PI * 1.4);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.70)';
+      ctx.beginPath();
+      ctx.arc(0, 2, 9, -door.pulseTimer * 1.5, -door.pulseTimer * 1.5 + Math.PI * 1.25);
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.strokeStyle = '#e9d5ff';
+      ctx.lineWidth = 2.5;
+      ctx.shadowColor = '#a78bfa';
+      ctx.shadowBlur = 12;
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+    } else {
+      // 锁死状态：哥特猩红铸铁闸门与封印锁链（无任何文字标注）
+      ctx.strokeStyle = '#7f1d1d';
+      ctx.lineWidth = 2.5;
+      ctx.strokeRect(-w / 2, -h / 2, w, h);
+
+      ctx.strokeStyle = '#ef4444';
+      ctx.lineWidth = 2.8;
+      for (let barX = -w / 2 + 14; barX < w / 2; barX += 15) {
+        ctx.beginPath();
+        ctx.moveTo(barX, -h / 2 + 2);
+        ctx.lineTo(barX, h / 2 - 2);
+        ctx.stroke();
+      }
+      // 横向加固铁梁
+      ctx.fillStyle = '#450a0a';
+      ctx.fillRect(-w / 2 + 2, -6, w - 4, 5);
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * 渲染具有独立哥特圣物雕塑造型的交互祭坛与黑曜石鎏金铭牌
+   */
+  private renderInteractable(ctx: CanvasRenderingContext2D, item: RoomInteractable): void {
+    ctx.save();
+    ctx.translate(item.x, item.y);
+
+    const bob = Math.sin(item.pulseTimer) * 4;
+
+    // 1. 地面哥特八芒星圣光法阵
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const auraR = item.radius + Math.sin(item.pulseTimer * 1.5) * 3;
+    ctx.strokeStyle = item.color;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(0, 6, auraR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(0, 6, auraR * 0.76, 0, Math.PI * 2);
+    ctx.stroke();
+
+    const glow = ctx.createRadialGradient(0, 4, 2, 0, 4, item.radius * 1.35);
+    glow.addColorStop(0, item.color);
+    glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.globalAlpha = 0.28;
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 4, item.radius * 1.35, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // 2. 黑曜石雕刻祭坛底座 (Carved Stone Altar Pedestal)
+    ctx.fillStyle = '#130f22';
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.roundRect(-18, 2, 36, 12, 3);
+    ctx.fill();
+    ctx.stroke();
+
+    // 3. 根据圣物类型绘制专属哥特雕塑 (Bespoke Gothic Reliquary Sculpture)
+    ctx.save();
+    ctx.translate(0, -12 + bob);
+
+    switch (item.kind) {
+      case 'SHOP_UPGRADE': {
+        // 铁匠黑曜石铁砧与熔火符文战锤
+        ctx.fillStyle = '#334155';
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(-16, 6);
+        ctx.lineTo(16, 6);
+        ctx.lineTo(11, 14);
+        ctx.lineTo(-11, 14);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // 悬浮锻造神锤
+        ctx.rotate(-0.35 + Math.sin(item.pulseTimer * 2) * 0.15);
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(-2, -12, 4, 18);
+        ctx.fillStyle = '#fbbf24';
+        ctx.fillRect(-10, -16, 20, 8);
+        break;
+      }
+
+      case 'SHOP_HEAL_REROLL': {
+        // 哥特鎏金圣血水晶瓶
+        ctx.fillStyle = '#10b981';
+        ctx.strokeStyle = '#fde047';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(0, 2, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#fef08a';
+        ctx.fillRect(-4, -14, 8, 6);
+        // 十字圣印
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(-5, 0, 10, 3);
+        ctx.fillRect(-1.5, -3.5, 3, 10);
+        break;
+      }
+
+      case 'EVENT_BLOOD_PACT': {
+        // 猩红双角献祭圣爵 (Crimson Blood Chalice)
+        ctx.fillStyle = '#991b1b';
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(0, -4, 12, 0, Math.PI, false);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(-3, 6, 6, 8);
+        ctx.fillRect(-9, 12, 18, 3);
+        // 升腾血珠
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(0, -10, 4, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+
+      case 'EVENT_STAR_GRACE': {
+        // 星界三环浑天仪 (Celestial Astrolabe)
+        ctx.strokeStyle = '#7dd3fc';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(0, 0, 14, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = '#fde047';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 14, 6, item.pulseTimer * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(0, 0, 5, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+
+      case 'CURSED_BLOOD_CHEST':
+      case 'SHOP_RELIC_BOX': {
+        // 锁链封印圣物秘匣 (Chained Reliquary Coffer)
+        ctx.fillStyle = item.kind === 'CURSED_BLOOD_CHEST' ? '#4c0519' : '#2e1065';
+        ctx.strokeStyle = item.kind === 'CURSED_BLOOD_CHEST' ? '#f43f5e' : '#fbbf24';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(-14, -8, 28, 20, 4);
+        ctx.fill();
+        ctx.stroke();
+        // 中央魔眼/宝石锁扣
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.arc(0, 2, 4.5, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      }
+
+      default: {
+        // CLEAR_REWARD: 圣翼加冕棱镜圣物核
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(-20, -4);
+        ctx.quadraticCurveTo(-12, -14, -6, 2);
+        ctx.moveTo(20, -4);
+        ctx.quadraticCurveTo(12, -14, 6, 2);
+        ctx.stroke();
+
+        ctx.fillStyle = item.color;
+        ctx.beginPath();
+        ctx.moveTo(0, -16);
+        ctx.lineTo(12, 0);
+        ctx.lineTo(0, 14);
+        ctx.lineTo(-12, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+        break;
+      }
+    }
+    ctx.restore();
+
+    // 4. 垂直丁达尔圣物光柱 (Volumetric Reliquary Light Beam - 替代原本繁杂的3行中文悬浮字)
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const beamGrad = ctx.createLinearGradient(0, 6, 0, -95);
+    beamGrad.addColorStop(0, item.color);
+    beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.14)');
+    beamGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.globalAlpha = 0.26;
+    ctx.fillStyle = beamGrad;
+    ctx.beginPath();
+    ctx.moveTo(-16, 6);
+    ctx.lineTo(16, 6);
+    ctx.lineTo(26, -95);
+    ctx.lineTo(-26, -95);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // 仅在需要金币购买时显示极简 3D 价格铭牌 (Zero verbose text clutter)
+    if (item.costGold > 0) {
+      ctx.fillStyle = 'rgba(9, 13, 22, 0.92)';
+      ctx.beginPath();
+      ctx.roundRect(-22, 18, 44, 15, 4);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = '600 10px ui-monospace, "SF Mono", -apple-system, sans-serif';
+      ctx.fillText(`${item.costGold}G`, 0, 26);
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * 渲染极简立体层数徽章与波次宝石指示器
+   */
+  public renderRoomOverlayHUD(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+    const room = this.currentRoom;
+    const meta = ROOM_TYPE_META[room.type];
+
+    ctx.save();
+
+    // 房间切换瞬间柔和暗影过渡
+    if (this.transitionFlashAlpha > 0) {
+      ctx.fillStyle = `rgba(6, 4, 14, ${this.transitionFlashAlpha * 0.85})`;
+      ctx.fillRect(0, 0, width, height);
+    }
+
+    // 极简 3D 浮雕层数铭牌与波次菱形晶石
+    const badgeW = 96;
+    const badgeH = 22;
+    const bx = width / 2 - badgeW / 2;
+    const by = 56;
+
+    // 立体投影
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.beginPath();
+    ctx.roundRect(bx + 1, by + 3, badgeW, badgeH, 5);
+    ctx.fill();
+
+    // 3D 斜切黑曜金属底壳
+    const plateGrad = ctx.createLinearGradient(bx, by, bx, by + badgeH);
+    plateGrad.addColorStop(0, '#1e293b');
+    plateGrad.addColorStop(1, '#090d16');
+    ctx.fillStyle = plateGrad;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, badgeW, badgeH, 5);
+    ctx.fill();
+
+    ctx.strokeStyle = room.state === RoomState.ACTIVE_LOCKED ? 'rgba(239, 68, 68, 0.6)' : 'rgba(148, 163, 184, 0.35)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = '600 10px -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", ui-monospace, sans-serif';
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillText(t(`第 ${room.roomNumber} 层`, `FLOOR ${room.roomNumber}`), width / 2, by + 11.5);
+
+    // 波次立体切面晶石指示点 (3D Faceted Wave Pips - 无需任何汉字即可直观感知波次进度)
+    if (room.totalWaves > 0) {
+      const pipSpacing = 16;
+      const startPipX = width / 2 - ((room.totalWaves - 1) * pipSpacing) / 2;
+      const pipY = by + badgeH + 10;
+
+      for (let wIdx = 1; wIdx <= room.totalWaves; wIdx++) {
+        const px = startPipX + (wIdx - 1) * pipSpacing;
+        const isCleared =
+          room.state === RoomState.CLEARED || wIdx < room.currentWave;
+        const isCurrent =
+          room.state === RoomState.ACTIVE_LOCKED && wIdx === room.currentWave;
+
+        ctx.save();
+        ctx.translate(px, pipY);
+        // 晶石底座暗影
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.beginPath();
+        ctx.moveTo(0, -4);
+        ctx.lineTo(5, 1);
+        ctx.lineTo(0, 6);
+        ctx.lineTo(-5, 1);
+        ctx.closePath();
+        ctx.fill();
+
+        // 晶石立体填充
+        ctx.fillStyle = isCleared
+          ? '#4ade80'
+          : isCurrent
+          ? '#ef4444'
+          : '#1e293b';
+        ctx.strokeStyle = isCleared
+          ? '#bbf7d0'
+          : isCurrent
+          ? '#fca5a5'
+          : '#475569';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(0, -5);
+        ctx.lineTo(4.5, 0);
+        ctx.lineTo(0, 5);
+        ctx.lineTo(-4.5, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+    } else {
+      // 特殊房间单颗发光星钻
+      ctx.save();
+      ctx.translate(width / 2, by + badgeH + 10);
+      ctx.fillStyle = meta.themeColor;
+      ctx.beginPath();
+      ctx.moveTo(0, -5);
+      ctx.lineTo(5, 0);
+      ctx.lineTo(0, 5);
+      ctx.lineTo(-5, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+}

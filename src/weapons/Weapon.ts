@@ -1,6 +1,7 @@
 import type { Player } from '../entities/Player';
 import type { CombatSystem } from '../systems/CombatSystem';
 import type { SoundSynthesizer } from '../core/SoundSynthesizer';
+import { SkillTag, WEAPON_DEFAULT_TAGS } from '../systems/BuildSystem';
 
 export interface WeaponUpgradeInfo {
   level: number;
@@ -18,6 +19,11 @@ export abstract class Weapon {
   public evolvedDescription: string | null = null;
   public iconName: string;
 
+  // 多维属性标签 (Multi-Dimensional Tags)
+  public tags: SkillTag[] = [];
+  // 记录当前这一次攻击是否处于“第4击奇点律令”激活状态
+  public currentAttackIsFourthStroke = false;
+
   // Base Combat stats
   public cooldown = 1.0; // seconds
   public cooldownTimer = 0;
@@ -32,10 +38,25 @@ export abstract class Weapon {
   public totalDamageDealt = 0;
   public totalKills = 0;
 
-  constructor(id: string, name: string, iconName: string) {
+  constructor(id: string, name: string, iconName: string, customTags?: SkillTag[]) {
     this.id = id;
     this.name = name;
     this.iconName = iconName;
+    this.tags = customTags ? [...customTags] : [...(WEAPON_DEFAULT_TAGS[id] || [SkillTag.PROJECTILE])];
+  }
+
+  public hasTag(tag: SkillTag): boolean {
+    return this.tags.includes(tag);
+  }
+
+  public hasAnyTag(checkTags: SkillTag[]): boolean {
+    return checkTags.some(t => this.tags.includes(t));
+  }
+
+  public addTag(tag: SkillTag): void {
+    if (!this.tags.includes(tag)) {
+      this.tags.push(tag);
+    }
   }
 
   public update(dt: number, player: Player, combatSystem: CombatSystem, sound: SoundSynthesizer): void {
@@ -43,6 +64,12 @@ export abstract class Weapon {
     this.cooldownTimer -= dt;
 
     if (this.cooldownTimer <= 0) {
+      // 在没有敌人时不发起攻击，保持冷却就绪状态，一旦敌人出现立即发动攻击
+      if (!combatSystem.hasActiveEnemies()) {
+        this.cooldownTimer = 0;
+        return;
+      }
+      combatSystem.notifyWeaponAttackStart(this, player);
       this.attack(player, combatSystem, sound);
       this.cooldownTimer = effectiveCooldown;
     }
@@ -64,6 +91,9 @@ export abstract class Weapon {
     this.isEvolved = true;
     if (this.evolvedName) {
       this.name = this.evolvedName;
+    }
+    if (!this.tags.includes(SkillTag.OVERLOAD)) {
+      this.tags.push(SkillTag.OVERLOAD);
     }
     this.onEvolve();
   }

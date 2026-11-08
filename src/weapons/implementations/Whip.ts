@@ -11,21 +11,49 @@ export class Whip extends Weapon {
     this.evolutionPairPassive = 'hollow_heart';
     this.evolvedName = 'Bloody Tear';
     this.evolvedDescription = 'Deals devastating critical strikes and recovers health on impact.';
-    this.damage = 20;
-    this.cooldown = 1.35;
+    this.damage = 22;
+    this.cooldown = 1.25;
     this.projectileCount = 1;
-    this.area = 55;
-    this.duration = 0.22;
+    this.area = 90;
+    this.duration = 0.36;
     this.pierce = 999;
   }
 
   public attack(player: Player, combatSystem: CombatSystem, sound: SoundSynthesizer): void {
     const totalCount = this.projectileCount + player.projectileCountBonus;
+    const targets = combatSystem.getNearestEnemies(player.position, 950, Math.max(4, totalCount));
+    const primaryTarget = targets[0];
+    const baseAngle = primaryTarget
+      ? Math.atan2(primaryTarget.position.y - player.position.y, primaryTarget.position.x - player.position.x)
+      : player.facingDirection >= 0
+      ? 0
+      : Math.PI;
+
+    // Face toward the enemy being cleaved
+    if (primaryTarget) {
+      player.facingDirection = Math.cos(baseAngle) >= 0 ? 1 : -1;
+    }
 
     for (let i = 0; i < totalCount; i++) {
-      // Alternate front / back
-      const dir = (i % 2 === 0) ? player.facingDirection : -player.facingDirection;
-      const offsetX = dir * (this.area * 0.8);
+      // Aim 1st cleave directly at nearest enemy (full 360-degree directional cleave!);
+      // subsequent cleaves target other nearby enemies or fan/reverse around baseAngle
+      let aimAngle = baseAngle;
+      if (i > 0) {
+        const secondaryTarget = targets[i];
+        if (secondaryTarget) {
+          aimAngle = Math.atan2(
+            secondaryTarget.position.y - player.position.y,
+            secondaryTarget.position.x - player.position.x
+          );
+        } else {
+          aimAngle = i % 2 === 1 ? baseAngle + Math.PI : baseAngle + (i % 4 === 2 ? 0.55 : -0.55);
+        }
+      }
+
+      const cosA = Math.cos(aimAngle);
+      const sinA = Math.sin(aimAngle);
+      const offsetX = cosA * 20;
+      const offsetY = sinA * 20;
       const isCrit = this.isEvolved || Math.random() < player.critChance;
       const dmg = Math.round(this.damage * player.damageMult * (isCrit ? 2.0 : 1.0));
 
@@ -33,16 +61,19 @@ export class Whip extends Weapon {
         ProjectileType.WHIP_SLASH,
         this.id,
         player.position.x + offsetX,
-        player.position.y - 4,
-        this.area * player.areaMult,
+        player.position.y + offsetY,
+        this.area * player.areaMult * 1.18,
         dmg,
         this.pierce,
-        this.duration
+        0.38
       );
 
+      proj.rotation = aimAngle; // Full 360-degree radian angle toward target!
+      proj.velocity.set(cosA * 185, sinA * 185); // High-velocity directional Sword Qi wave!
       proj.isCrit = isCrit;
-      proj.color = this.isEvolved ? '#ef4444' : '#f59e0b';
-      proj.glowColor = this.isEvolved ? '#b91c1c' : '#b45309';
+      proj.isEvolved = this.isEvolved;
+      proj.color = this.isEvolved ? '#ef4444' : '#38bdf8';
+      proj.glowColor = this.isEvolved ? '#fbbf24' : '#7dd3fc';
 
       combatSystem.addProjectile(proj);
 

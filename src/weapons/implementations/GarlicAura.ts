@@ -18,7 +18,7 @@ export class GarlicAura extends Weapon {
   }
 
   public update(dt: number, player: Player, combatSystem: CombatSystem, sound: SoundSynthesizer): void {
-    if (!player.active || player.isDead) {
+    if (!player.active || player.isDead || !combatSystem.hasActiveEnemies()) {
       if (this.auraProjectile) {
         this.auraProjectile.active = false;
         this.auraProjectile = null;

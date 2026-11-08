@@ -46,8 +46,13 @@ export class Axe extends Weapon {
       return;
     }
 
-    // Normal high arc lob
+    // Normal high arc lob aimed toward the nearest enemy
     const totalCount = this.projectileCount + player.projectileCountBonus;
+    const nearest = combatSystem.getNearestEnemies(player.position, 800, 1)[0];
+    const baseHorizontalVel = nearest
+      ? Math.max(-240, Math.min(240, (nearest.position.x - player.position.x) * 1.15))
+      : player.facingDirection * 120;
+
     for (let i = 0; i < totalCount; i++) {
       const spreadX = (i - (totalCount - 1) / 2) * 90;
       const proj = new Projectile(
@@ -61,8 +66,8 @@ export class Axe extends Weapon {
         this.duration
       );
 
-      // Launch up and slightly outward
-      proj.velocity.set(player.facingDirection * 120 + spreadX, -420);
+      // Launch up and toward the target enemy
+      proj.velocity.set(baseHorizontalVel + spreadX, -420);
       proj.color = '#94a3b8';
       proj.glowColor = '#cbd5e1';
 

@@ -5,11 +5,13 @@ export interface SaveData {
   unlockedCharacters: string[];
 }
 
+const ALL_CHARACTER_IDS = ['antonio', 'imelda', 'gennaro', 'arca', 'pasqualina', 'mortaccio'];
+
 const DEFAULT_SAVE: SaveData = {
   highScoreSeconds: 0,
   lifetimeKills: 0,
   totalGold: 0,
-  unlockedCharacters: ['antonio', 'imelda']
+  unlockedCharacters: [...ALL_CHARACTER_IDS]
 };
 
 const SAVE_KEY = 'bloodyberry_save_v1';
@@ -25,12 +27,17 @@ export class SaveManager {
     try {
       const raw = localStorage.getItem(SAVE_KEY);
       if (raw) {
-        return { ...DEFAULT_SAVE, ...JSON.parse(raw) };
+        const parsed = JSON.parse(raw);
+        return {
+          ...DEFAULT_SAVE,
+          ...parsed,
+          unlockedCharacters: [...ALL_CHARACTER_IDS]
+        };
       }
     } catch {
       // Fallback if localStorage unavailable
     }
-    return { ...DEFAULT_SAVE };
+    return { ...DEFAULT_SAVE, unlockedCharacters: [...ALL_CHARACTER_IDS] };
   }
 
   public save(): void {
@@ -69,7 +76,7 @@ export class SaveManager {
     this.save();
   }
 
-  public isCharacterUnlocked(id: string): boolean {
-    return this.data.unlockedCharacters.includes(id);
+  public isCharacterUnlocked(_id: string): boolean {
+    return true;
   }
 }

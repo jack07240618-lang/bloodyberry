@@ -6,7 +6,6 @@ import { PiercingDagger } from './implementations/PiercingDagger';
 import { ChainLightning } from './implementations/ChainLightning';
 import { CrossBoomerang } from './implementations/CrossBoomerang';
 import { GarlicAura } from './implementations/GarlicAura';
-import { Pentagram } from './implementations/Pentagram';
 import { Whip } from './implementations/Whip';
 import { Axe } from './implementations/Axe';
 import { FireWand } from './implementations/FireWand';
@@ -109,13 +108,5 @@ export const ALL_WEAPON_DEFINITIONS: Record<string, WeaponDefinition> = {
     evolutionPassive: 'pummarola',
     evolvedName: 'Soul Eater',
     create: () => new GarlicAura()
-  },
-  pentagram: {
-    id: 'pentagram',
-    name: 'Pentagram',
-    description: 'Erases all enemies on screen on a long recharge.',
-    evolutionPassive: 'crown',
-    evolvedName: 'Gorgeous Moon',
-    create: () => new Pentagram()
   }
 };

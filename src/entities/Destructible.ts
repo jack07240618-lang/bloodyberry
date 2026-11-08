@@ -1,5 +1,4 @@
 import { Entity } from './Entity';
-import { Vector2 } from '../core/Vector2';
 import { DropType } from './DropItem';
 
 export class Destructible extends Entity {
@@ -14,7 +13,7 @@ export class Destructible extends Entity {
 
   public update(dt: number): void {
     if (!this.active) return;
-    this.flameTimer += dt * 6;
+    this.flameTimer += dt * 7;
   }
 
   public takeDamage(amount: number): boolean {
@@ -40,48 +39,87 @@ export class Destructible extends Entity {
     ctx.save();
     ctx.translate(this.position.x, this.position.y);
 
-    // Subtle shadow
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+    // 1. Directional Cast Ground Shadow
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.beginPath();
-    ctx.ellipse(0, 12, 10, 4, 0, 0, Math.PI * 2);
+    ctx.ellipse(3, 13, 12, 5, 0.12, 0, Math.PI * 2);
     ctx.fill();
 
-    // Stone / Iron Brazier Stand
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(-2, -6, 4, 18);
-    ctx.fillRect(-6, 10, 12, 3);
-
-    // Bowl
-    ctx.fillStyle = '#475569';
+    // 2. Warm Additive Ground Fire Pool Glow
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const flickerRadius = 28 + Math.sin(this.flameTimer * 1.3) * 3;
+    const groundGlow = ctx.createRadialGradient(0, 2, 2, 0, 2, flickerRadius);
+    groundGlow.addColorStop(0, 'rgba(251, 146, 60, 0.35)');
+    groundGlow.addColorStop(0.5, 'rgba(234, 88, 12, 0.14)');
+    groundGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = groundGlow;
     ctx.beginPath();
-    ctx.moveTo(-9, -6);
-    ctx.lineTo(9, -6);
-    ctx.lineTo(6, -1);
-    ctx.lineTo(-6, -1);
+    ctx.arc(0, 2, flickerRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // 3. Ornate Wrought-Iron Tripod Pedestal Base
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(-7, 10, 14, 3);
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(-3, -4, 6, 15);
+    ctx.fillStyle = '#475569';
+    ctx.fillRect(-2, -4, 2, 14); // Specular iron shaft highlight
+
+    // Golden Ring Collar
+    ctx.fillStyle = '#d97706';
+    ctx.fillRect(-4, 2, 8, 2);
+
+    // 4. Spiked Gothic Iron Brazier Bowl
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.moveTo(-11, -7);
+    ctx.lineTo(11, -7);
+    ctx.lineTo(7, -1);
+    ctx.lineTo(-7, -1);
     ctx.closePath();
     ctx.fill();
 
-    // Animated Torch Flame
-    const flicker = Math.sin(this.flameTimer) * 2;
-    ctx.shadowColor = '#f97316';
-    ctx.shadowBlur = 12;
+    // Rim highlight & Glowing Hot Coals inside bowl
+    ctx.fillStyle = '#64748b';
+    ctx.fillRect(-11, -8, 22, 2);
+    ctx.fillStyle = '#dc2626';
+    ctx.fillRect(-8, -8, 16, 2);
 
+    // 5. Multi-Layered Additive Roaring Torch Flame
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const sway = Math.sin(this.flameTimer) * 2.5;
+    const stretch = Math.cos(this.flameTimer * 1.7) * 2;
+
+    // Outer Crimson-Orange Flame Tongue
     ctx.fillStyle = '#ea580c';
     ctx.beginPath();
-    ctx.moveTo(-5, -6);
-    ctx.quadraticCurveTo(0, -18 + flicker, 0, -20 + flicker);
-    ctx.quadraticCurveTo(5, -12, 5, -6);
+    ctx.moveTo(-7, -7);
+    ctx.quadraticCurveTo(-5, -18, sway, -24 + stretch);
+    ctx.quadraticCurveTo(6, -16, 7, -7);
     ctx.closePath();
     ctx.fill();
 
-    // Inner bright yellow flame
-    ctx.fillStyle = '#fef08a';
+    // Mid Golden Flame
+    ctx.fillStyle = '#fbbf24';
     ctx.beginPath();
-    ctx.moveTo(-3, -6);
-    ctx.quadraticCurveTo(0, -14 + flicker, 0, -16 + flicker);
-    ctx.quadraticCurveTo(3, -10, 3, -6);
+    ctx.moveTo(-4.5, -7);
+    ctx.quadraticCurveTo(-2, -15, sway * 0.7, -19 + stretch);
+    ctx.quadraticCurveTo(3, -14, 4.5, -7);
     ctx.closePath();
     ctx.fill();
+
+    // White-Hot Core
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(-2, -7);
+    ctx.quadraticCurveTo(0, -12, sway * 0.4, -14 + stretch * 0.5);
+    ctx.quadraticCurveTo(2, -11, 2, -7);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 
     ctx.restore();
   }

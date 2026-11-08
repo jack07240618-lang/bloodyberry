@@ -21,7 +21,10 @@ export class PiercingDagger extends Weapon {
 
   public attack(player: Player, combatSystem: CombatSystem, sound: SoundSynthesizer): void {
     const totalCount = this.projectileCount + player.projectileCountBonus;
-    const baseDir = player.moveDirection.lengthSq() > 0.001
+    const nearest = combatSystem.getNearestEnemies(player.position, 900, 1)[0];
+    const baseDir = nearest
+      ? nearest.position.clone().sub(player.position).normalize()
+      : player.moveDirection.lengthSq() > 0.001
       ? player.moveDirection.clone()
       : new Vector2(player.facingDirection, 0);
 
