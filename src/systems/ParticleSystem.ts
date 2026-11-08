@@ -269,6 +269,72 @@ export class ParticleSystem {
     }
   }
 
+  /**
+   * 首领击杀终结演出：全屏径向冲击波 + 圣金符文碎片爆裂
+   */
+  public emitBossSlainBurst(x: number, y: number): void {
+    // 1. Triple Concentric Radial Shockwaves
+    const ringColors = ['#ffffff', '#fde047', '#ef4444'];
+    for (let r = 0; r < 3; r++) {
+      this.particles.push({
+        position: new Vector2(x, y),
+        velocity: new Vector2(0, 0),
+        radius: 12 + r * 8,
+        maxRadius: 180 + r * 95,
+        color: ringColors[r],
+        lifetime: 0.55 + r * 0.14,
+        maxLifetime: 0.55 + r * 0.14,
+        alpha: 1.0,
+        shape: 'RING',
+        rotation: 0,
+        rotationSpeed: 0,
+        additive: true
+      });
+    }
+
+    // 2. 8-Way Cross-Slash Dimensional Rifts
+    for (let s = 0; s < 8; s++) {
+      const ang = (s * Math.PI) / 4;
+      this.particles.push({
+        position: new Vector2(x, y),
+        velocity: new Vector2(Math.cos(ang) * 90, Math.sin(ang) * 90),
+        radius: 56,
+        color: s % 2 === 0 ? '#fef08a' : '#f97316',
+        lifetime: 0.36,
+        maxLifetime: 0.36,
+        alpha: 1.0,
+        shape: 'SLASH',
+        rotation: ang,
+        rotationSpeed: 0,
+        additive: true
+      });
+    }
+
+    // 3. Sacred Golden Runic Shards & Sparks Eruption
+    const palette = ['#ffffff', '#fef08a', '#fbbf24', '#f59e0b', '#ef4444'];
+    for (let i = 0; i < 85; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 80 + Math.random() * 380;
+      const lifetime = 0.65 + Math.random() * 0.75;
+      const shape: ParticleShape = i % 3 === 0 ? 'SHARD' : i % 3 === 1 ? 'SPARK' : 'ORB';
+
+      this.particles.push({
+        position: new Vector2(x, y),
+        velocity: new Vector2(Math.cos(angle) * speed, Math.sin(angle) * speed),
+        radius: 3 + Math.random() * 4.5,
+        color: palette[i % palette.length],
+        lifetime,
+        maxLifetime: lifetime,
+        alpha: 1.0,
+        gravity: shape === 'SHARD' ? 140 : 45,
+        shape,
+        rotation: angle,
+        rotationSpeed: (Math.random() - 0.5) * 16,
+        additive: true
+      });
+    }
+  }
+
   public render(ctx: CanvasRenderingContext2D): void {
     for (const p of this.particles) {
       ctx.save();

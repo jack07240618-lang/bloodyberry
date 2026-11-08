@@ -64,6 +64,7 @@ class GameEngine {
   private selectedUpgradeIdx = 0;
   private chestReward: UpgradeOption | null = null;
   private hitStopTimer = 0;
+  private wasBossPresent = false;
 
   constructor() {
     this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -197,6 +198,8 @@ class GameEngine {
     this.camera.position.copy(this.player.position);
     this.sound.playBGM('BATTLE');
     this.isSettingsOpen = false;
+    this.wasBossPresent = false;
+    this.uiManager.resetBossPresentation();
     this.state = GameState.PLAYING;
   }
 
@@ -265,6 +268,13 @@ class GameEngine {
 
     if (this.hitStopTimer > 0) {
       this.hitStopTimer -= dt;
+      // Keep particles, damage numbers, and camera shake alive during cinematic hit-stop / time dilation
+      this.camera.update(dt);
+      this.particleSystem.update(dt * 0.45);
+      this.damageTextSystem.update(dt * 0.45);
+      if (this.combatSystem.bossSlainWaveTimer > 0) {
+        this.combatSystem.bossSlainWaveTimer = Math.max(0, this.combatSystem.bossSlainWaveTimer - dt);
+      }
       return;
     }
 
@@ -302,14 +312,6 @@ class GameEngine {
       return;
     }
 
-    // Dynamic Boss BGM switch
-    const hasBoss = this.combatSystem.enemies.some(e => e.isBoss && e.active);
-    if (hasBoss) {
-      this.sound.playBGM('BOSS');
-    } else {
-      this.sound.playBGM('BATTLE');
-    }
-
     // Camera follow player with smooth interpolation
     this.camera.follow(this.player.position, 0.12);
     this.camera.update(dt);
@@ -328,6 +330,25 @@ class GameEngine {
       () => this.triggerBossChest(),
       (dur) => { this.hitStopTimer = dur; }
     );
+
+    // Dynamic Boss BGM switch & Cinematic Entrance / Slain Presentation
+    const activeBoss = this.combatSystem.enemies.find(e => e.isBoss && e.active) || null;
+    const hasBoss = activeBoss !== null;
+    if (hasBoss && !this.wasBossPresent) {
+      this.wasBossPresent = true;
+      this.hitStopTimer = Math.max(this.hitStopTimer, 0.15);
+      this.sound.playBossWarning();
+      this.uiManager.triggerBossEntranceWarning(activeBoss.bossVariant);
+    } else if (!hasBoss && this.wasBossPresent) {
+      this.wasBossPresent = false;
+      this.uiManager.triggerBossSlainShatter();
+    }
+
+    if (hasBoss) {
+      this.sound.playBGM('BOSS');
+    } else {
+      this.sound.playBGM('BATTLE');
+    }
 
     // Particle & Damage Text Systems
     this.particleSystem.update(dt);
@@ -961,7 +982,8 @@ class GameEngine {
     this.mapSystem.renderLighting(this.ctx, this.camera, this.player, this.combatSystem);
 
     // Screen-space UI Overlays
-    const hasBoss = this.combatSystem.enemies.some(e => e.isBoss && e.active);
+    const activeBoss = this.combatSystem.enemies.find(e => e.isBoss && e.active) || null;
+    const hasBoss = activeBoss !== null;
     this.uiManager.renderHUD(
       this.ctx,
       w,
@@ -970,7 +992,8 @@ class GameEngine {
       this.roomManager.elapsedSeconds,
       this.combatSystem.freezeTimer > 0,
       hasBoss,
-      this.companionSystem
+      this.companionSystem,
+      activeBoss
     );
     this.roomManager.renderRoomOverlayHUD(this.ctx, w, h);
 

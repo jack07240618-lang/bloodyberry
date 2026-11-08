@@ -11,6 +11,11 @@ export interface BloodDecal {
   color: string;
   alpha: number;
   seed: number;
+  rotation: number;
+  stretchX: number;
+  stretchY: number;
+  lobeRadii: number[];
+  droplets: { dx: number; dy: number; r: number; rx: number; ry: number; ang: number }[];
 }
 
 export type ShrineType = 'FRENZY' | 'GREED' | 'BLESSING';
@@ -222,13 +227,52 @@ export class MapSystem {
   }
 
   public addBloodDecal(x: number, y: number, color = '#7f1d1d', radius = 14): void {
+    const baseR = radius * (0.85 + Math.random() * 0.45);
+    const vertexCount = 10;
+    const lobeRadii: number[] = [];
+    const phase1 = Math.random() * Math.PI * 2;
+    const phase2 = Math.random() * Math.PI * 2;
+
+    for (let i = 0; i < vertexCount; i++) {
+      const ang = (i * Math.PI * 2) / vertexCount;
+      // Organic multi-frequency liquid puddle contour (avoiding any uniform circle)
+      const wave =
+        1.0 +
+        Math.sin(ang * 2 + phase1) * 0.24 +
+        Math.cos(ang * 3 + phase2) * 0.18 +
+        (Math.random() - 0.5) * 0.26;
+      lobeRadii.push(baseR * Math.max(0.52, Math.min(1.42, wave)));
+    }
+
+    const dropCount = 4 + Math.floor(Math.random() * 5);
+    const droplets: { dx: number; dy: number; r: number; rx: number; ry: number; ang: number }[] = [];
+    for (let d = 0; d < dropCount; d++) {
+      const dAng = Math.random() * Math.PI * 2;
+      const dist = baseR * (0.82 + Math.random() * 0.85);
+      const dr = Math.max(1.4, baseR * (0.11 + Math.random() * 0.18));
+      const stretch = 1.15 + Math.random() * 0.65;
+      droplets.push({
+        dx: Math.cos(dAng) * dist,
+        dy: Math.sin(dAng) * dist * 0.78,
+        r: dr,
+        rx: dr * stretch,
+        ry: dr / Math.sqrt(stretch),
+        ang: dAng + (Math.random() - 0.5) * 0.35
+      });
+    }
+
     this.bloodDecals.push({
       x,
       y,
-      radius: radius * (0.85 + Math.random() * 0.45),
+      radius: baseR,
       color,
-      alpha: 0.65,
-      seed: Math.floor(Math.random() * 100)
+      alpha: 0.72,
+      seed: Math.floor(Math.random() * 100),
+      rotation: (Math.random() - 0.5) * 0.7,
+      stretchX: 0.95 + Math.random() * 0.32,
+      stretchY: 0.64 + Math.random() * 0.22, // 2.5D ground perspective compression
+      lobeRadii,
+      droplets
     });
 
     if (this.bloodDecals.length > 260) {
@@ -374,30 +418,10 @@ export class MapSystem {
       }
     }
 
-    // 2. Render Persistent Battle Scars / Blood Splatters
+    // 2. Render Persistent Battle Scars / Organic Liquid Puddle Blood Splatters
     for (const decal of this.bloodDecals) {
-      if (camera.isVisible(new Vector2(decal.x, decal.y), decal.radius + 10)) {
-        ctx.save();
-        ctx.globalAlpha = decal.alpha;
-        ctx.fillStyle = decal.color;
-        ctx.beginPath();
-        ctx.arc(decal.x, decal.y, decal.radius, 0, Math.PI * 2);
-        ctx.arc(
-          decal.x + ((decal.seed % 9) - 4),
-          decal.y + (((decal.seed * 3) % 9) - 4),
-          decal.radius * 0.6,
-          0,
-          Math.PI * 2
-        );
-        ctx.arc(
-          decal.x - ((decal.seed % 7) - 3),
-          decal.y + ((decal.seed % 5) - 2),
-          decal.radius * 0.4,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
-        ctx.restore();
+      if (camera.isVisible(new Vector2(decal.x, decal.y), decal.radius * 1.8 + 12)) {
+        this.renderOrganicBloodPuddle(ctx, decal);
       }
     }
 
@@ -422,6 +446,85 @@ export class MapSystem {
         this.renderMysteryDoor(ctx, this.mysteryDoor);
       }
     }
+  }
+
+  /**
+   * Renders an irregular, organic liquid puddle stain with smooth Bezier lobes, coagulated dark rim,
+   * directional splatter droplets, and subtle wet liquid surface sheen.
+   */
+  private renderOrganicBloodPuddle(ctx: CanvasRenderingContext2D, decal: BloodDecal): void {
+    ctx.save();
+    ctx.translate(decal.x, decal.y);
+    ctx.rotate(decal.rotation);
+    ctx.scale(decal.stretchX, decal.stretchY);
+
+    const n = decal.lobeRadii.length;
+    const buildOrganicPath = (scale = 1.0, offsetX = 0, offsetY = 0) => {
+      ctx.beginPath();
+      for (let i = 0; i < n; i++) {
+        const angCurr = (i * Math.PI * 2) / n;
+        const angNext = (((i + 1) % n) * Math.PI * 2) / n;
+        const rCurr = decal.lobeRadii[i] * scale;
+        const rNext = decal.lobeRadii[(i + 1) % n] * scale;
+
+        const xCurr = offsetX + Math.cos(angCurr) * rCurr;
+        const yCurr = offsetY + Math.sin(angCurr) * rCurr;
+        const xNext = offsetX + Math.cos(angNext) * rNext;
+        const yNext = offsetY + Math.sin(angNext) * rNext;
+
+        const midX = (xCurr + xNext) * 0.5;
+        const midY = (yCurr + yNext) * 0.5;
+
+        if (i === 0) {
+          const prevAng = (((n - 1) * Math.PI * 2) / n);
+          const prevR = decal.lobeRadii[n - 1] * scale;
+          const xPrev = offsetX + Math.cos(prevAng) * prevR;
+          const yPrev = offsetY + Math.sin(prevAng) * prevR;
+          ctx.moveTo((xPrev + xCurr) * 0.5, (yPrev + yCurr) * 0.5);
+        }
+        ctx.quadraticCurveTo(xCurr, yCurr, midX, midY);
+      }
+      ctx.closePath();
+    };
+
+    // 1. Outer Seeping Liquid Stain & Coagulated Rim (深色水渍浸润边缘)
+    ctx.globalAlpha = decal.alpha * 0.58;
+    ctx.fillStyle = '#230509';
+    buildOrganicPath(1.06, 0, 1);
+    ctx.fill();
+
+    // 2. Main Viscous Puddle Body (主水洼不规则流体层)
+    ctx.globalAlpha = decal.alpha * 0.88;
+    ctx.fillStyle = decal.color;
+    buildOrganicPath(0.95, 0, 0);
+    ctx.fill();
+
+    // 3. Deeper Coagulated Core Pool (中心浓稠深潭)
+    ctx.globalAlpha = decal.alpha * 0.65;
+    ctx.fillStyle = 'rgba(15, 2, 6, 0.55)';
+    buildOrganicPath(0.56, (decal.seed % 3) - 1, -0.5);
+    ctx.fill();
+
+    // 4. Subtle Wet Liquid Specular Highlight (水迹表面湿润反光弧)
+    ctx.globalAlpha = decal.alpha * 0.26;
+    ctx.fillStyle = 'rgba(255, 228, 230, 0.42)';
+    buildOrganicPath(0.32, -decal.radius * 0.18, -decal.radius * 0.16);
+    ctx.fill();
+
+    // 5. Peripheral Splatter Droplets & Trails (四周飞溅的小水滴与拖拽液滴)
+    ctx.globalAlpha = decal.alpha * 0.82;
+    ctx.fillStyle = decal.color;
+    for (const drop of decal.droplets) {
+      ctx.save();
+      ctx.translate(drop.dx, drop.dy);
+      ctx.rotate(drop.ang);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, drop.rx, drop.ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.restore();
   }
 
   /**
@@ -459,72 +562,91 @@ export class MapSystem {
     ctx.restore();
 
     // 3. Heavy Carved Gothic Cathedral Stone Archway Frame & Keystone
-    ctx.fillStyle = '#1e293b';
+    ctx.fillStyle = '#141122';
     ctx.beginPath();
-    ctx.moveTo(-25, 14);
-    ctx.lineTo(-25, -18);
-    ctx.arc(0, -18, 25, Math.PI, 0);
-    ctx.lineTo(25, 14);
+    ctx.moveTo(-30, 15);
+    ctx.lineTo(-30, -20);
+    ctx.arc(0, -20, 30, Math.PI, 0);
+    ctx.lineTo(30, 15);
     ctx.closePath();
     ctx.fill();
-
-    ctx.strokeStyle = '#cbd5e1';
+    ctx.strokeStyle = '#d97706';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Top Keystone Block
-    ctx.fillStyle = '#475569';
-    ctx.beginPath();
-    ctx.moveTo(-6, -46);
-    ctx.lineTo(6, -46);
-    ctx.lineTo(4, -37);
-    ctx.lineTo(-4, -37);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#e2e8f0';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    // Twin Carved Gothic Columns & Runic Inscriptions
+    ctx.fillStyle = '#1e1b36';
+    ctx.fillRect(-32, -20, 8, 35);
+    ctx.fillRect(24, -20, 8, 35);
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.2;
+    ctx.strokeRect(-32, -20, 8, 35);
+    ctx.strokeRect(24, -20, 8, 35);
 
-    // 4. Inner Dark Iron-Bound Mystery Door Leaf (Strictly NO text or room icon!)
-    ctx.fillStyle = '#090d16';
-    ctx.beginPath();
-    ctx.moveTo(-18, 13);
-    ctx.lineTo(-18, -16);
-    ctx.arc(0, -16, 18, Math.PI, 0);
-    ctx.lineTo(18, 13);
-    ctx.closePath();
-    ctx.fill();
-
-    // Swirling Neutral Mist Spirals on the Door Surface
+    // 4. Inner Dimensional Rift & Swirling Arcane Astrolabe Vortex (深渊星界裂隙与多重符文漩涡)
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.strokeStyle = 'rgba(203, 213, 225, 0.32)';
-    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(0, -6, 9 + Math.sin(door.pulseTimer * 3) * 2, door.pulseTimer, door.pulseTimer + Math.PI * 1.3);
-    ctx.stroke();
+    ctx.moveTo(-22, 13);
+    ctx.lineTo(-22, -18);
+    ctx.arc(0, -18, 22, Math.PI, 0);
+    ctx.lineTo(22, 13);
+    ctx.closePath();
+    ctx.fillStyle = '#05030c';
+    ctx.fill();
+    ctx.clip();
+
+    ctx.globalCompositeOperation = 'lighter';
+    const vortexGrad = ctx.createRadialGradient(0, -6, 2, 0, -6, 28);
+    vortexGrad.addColorStop(0, '#ffffff');
+    vortexGrad.addColorStop(0.35, 'rgba(196, 181, 253, 0.88)');
+    vortexGrad.addColorStop(0.7, 'rgba(109, 40, 217, 0.48)');
+    vortexGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = vortexGrad;
+    ctx.beginPath();
+    ctx.arc(0, -6, 28, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 4 Logarithmic Spiral Dimensional Tendrils
+    for (let s = 0; s < 4; s++) {
+      const baseAng = door.pulseTimer * 1.8 + (s * Math.PI) / 2;
+      ctx.strokeStyle = s % 2 === 0 ? 'rgba(221, 214, 254, 0.75)' : 'rgba(251, 191, 36, 0.65)';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      for (let t = 0; t <= 1; t += 0.1) {
+        const rad = t * 22;
+        const a = baseAng + t * 2.4;
+        const px = Math.cos(a) * rad;
+        const py = -6 + Math.sin(a) * rad * 1.15;
+        if (t === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+    }
+
+    // Converging Dimensional Motes
+    for (let m = 0; m < 6; m++) {
+      const mProg = ((door.pulseTimer * 0.9 + m * 0.17) % 1);
+      const mRad = (1 - mProg) * 22;
+      const mAng = -door.pulseTimer * 2.2 + m * 1.05;
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = mProg * 0.9;
+      ctx.beginPath();
+      ctx.arc(Math.cos(mAng) * mRad, -6 + Math.sin(mAng) * mRad, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
 
-    // Wrought-Iron Straps & Center Seam
-    ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 1.8;
+    // Top Keystone Block & Winged Crest
+    ctx.fillStyle = '#f59e0b';
     ctx.beginPath();
-    ctx.moveTo(0, -34);
-    ctx.lineTo(0, 13);
-    ctx.moveTo(-18, -7);
-    ctx.lineTo(18, -7);
-    ctx.moveTo(-18, 5);
-    ctx.lineTo(18, 5);
-    ctx.stroke();
-
-    // Twin Ornate Brass Knockers
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(-5.5, -1, 2.8, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.arc(5.5, -1, 2.8, 0, Math.PI * 2);
+    ctx.moveTo(0, -54);
+    ctx.lineTo(8, -45);
+    ctx.lineTo(0, -38);
+    ctx.lineTo(-8, -45);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#fef08a';
+    ctx.lineWidth = 1.2;
     ctx.stroke();
 
     ctx.restore();

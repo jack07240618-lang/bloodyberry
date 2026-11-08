@@ -788,3 +788,58 @@ export function getPassiveLevelDescription(id: string, levelIndex: number): stri
   const data = entry[i18n.lang];
   return data.perLevel[levelIndex] || data.description;
 }
+
+// --- 首领双语字典 (Boss Variants Localization) ---
+export interface LocalizedBossText {
+  name: string;
+  title: string;
+}
+
+export const BOSS_I18N: Record<number, { zh: LocalizedBossText; en: LocalizedBossText }> = {
+  0: {
+    zh: {
+      name: '「深渊领主 · 玛拉考斯」',
+      title: '炼狱守门人'
+    },
+    en: {
+      name: 'ARCH-DEMON MALAKOR',
+      title: 'WARDEN OF THE ABYSS'
+    }
+  },
+  1: {
+    zh: {
+      name: '「凛冬巫妖 · 维萨里奥」',
+      title: '极寒王座执政官'
+    },
+    en: {
+      name: 'FROST ARCHLICH VESARIO',
+      title: 'SOVEREIGN OF RIME'
+    }
+  },
+  2: {
+    zh: {
+      name: '「腐化圣母 · 塞拉菲娜」',
+      title: '翡翠剧毒织网者'
+    },
+    en: {
+      name: 'VENOM MATRIARCH SERAPHINA',
+      title: 'WEAVER OF BLIGHT'
+    }
+  },
+  3: {
+    zh: {
+      name: '「焚世炎魔 · 巴尔洛格」',
+      title: '熔炉深渊暴君'
+    },
+    en: {
+      name: 'INFERNAL BALROG IGNIS',
+      title: 'TYRANT OF THE FORGE'
+    }
+  }
+};
+
+export function getBossText(variant = 0): LocalizedBossText {
+  const entry = BOSS_I18N[((variant % 4) + 4) % 4] || BOSS_I18N[0];
+  return entry[i18n.lang];
+}
+

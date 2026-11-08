@@ -936,12 +936,32 @@ export class Enemy extends Entity {
         ctx.restore();
       }
 
-      // 2. Boss Laser Sweep Telegraph & High-Impact Helical Plasma Beams (螺旋高压电浆巨炮与地面熔岩灼痕)
+        // 2. Boss Laser Sweep Telegraph & High-Impact Helical Plasma Beams (螺旋高压电浆巨炮与地面熔岩灼痕)
       if (this.bossState === 'LASER_TELEGRAPH' || this.bossState === 'LASER_SWEEP') {
         const beamCount = this.bossPhase === 2 ? 3 : 2;
         const beamLen = 380;
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
+
+        // Converging Runic Charge Waves & Contraction Ring during Telegraph
+        if (this.bossState === 'LASER_TELEGRAPH') {
+          const telProg = Math.max(0, Math.min(1, 1 - this.bossStateTimer / 0.55));
+          const shrinkR = this.radius * (2.6 - telProg * 1.8);
+          ctx.strokeStyle = 'rgba(254, 240, 138, 0.85)';
+          ctx.lineWidth = 2.6;
+          ctx.setLineDash([8, 5]);
+          ctx.beginPath();
+          ctx.arc(0, 0, shrinkR, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Runic Ripple Wave
+          ctx.strokeStyle = `rgba(239, 68, 68, ${0.8 - telProg * 0.6})`;
+          ctx.lineWidth = 2.0;
+          ctx.beginPath();
+          ctx.arc(0, 0, this.radius * (0.9 + telProg * 1.4), 0, Math.PI * 2);
+          ctx.stroke();
+        }
 
         // Central Arcane Cannon Muzzle Core on Boss
         const coreR = this.bossState === 'LASER_SWEEP' ? 22 + Math.sin(this.animTimer * 12) * 4 : 14;
@@ -959,8 +979,25 @@ export class Enemy extends Entity {
           const ex = Math.cos(bAng) * beamLen;
           const ey = Math.sin(bAng) * beamLen;
           if (this.bossState === 'LASER_TELEGRAPH') {
-            ctx.strokeStyle = 'rgba(239, 68, 68, 0.78)';
-            ctx.lineWidth = 2.5;
+            const telProg = Math.max(0, Math.min(1, 1 - this.bossStateTimer / 0.55));
+            // Narrowing Laser Sight Corridor
+            const corridorHalfW = Math.max(2, (1 - telProg) * 18);
+            ctx.save();
+            ctx.rotate(bAng);
+            ctx.fillStyle = `rgba(239, 68, 68, ${0.12 + telProg * 0.22})`;
+            ctx.fillRect(0, -corridorHalfW, beamLen, corridorHalfW * 2);
+            ctx.strokeStyle = '#fef08a';
+            ctx.lineWidth = 1.4;
+            ctx.beginPath();
+            ctx.moveTo(0, -corridorHalfW);
+            ctx.lineTo(beamLen, -corridorHalfW);
+            ctx.moveTo(0, corridorHalfW);
+            ctx.lineTo(beamLen, corridorHalfW);
+            ctx.stroke();
+            ctx.restore();
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+            ctx.lineWidth = 2.2;
             ctx.setLineDash([8, 6]);
             ctx.beginPath();
             ctx.moveTo(0, 0);
@@ -1473,7 +1510,7 @@ export class EnemyProjectile extends Entity {
       const progress = Math.max(0, Math.min(1, 1 - this.lifetime / this.maxLifetime));
       ctx.globalCompositeOperation = 'lighter';
 
-      // 1. Tactical Ground Hazard Ring (旋转符文锁定法阵 + 十字准星)
+      // 1. Tactical Ground Hazard Ring (旋转符文锁定法阵 + 聚焦收缩环 + 符文充能波纹)
       ctx.save();
       ctx.rotate(this.elapsed * 2.2);
       ctx.strokeStyle = progress > 0.8 ? '#ffffff' : 'rgba(249, 115, 22, 0.9)';
@@ -1484,6 +1521,32 @@ export class EnemyProjectile extends Entity {
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
+
+      // Focusing Contraction Ring (聚焦收缩环：从外向圆心急速收拢)
+      const shrinkRadius = Math.max(4, this.radius * (1.35 - progress * 1.15));
+      ctx.strokeStyle = progress > 0.75 ? '#ffffff' : '#fef08a';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, shrinkRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Runic Charge Ripple & Octagram Marks (符文充能波纹与四向锁定刻度)
+      const ripplePhase = (this.elapsed * 3.5) % 1;
+      ctx.strokeStyle = `rgba(251, 191, 36, ${(1 - ripplePhase) * 0.75})`;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius * (0.25 + ripplePhase * 0.75), 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(254, 240, 138, 0.75)';
+      ctx.lineWidth = 1.8;
+      for (let k = 0; k < 4; k++) {
+        const ka = (k * Math.PI) / 2 + this.elapsed * 0.8;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(ka) * (this.radius * 0.68), Math.sin(ka) * (this.radius * 0.68));
+        ctx.lineTo(Math.cos(ka) * (this.radius * 0.96), Math.sin(ka) * (this.radius * 0.96));
+        ctx.stroke();
+      }
 
       // Inner expanding magma charge circle
       const fillGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, this.radius * progress);

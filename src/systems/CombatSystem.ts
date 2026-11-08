@@ -37,6 +37,9 @@ export class CombatSystem {
   private activeUltimateHeroId = 'antonio';
   private currentPlayerRef: Player | null = null;
   private globalAttackCounter = 0;
+  private activeHitStopCallback?: (duration: number) => void;
+  public bossSlainWaveTimer = 0;
+  public bossSlainPosition: Vector2 = new Vector2();
 
   constructor(
     public particleSystem: ParticleSystem,
@@ -514,6 +517,11 @@ export class CombatSystem {
 
   public update(dt: number, player: Player, onLevelUp: () => void, onBossChestOpen: () => void, onHitStop?: (duration: number) => void): void {
     this.currentPlayerRef = player;
+    this.activeHitStopCallback = onHitStop;
+
+    if (this.bossSlainWaveTimer > 0) {
+      this.bossSlainWaveTimer = Math.max(0, this.bossSlainWaveTimer - dt);
+    }
 
     // Screen nuke white flash decay
     if (this.screenNukeFlashTimer > 0) {
@@ -904,15 +912,33 @@ export class CombatSystem {
 
         const isDead = enemy.takeDamage(totalDamage);
         this.damageTextSystem.addDamage(enemy.position.x, enemy.position.y, totalDamage, isCrit);
+        const impactAngle =
+          proj.type === ProjectileType.WHIP_SLASH
+            ? proj.rotation
+            : proj.velocity.lengthSq() > 1
+            ? proj.velocity.angle()
+            : enemy.position.clone().sub(proj.position).angle();
+
         if (proj.type === ProjectileType.WHIP_SLASH) {
           this.particleSystem.emitSlashImpact(
             enemy.position.x,
             enemy.position.y,
-            proj.rotation,
+            impactAngle,
+            proj.glowColor || proj.color,
+            isCrit || enemy.isBoss
+          );
+          this.camera.triggerShake(enemy.isBoss ? (isCrit ? 6.5 : 3.6) : isCrit ? 5.5 : 2.2);
+        } else if (enemy.isBoss) {
+          // 投射物击中 Boss 时触发定向冲击火星与削韧微震
+          this.particleSystem.emitSlashImpact(
+            enemy.position.x,
+            enemy.position.y,
+            impactAngle,
             proj.glowColor || proj.color,
             isCrit
           );
-          this.camera.triggerShake(isCrit ? 5.5 : 2.2);
+          this.particleSystem.emitHit(enemy.position.x, enemy.position.y, '#fef08a', isCrit ? 8 : 5);
+          this.camera.triggerShake(isCrit ? 5.5 : 2.8);
         } else {
           this.particleSystem.emitHit(enemy.position.x, enemy.position.y, proj.color, 4);
         }
@@ -1080,8 +1106,25 @@ export class CombatSystem {
   }
 
   public handleEnemyDeath(enemy: Enemy, dropLoot = true, triggerKillHooks = true): void {
-    this.sound.playEnemyDeath();
-    this.particleSystem.emitDeath(enemy.position.x, enemy.position.y, '#64748b', enemy.isBoss ? 30 : 10);
+    if (enemy.isBoss) {
+      this.sound.playBossSlain();
+      this.particleSystem.emitBossSlainBurst(enemy.position.x, enemy.position.y);
+      this.camera.triggerShake(18);
+      this.bossSlainWaveTimer = 0.85;
+      this.bossSlainPosition.copy(enemy.position);
+      if (this.activeHitStopCallback) {
+        this.activeHitStopCallback(0.3);
+      }
+      // Clear hostile bullets on Boss defeat for cinematic relief
+      for (const ep of this.enemyProjectiles) {
+        if (!ep.isReflected) {
+          ep.active = false;
+        }
+      }
+    } else {
+      this.sound.playEnemyDeath();
+      this.particleSystem.emitDeath(enemy.position.x, enemy.position.y, '#64748b', 10);
+    }
 
     // 触发事件总线 OnKill 监听节点（亡语追踪噬魂弹、异常状态链式殉爆等）
     if (triggerKillHooks && this.currentPlayerRef) {
@@ -1096,7 +1139,7 @@ export class CombatSystem {
     if (enemy.type === EnemyType.SLIME_LARGE || enemy.type === EnemyType.SLIME_MEDIUM || enemy.type === EnemyType.SLIME_SMALL) {
       this.mapSystem.addBloodDecal(enemy.position.x, enemy.position.y, '#065f46', enemy.radius * 1.1);
     } else if (enemy.isBoss) {
-      this.mapSystem.addBloodDecal(enemy.position.x, enemy.position.y, '#450a0a', 32);
+      this.mapSystem.addBloodDecal(enemy.position.x, enemy.position.y, '#450a0a', 38);
     } else {
       this.mapSystem.addBloodDecal(enemy.position.x, enemy.position.y, '#7f1d1d', enemy.radius);
     }
@@ -1130,9 +1173,34 @@ export class CombatSystem {
       gem.isMagnetized = true;
       this.dropItems.push(gem);
 
-      // Boss drops a Boss Chest
+      // Boss drops a Mythic Boss Chest & a rich fountain of Golden Loot + Relics
       if (enemy.isBoss) {
-        this.dropItems.push(new DropItem(DropType.BOSS_CHEST, enemy.position.x + 26, enemy.position.y + 10, 1));
+        this.dropItems.push(new DropItem(DropType.BOSS_CHEST, enemy.position.x, enemy.position.y, 1));
+        const goldCount = 12;
+        for (let g = 0; g < goldCount; g++) {
+          const ang = (g * Math.PI * 2) / goldCount;
+          const dist = 32 + (g % 3) * 18;
+          const coin = new DropItem(
+            DropType.GOLD_COIN,
+            enemy.position.x + Math.cos(ang) * dist,
+            enemy.position.y + Math.sin(ang) * dist,
+            25
+          );
+          coin.isMagnetized = true;
+          this.dropItems.push(coin);
+        }
+        const bonusGems = 6;
+        for (let b = 0; b < bonusGems; b++) {
+          const ang = (b * Math.PI * 2) / bonusGems + 0.3;
+          const vGem = new DropItem(
+            DropType.XP_VIOLET,
+            enemy.position.x + Math.cos(ang) * 48,
+            enemy.position.y + Math.sin(ang) * 48,
+            30
+          );
+          vGem.isMagnetized = true;
+          this.dropItems.push(vGem);
+        }
         this.mapSystem.shrines = [];
       }
     }
@@ -1251,6 +1319,45 @@ export class CombatSystem {
     // 5. Render Lightning Visuals
     for (const l of this.visualLightnings) {
       this.renderLightningEffect(ctx, l);
+    }
+
+    // 5b. Boss Slain Radial Shockwave & Sacred Golden Runes (Boss 终结径向冲击波)
+    if (this.bossSlainWaveTimer > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const prog = 1 - this.bossSlainWaveTimer / 0.85;
+      const alpha = Math.max(0, 1 - prog);
+      const bx = this.bossSlainPosition.x;
+      const by = this.bossSlainPosition.y;
+      const maxR = 460;
+      const curR = maxR * Math.pow(prog, 0.55);
+
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = Math.max(2, 16 * (1 - prog));
+      ctx.beginPath();
+      ctx.arc(bx, by, curR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = Math.max(1.5, 8 * (1 - prog));
+      ctx.beginPath();
+      ctx.arc(bx, by, curR * 0.76, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Rotating 8-Pointed Sacred Runic Seal at Boss Death Epicenter
+      ctx.save();
+      ctx.translate(bx, by);
+      ctx.rotate(prog * 1.8);
+      ctx.strokeStyle = `rgba(254, 240, 138, ${alpha * 0.75})`;
+      ctx.lineWidth = 2.5;
+      for (let s = 0; s < 2; s++) {
+        ctx.rotate(Math.PI / 4);
+        const boxS = curR * 0.48;
+        ctx.strokeRect(-boxS, -boxS, boxS * 2, boxS * 2);
+      }
+      ctx.restore();
+      ctx.restore();
     }
 
     // 6. Character-Specific Ultimate Screen Sigil + Flash

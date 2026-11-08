@@ -988,4 +988,47 @@ export class SoundSynthesizer {
       this.playPureTone(freq, t, 0.36, 0.15, undefined, 2.0, 0.15);
     });
   }
+
+  /**
+   * 首领降临警报音效：深渊低频管风琴轰鸣 + 巴洛克减五度不协和警钟泛音
+   */
+  public playBossWarning(): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.sfxGain) return;
+
+    const startTime = this.ctx.currentTime;
+
+    // 1. Sub-bass abyssal pipe-organ drone (D2 -> D1)
+    this.playPureTone(73.42, startTime, 1.45, 0.24, 36.71, 2.0, 0.28);
+    this.playPureTone(110.0, startTime + 0.04, 1.35, 0.16, 73.42, 1.5, 0.22);
+
+    // 2. Three ominous Gothic Sanctuary bell tolls (D4 -> Ab4 -> D4)
+    const bellNotes = [293.66, 415.3, 293.66];
+    bellNotes.forEach((freq, idx) => {
+      const t = startTime + idx * 0.34;
+      this.playPureTone(freq, t, 0.42, 0.14, freq * 0.98, 2.0, 0.2);
+    });
+  }
+
+  /**
+   * 首领讨伐终结圣音：恢弘时停低频震波 + 哥特大调辉煌加冕琶音
+   */
+  public playBossSlain(): void {
+    if (this.isMuted) return;
+    this.initContext();
+    if (!this.ctx || !this.sfxGain) return;
+
+    const startTime = this.ctx.currentTime;
+    // Deep time-dilation impact boom
+    this.playExplosion(0.55, 620);
+
+    // Majestic D-Major / Celestial fanfare chord arpeggio (D4 -> F#4 -> A4 -> D5 -> A5)
+    const notes = [293.66, 369.99, 440.0, 587.33, 880.0];
+    notes.forEach((freq, idx) => {
+      const t = startTime + 0.08 + idx * 0.085;
+      const isFinal = idx === notes.length - 1;
+      this.playPureTone(freq, t, isFinal ? 0.85 : 0.42, isFinal ? 0.16 : 0.12, undefined, 2.0, 0.18);
+    });
+  }
 }

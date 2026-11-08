@@ -1389,62 +1389,68 @@ export class RoomManager {
     ctx.lineWidth = 2;
     ctx.strokeRect(-hw, -hh, hw * 2, hh * 2);
 
-    // 四角石雕柱墩与圣十字徽记 (4 Corner Bastion Pillars)
+    // 四角石雕柱墩与立柱火盆/符文灯塔 (4 Corner Bastion Pillars & Beacon Lanterns)
     const corners = [
       [-hw - wt * 0.5, -hh - wt * 0.5],
       [hw + wt * 0.5, -hh - wt * 0.5],
       [-hw - wt * 0.5, hh + wt * 0.5],
       [hw + wt * 0.5, hh + wt * 0.5]
     ];
-    for (const [cx, cy] of corners) {
+    for (let cIdx = 0; cIdx < corners.length; cIdx++) {
+      const [cx, cy] = corners[cIdx];
       ctx.fillStyle = theme.wallBase;
       ctx.fillRect(cx - 26, cy - 26, 52, 52);
       ctx.strokeStyle = theme.borderUnlocked;
       ctx.lineWidth = 2;
       ctx.strokeRect(cx - 26, cy - 26, 52, 52);
+
+      // 铸铁八角灯座底盘
+      ctx.fillStyle = '#090d16';
+      ctx.strokeStyle = '#94a3b8';
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 13, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // 燃烧/充能灯芯与辉光
+      const cFlicker = 0.85 + Math.sin(this.elapsedSeconds * 7 + cIdx * 1.9) * 0.15;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const cg = ctx.createRadialGradient(cx, cy, 2, cx, cy, 34 * cFlicker);
+      cg.addColorStop(0, '#ffffff');
+      cg.addColorStop(0.35, isLocked ? 'rgba(239, 68, 68, 0.55)' : theme.sconceMid);
+      cg.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 34 * cFlicker, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
       ctx.fillStyle = isLocked ? '#ef4444' : theme.pillarGem;
       ctx.beginPath();
-      ctx.moveTo(cx, cy - 12);
-      ctx.lineTo(cx + 12, cy);
-      ctx.lineTo(cx, cy + 12);
-      ctx.lineTo(cx - 12, cy);
+      ctx.moveTo(cx, cy - 9);
+      ctx.lineTo(cx + 9, cy);
+      ctx.lineTo(cx, cy + 9);
+      ctx.lineTo(cx - 9, cy);
       ctx.closePath();
       ctx.fill();
     }
 
-    // 城墙壁挂生态火炬光晕 (Flickering Biome Wall Sconces)
-    const sconces = [
-      [-260, -hh + 4],
-      [260, -hh + 4],
-      [-260, hh - 4],
-      [260, hh - 4],
-      [-hw + 4, -160],
-      [-hw + 4, 160],
-      [hw - 4, -160],
-      [hw - 4, 160]
+    // 城墙壁挂哥特铸铁灯具 / 壁炉火盆与真实光照投射 (3D Wall-Mounted Gothic Lantern Sconces)
+    const sconces: Array<{ x: number; y: number; wall: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT' }> = [
+      { x: -260, y: -hh, wall: 'TOP' },
+      { x: 260, y: -hh, wall: 'TOP' },
+      { x: -260, y: hh, wall: 'BOTTOM' },
+      { x: 260, y: hh, wall: 'BOTTOM' },
+      { x: -hw, y: -160, wall: 'LEFT' },
+      { x: -hw, y: 160, wall: 'LEFT' },
+      { x: hw, y: -160, wall: 'RIGHT' },
+      { x: hw, y: 160, wall: 'RIGHT' }
     ];
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
     for (let i = 0; i < sconces.length; i++) {
-      const [sx, sy] = sconces[i];
-      const flicker = 0.85 + Math.sin(this.elapsedSeconds * 9 + i * 1.7) * 0.15;
-      const rGlow = 56 * flicker;
-      const g = ctx.createRadialGradient(sx, sy, 2, sx, sy, rGlow);
-      g.addColorStop(0, '#ffffff');
-      g.addColorStop(0.3, theme.sconceMid);
-      g.addColorStop(0.7, theme.sconceOuter);
-      g.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(sx, sy, rGlow, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.fillStyle = theme.sconceCore;
-      ctx.beginPath();
-      ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
-      ctx.fill();
+      this.renderWallLanternSconce(ctx, sconces[i], i, theme);
     }
-    ctx.restore();
 
     // 4. 渲染北侧唯一无标注出口拱门 (Single Unlabeled Mystery Archway)
     for (const door of this.currentRoom.doors) {
@@ -1494,6 +1500,160 @@ export class RoomManager {
     }
     ctx.restore();
 
+    ctx.restore();
+  }
+
+  /**
+   * 渲染四面城墙壁挂式哥特铸铁灯具/火炬架与定向地面投射光池，使房间四周的光源具备真实严谨的物理与视觉逻辑来源
+   */
+  private renderWallLanternSconce(
+    ctx: CanvasRenderingContext2D,
+    sconce: { x: number; y: number; wall: 'TOP' | 'BOTTOM' | 'LEFT' | 'RIGHT' },
+    index: number,
+    theme: {
+      sconceCore: string;
+      sconceMid: string;
+      sconceOuter: string;
+      borderUnlocked: string;
+      pillarGem: string;
+    }
+  ): void {
+    const { x, y, wall } = sconce;
+    // 计算从墙面向房间内部伸出的单位方向向量
+    const inX = wall === 'LEFT' ? 1 : wall === 'RIGHT' ? -1 : 0;
+    const inY = wall === 'TOP' ? 1 : wall === 'BOTTOM' ? -1 : 0;
+    // 墙面切线向量
+    const tanX = -inY;
+    const tanY = inX;
+
+    // 提灯炉头悬挂中心点（从墙体向房间内伸出 14px）
+    const headX = x + inX * 14;
+    const headY = y + inY * 14;
+    const flicker = 0.88 + Math.sin(this.elapsedSeconds * 8.5 + index * 1.9) * 0.12;
+    const sway = Math.sin(this.elapsedSeconds * 11 + index * 2.3) * 2.2;
+
+    ctx.save();
+
+    // 1. 灯架下方墙根与地面的铸铁投影 (Cast Bracket Shadow)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.62)';
+    ctx.beginPath();
+    ctx.ellipse(headX + inX * 4 + 2, headY + inY * 4 + 4, 11, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. 镶嵌在城墙石砖上的哥特铆钉黑铁背板 (Wall-Mounted Wrought-Iron Escutcheon Plate)
+    const plateBaseX = x - inX * 4;
+    const plateBaseY = y - inY * 4;
+    ctx.fillStyle = '#0f172a';
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(plateBaseX + tanX * 12 - inX * 5, plateBaseY + tanY * 12 - inY * 5);
+    ctx.lineTo(plateBaseX - tanX * 12 - inX * 5, plateBaseY - tanY * 12 - inY * 5);
+    ctx.lineTo(plateBaseX - tanX * 9 + inX * 4, plateBaseY - tanY * 9 + inY * 4);
+    ctx.lineTo(plateBaseX + tanX * 9 + inX * 4, plateBaseY + tanY * 9 + inY * 4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 背板两侧黄铜固定铆钉
+    ctx.fillStyle = '#f59e0b';
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.arc(plateBaseX + tanX * 7 * side, plateBaseY + tanY * 7 * side, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 3. 锻铁悬挑支架与斜拉锁链 (Forged Iron Cantilever Arm & Support Struts)
+    ctx.strokeStyle = '#475569';
+    ctx.lineWidth = 3.2;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(x - inX * 3, y - inY * 3);
+    ctx.lineTo(headX, headY);
+    ctx.stroke();
+
+    // 鎏金装饰箍环與斜撑铁链
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(x + tanX * 8 - inX * 2, y + tanY * 8 - inY * 2);
+    ctx.lineTo(headX, headY);
+    ctx.moveTo(x - tanX * 8 - inX * 2, y - tanY * 8 - inY * 2);
+    ctx.lineTo(headX, headY);
+    ctx.stroke();
+
+    // 4. 六角哥特铁笼提灯/火盆主体 (Hexagonal Caged Sanctuary Brazier Lantern)
+    ctx.fillStyle = '#131c2e';
+    ctx.strokeStyle = theme.borderUnlocked;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(headX, headY, 8.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // 铁笼十字护栏条
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(headX - 8, headY);
+    ctx.lineTo(headX + 8, headY);
+    ctx.moveTo(headX, headY - 8);
+    ctx.lineTo(headX, headY + 8);
+    ctx.stroke();
+
+    // 5. 动态多层摇曳灯芯火焰 + 朝向房间内部投射的扇形体积光晕 (Directional Light Cone & Flickering Flame)
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // 5a. 向房间内侧地面扩散的柔和照明光扇 (Inward Cast Illumination Pool)
+    const poolX = headX + inX * 26;
+    const poolY = headY + inY * 26;
+    const poolRadius = 82 * flicker;
+    const poolGrad = ctx.createRadialGradient(headX, headY, 3, poolX, poolY, poolRadius);
+    poolGrad.addColorStop(0, '#ffffff');
+    poolGrad.addColorStop(0.22, theme.sconceMid);
+    poolGrad.addColorStop(0.62, theme.sconceOuter);
+    poolGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = poolGrad;
+    ctx.beginPath();
+    ctx.arc(poolX, poolY, poolRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 5b. 提灯核心三层动态火苗 (Outer Tongue -> Mid Amber -> White-Hot Core)
+    ctx.fillStyle = theme.pillarGem;
+    ctx.beginPath();
+    ctx.moveTo(headX - 5, headY + 2);
+    ctx.quadraticCurveTo(headX - 4, headY - 9, headX + sway * 0.8, headY - 13 * flicker);
+    ctx.quadraticCurveTo(headX + 4, headY - 9, headX + 5, headY + 2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = theme.sconceCore;
+    ctx.beginPath();
+    ctx.moveTo(headX - 3.2, headY + 1.5);
+    ctx.quadraticCurveTo(headX - 2, headY - 6, headX + sway * 0.4, headY - 9 * flicker);
+    ctx.quadraticCurveTo(headX + 2, headY - 6, headX + 3.2, headY + 1.5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(headX, headY - 1.5, 2.6, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 5c. 提灯周围上升的细微火星微粒 (Rising Lantern Sparks)
+    for (let s = 0; s < 2; s++) {
+      const sparkProg = ((this.elapsedSeconds * 1.6 + index * 0.37 + s * 0.5) % 1);
+      const sx = headX + Math.sin(this.elapsedSeconds * 5 + index + s * 3) * 5;
+      const sy = headY - 4 - sparkProg * 16;
+      ctx.fillStyle = theme.sconceCore;
+      ctx.globalAlpha = (1 - sparkProg) * 0.85;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.3 * (1 - sparkProg * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
     ctx.restore();
   }
 
@@ -1907,90 +2067,288 @@ export class RoomManager {
   }
 
   /**
-   * 渲染唯一的一扇无标注哥特尖拱神秘传送门（不显示任何房间名字、图标或颜色剧透，玩家踏入前完全未知）
+   * 渲染唯一的一扇无标注哥特尖拱深渊星界传送门（不显示任何房间名字、图标或颜色剧透，视觉与哥特暗黑圣所主题深度融合）
    */
   private renderDoorPortal(ctx: CanvasRenderingContext2D, door: DoorPortal): void {
     ctx.save();
     ctx.translate(door.x, door.y);
 
-    const w = door.width;
-    const h = door.height;
+    const w = door.width;   // 112
+    const h = door.height;  // 58
+    const halfW = w / 2;
+    const halfH = h / 2;
+    const t = door.pulseTimer || this.elapsedSeconds * 3;
 
-    // 1. 哥特双柱浮雕石拱门基座 (Sculpted Twin-Pillar Gothic Archway)
-    ctx.fillStyle = '#0b0816';
-    ctx.beginPath();
-    ctx.roundRect(-w / 2 - 12, -h / 2 - 8, w + 24, h + 14, 10);
-    ctx.fill();
+    // 哥特尖拱路径构造函数 (Pointed Cathedral Archway Path)
+    const traceGothicArch = (inset = 0) => {
+      const aw = halfW - inset;
+      const ah = halfH - inset * 0.6;
+      const springY = -ah * 0.15;
+      const apexY = -ah - 14 + inset * 0.8;
+      const bottomY = ah + 6 - inset * 0.5;
 
-    // 左右哥特石柱与鎏金柱头
-    ctx.fillStyle = '#1e1836';
-    ctx.strokeStyle = '#d97706';
-    ctx.lineWidth = 2;
-    ctx.fillRect(-w / 2 - 12, -h / 2 - 6, 14, h + 12);
-    ctx.strokeRect(-w / 2 - 12, -h / 2 - 6, 14, h + 12);
-    ctx.fillRect(w / 2 - 2, -h / 2 - 6, 14, h + 12);
-    ctx.strokeRect(w / 2 - 2, -h / 2 - 6, 14, h + 12);
-
-    // 拱门顶部鎏金拱心石 (Keystone Crest)
-    ctx.fillStyle = '#f59e0b';
-    ctx.beginPath();
-    ctx.moveTo(0, -h / 2 - 14);
-    ctx.lineTo(10, -h / 2 - 4);
-    ctx.lineTo(0, -h / 2 + 4);
-    ctx.lineTo(-10, -h / 2 - 4);
-    ctx.closePath();
-    ctx.fill();
-
-    if (door.isOpen) {
-      // 开启状态：统一神秘银紫星界漩涡与星盘（绝不透露下个房间类型，无任何文字标注）
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      const pulse = 0.88 + Math.sin(door.pulseTimer) * 0.12;
-      const grad = ctx.createRadialGradient(0, 0, 4, 0, 0, (w / 2) * pulse);
-      grad.addColorStop(0, '#ffffff');
-      grad.addColorStop(0.42, '#c4b5fd');
-      grad.addColorStop(0.75, 'rgba(139, 92, 246, 0.45)');
-      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = grad;
       ctx.beginPath();
-      ctx.ellipse(0, 2, w * 0.44 * pulse, h * 0.44 * pulse, 0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(-aw, bottomY);
+      ctx.lineTo(-aw, springY);
+      ctx.quadraticCurveTo(-aw * 0.92, apexY + 8, 0, apexY);
+      ctx.quadraticCurveTo(aw * 0.92, apexY + 8, aw, springY);
+      ctx.lineTo(aw, bottomY);
+      ctx.closePath();
+    };
 
-      // 漩涡内部双层逆向旋转星盘（纯图形，零文字）
-      ctx.strokeStyle = 'rgba(248, 250, 252, 0.82)';
+    // 1. 地面三阶黑曜迎宾石阶与浮雕投影 (3-Tier Carved Obsidian Threshold Steps)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+    ctx.beginPath();
+    ctx.ellipse(0, halfH + 14, halfW + 24, 16, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    for (let step = 2; step >= 0; step--) {
+      const sw = w + 32 - step * 10;
+      const sh = 6;
+      const sy = halfH + 2 + step * 4;
+      ctx.fillStyle = step % 2 === 0 ? '#110d20' : '#1b1530';
+      ctx.strokeStyle = step === 0 ? '#b45309' : '#332952';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.roundRect(-sw / 2, sy, sw, sh, 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // 2. 哥特双联石雕立柱、飞扶壁与石砌尖拱外框 (Twin Fluted Gothic Pillars & Stone Arch)
+    traceGothicArch(-8);
+    const frameGrad = ctx.createLinearGradient(0, -halfH - 22, 0, halfH + 10);
+    frameGrad.addColorStop(0, '#2a2244');
+    frameGrad.addColorStop(0.5, '#171229');
+    frameGrad.addColorStop(1, '#090712');
+    ctx.fillStyle = frameGrad;
+    ctx.fill();
+    ctx.strokeStyle = door.isOpen ? '#f59e0b' : '#78350f';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    // 左右两侧立体凹槽石柱与柱头火炬圣徽 (Left & Right Fluted Pilasters)
+    for (const side of [-1, 1]) {
+      const px = side * (halfW + 7);
+      ctx.fillStyle = '#18132a';
+      ctx.strokeStyle = door.isOpen ? '#fbbf24' : '#92400e';
       ctx.lineWidth = 1.6;
       ctx.beginPath();
-      ctx.arc(0, 2, 15 + Math.sin(door.pulseTimer * 2) * 2, door.pulseTimer, door.pulseTimer + Math.PI * 1.4);
+      ctx.roundRect(px - 8, -halfH - 4, 16, h + 12, 3);
+      ctx.fill();
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(251, 191, 36, 0.70)';
+
+      // 柱身纵向石雕凹槽线
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(0, 2, 9, -door.pulseTimer * 1.5, -door.pulseTimer * 1.5 + Math.PI * 1.25);
+      ctx.moveTo(px - 3, -halfH);
+      ctx.lineTo(px - 3, halfH + 4);
+      ctx.moveTo(px + 3, -halfH);
+      ctx.lineTo(px + 3, halfH + 4);
       ctx.stroke();
-      ctx.restore();
 
-      ctx.strokeStyle = '#e9d5ff';
-      ctx.lineWidth = 2.5;
-      ctx.shadowColor = '#a78bfa';
-      ctx.shadowBlur = 12;
-      ctx.strokeRect(-w / 2, -h / 2, w, h);
-    } else {
-      // 锁死状态：哥特猩红铸铁闸门与封印锁链（无任何文字标注）
-      ctx.strokeStyle = '#7f1d1d';
-      ctx.lineWidth = 2.5;
-      ctx.strokeRect(-w / 2, -h / 2, w, h);
+      // 柱头镶嵌符文晶石
+      ctx.fillStyle = door.isOpen ? '#c4b5fd' : '#ef4444';
+      ctx.beginPath();
+      ctx.moveTo(px, -halfH - 9);
+      ctx.lineTo(px + 5, -halfH - 3);
+      ctx.lineTo(px, -halfH + 3);
+      ctx.lineTo(px - 5, -halfH - 3);
+      ctx.closePath();
+      ctx.fill();
+    }
 
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 2.8;
-      for (let barX = -w / 2 + 14; barX < w / 2; barX += 15) {
+    // 3. 门扉内部：开启时为深渊星界裂隙与多重符文星盘；锁死时为猩红炼狱铁闸门与封印符文锁链
+    ctx.save();
+    traceGothicArch(2);
+    ctx.fillStyle = '#04020a';
+    ctx.fill();
+    ctx.clip(); // 严格裁剪在哥特尖拱门洞内部
+
+    if (door.isOpen) {
+      ctx.globalCompositeOperation = 'lighter';
+      const pulse = 0.9 + Math.sin(t * 1.4) * 0.1;
+
+      // 3a. 深渊视差星云底光 (Multi-Layered Abyssal Void Nebula)
+      const nebGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, halfW * 1.05 * pulse);
+      nebGrad.addColorStop(0, '#ffffff');
+      nebGrad.addColorStop(0.22, 'rgba(221, 214, 254, 0.92)');
+      nebGrad.addColorStop(0.52, 'rgba(139, 92, 246, 0.62)');
+      nebGrad.addColorStop(0.82, 'rgba(76, 29, 149, 0.32)');
+      nebGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = nebGrad;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, halfW * 0.92 * pulse, (halfH + 12) * 0.92 * pulse, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3b. 6 道对数螺旋时空涡流光带 (6 Logarithmic Spiral Rift Arms)
+      const arms = 6;
+      for (let a = 0; a < arms; a++) {
+        const baseAng = t * 1.15 + (a * Math.PI * 2) / arms;
+        ctx.strokeStyle = a % 2 === 0 ? 'rgba(233, 213, 255, 0.72)' : 'rgba(251, 191, 36, 0.55)';
+        ctx.lineWidth = a % 2 === 0 ? 2.2 : 1.5;
         ctx.beginPath();
-        ctx.moveTo(barX, -h / 2 + 2);
-        ctx.lineTo(barX, h / 2 - 2);
+        for (let step = 0; step <= 1; step += 0.08) {
+          const rad = step * (halfW * 0.88);
+          const spiralAng = baseAng + step * 2.6;
+          const sx = Math.cos(spiralAng) * rad;
+          const sy = Math.sin(spiralAng) * rad * 0.72;
+          if (step === 0) ctx.moveTo(sx, sy);
+          else ctx.lineTo(sx, sy);
+        }
         ctx.stroke();
       }
-      // 横向加固铁梁
+
+      // 3c. 双层逆向旋转哥特八芒星阵与神秘刻度环 (Counter-Rotating Arcane Octagram & Runic Dial)
+      ctx.save();
+      ctx.scale(1, 0.72);
+
+      // 外层顺时针符文刻度环
+      ctx.save();
+      ctx.rotate(t * 0.45);
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.68)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([5, 4]);
+      ctx.beginPath();
+      ctx.arc(0, 0, 32, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // 内层逆时针八芒星几何法阵
+      ctx.save();
+      ctx.rotate(-t * 0.75);
+      ctx.strokeStyle = 'rgba(248, 250, 252, 0.85)';
+      ctx.lineWidth = 1.4;
+      for (let sq = 0; sq < 2; sq++) {
+        ctx.rotate(Math.PI / 4);
+        ctx.strokeRect(-16, -16, 32, 32);
+      }
+      ctx.restore();
+      ctx.restore();
+
+      // 3d. 向门心视界坍缩汇聚的星尘微粒 + 踏入地面迎宾光毯 (Converging Horizon Motes)
+      for (let m = 0; m < 10; m++) {
+        const mPhase = (t * 0.55 + m * 0.1) % 1;
+        const mDist = (1 - mPhase) * 44;
+        const mAng = -t * 1.4 + m * 1.25;
+        const mx = Math.cos(mAng) * mDist;
+        const my = Math.sin(mAng) * mDist * 0.72;
+        ctx.fillStyle = m % 3 === 0 ? '#fef08a' : '#ffffff';
+        ctx.globalAlpha = Math.sin(mPhase * Math.PI) * 0.95;
+        ctx.beginPath();
+        ctx.arc(mx, my, 1.4 + (1 - mPhase) * 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 视界奇点高光核
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, 0, 4.5 + Math.sin(t * 4) * 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      // 锁死状态：哥特尖刺铸铁落闸 (Portcullis) + 猩红交叉封印锁链 + 恶魔血色铭文锁
+      const lockPulse = 0.75 + Math.sin(this.elapsedSeconds * 5) * 0.25;
+
+      // 门洞深处透出的暗红封印微光
+      const sealGlow = ctx.createRadialGradient(0, 0, 4, 0, 0, halfW * 0.85);
+      sealGlow.addColorStop(0, `rgba(220, 38, 38, ${0.32 * lockPulse})`);
+      sealGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = sealGlow;
+      ctx.fillRect(-halfW, -halfH - 15, w, h + 25);
+
+      // 纵向锻铁尖刺闸门栏杆 (Spiked Iron Portcullis Bars)
+      for (let barX = -halfW + 12; barX <= halfW - 12; barX += 14) {
+        ctx.fillStyle = '#1e293b';
+        ctx.fillRect(barX - 2, -halfH - 14, 4, h + 18);
+        ctx.fillStyle = '#64748b';
+        ctx.fillRect(barX - 1, -halfH - 14, 1.2, h + 18);
+      }
+
+      // 横向双道铆钉加固铁梁
+      for (const barY of [-10, 10]) {
+        ctx.fillStyle = '#0f172a';
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = 1.2;
+        ctx.fillRect(-halfW, barY - 3, w, 6);
+        ctx.strokeRect(-halfW, barY - 3, w, 6);
+      }
+
+      // X 型交叉猩红封印锁链 (Crossed Crimson Binding Chains)
+      ctx.strokeStyle = '#dc2626';
+      ctx.lineWidth = 3.2;
+      ctx.setLineDash([7, 4]);
+      ctx.beginPath();
+      ctx.moveTo(-halfW + 4, -halfH - 4);
+      ctx.lineTo(halfW - 4, halfH + 4);
+      ctx.moveTo(halfW - 4, -halfH - 4);
+      ctx.lineTo(-halfW + 4, halfH + 4);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 门心八角血色封印锁扣
       ctx.fillStyle = '#450a0a';
-      ctx.fillRect(-w / 2 + 2, -6, w - 4, 5);
+      ctx.strokeStyle = '#f87171';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(0, 0, 9.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#fef08a';
+      ctx.beginPath();
+      ctx.moveTo(0, -4.5);
+      ctx.lineTo(4.5, 0);
+      ctx.lineTo(0, 4.5);
+      ctx.lineTo(-4.5, 0);
+      ctx.closePath();
+      ctx.fill();
     }
+    ctx.restore();
+
+    // 4. 尖拱内沿发光石雕镶边與拱顶双翼拱心石 (Inner Glowing Arch Rim & Winged Keystone)
+    traceGothicArch(2);
+    ctx.strokeStyle = door.isOpen ? '#e9d5ff' : '#991b1b';
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    // 开启时向门前石阶洒下的星界迎宾光晕
+    if (door.isOpen) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const spillGrad = ctx.createRadialGradient(0, halfH + 6, 4, 0, halfH + 18, 48);
+      spillGrad.addColorStop(0, 'rgba(233, 213, 255, 0.42)');
+      spillGrad.addColorStop(0.5, 'rgba(139, 92, 246, 0.18)');
+      spillGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = spillGrad;
+      ctx.beginPath();
+      ctx.ellipse(0, halfH + 14, 52, 22, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // 拱顶中央鎏金双翼拱心石 (Winged Gothic Keystone Crest)
+    const ky = -halfH - 18;
+    ctx.fillStyle = '#1e1b36';
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(0, ky - 9);
+    ctx.lineTo(14, ky - 2);
+    ctx.lineTo(9, ky + 8);
+    ctx.lineTo(0, ky + 12);
+    ctx.lineTo(-9, ky + 8);
+    ctx.lineTo(-14, ky - 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = door.isOpen ? '#e9d5ff' : '#ef4444';
+    ctx.beginPath();
+    ctx.arc(0, ky + 1, 3.2, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.restore();
   }
@@ -2222,11 +2580,12 @@ export class RoomManager {
       ctx.fillRect(0, 0, width, height);
     }
 
-    // 极简 3D 浮雕层数铭牌与波次菱形晶石
+    // 极简 3D 浮雕层数铭牌与波次菱形晶石（当存在活跃首领时自动下移，礼让顶部全屏首领血条 HUD）
+    const hasActiveBoss = this.combatSystem.enemies.some(e => e.isBoss && e.active);
     const badgeW = 96;
     const badgeH = 22;
     const bx = width / 2 - badgeW / 2;
-    const by = 56;
+    const by = hasActiveBoss ? 142 : 56;
 
     // 立体投影
     ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
