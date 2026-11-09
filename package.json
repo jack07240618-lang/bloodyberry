@@ -7,7 +7,8 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "simulate": "tsx src/simulation/simulate.ts"
+    "simulate": "tsx src/simulation/simulate.ts",
+    "test:balance": "tsx src/simulation/balance.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.13.9",

@@ -203,6 +203,8 @@ export class RoomManager {
     this.combatSystem.enemyProjectiles = [];
     this.combatSystem.projectiles = [];
     this.combatSystem.dropItems = [];
+    this.combatSystem.bossChestRolledThisRoom = false;
+    this.combatSystem.bossChestDroppedThisRoom = false;
     this.combatSystem.delayedBombs = [];
     this.combatSystem.mapSystem.destructibles = [];
     this.combatSystem.mapSystem.shrines = [];
@@ -520,8 +522,8 @@ export class RoomManager {
 
     this.currentRoom.traps = traps;
 
-    // 55% 概率在战斗房刷出【禁忌诅咒血箱】，位置随房间布局动态变化
-    if (Math.random() < 0.55) {
+    // 18% 概率在战斗房刷出【禁忌诅咒血箱】，位置随房间布局动态变化
+    if (Math.random() < 0.18) {
       const chestSpots: Array<[number, number]> = [
         [-315, 15],
         [315, 15],
@@ -709,7 +711,7 @@ export class RoomManager {
    * 房间内所有波次怪物被击败后触发：
    * 1. 状态变为 CLEARED
    * 2. 解锁北侧所有通往下一房间的门
-   * 3. 在房间正中央生成过关奖励（三选一遗物/机制构筑祭坛 + 掉落物）
+   * 3. 概率生成构筑祭坛，并掉落金币
    */
   private onRoomCleared(player: Player): void {
     this.currentRoom.state = RoomState.CLEARED;
@@ -721,34 +723,33 @@ export class RoomManager {
     this.combatSystem.particleSystem.emitLevelUpFanfare(0, 0);
     this.combatSystem.vacuumAllGems();
 
-    // 房间中央生成“过关三选一构筑水晶台”
-    this.currentRoom.interactables.push({
-      id: 'room_clear_reward',
-      kind: 'CLEAR_REWARD',
-      x: 0,
-      y: 0,
-      radius: 38,
-      title: this.currentRoom.type === RoomType.ELITE
-        ? '✦ 精英过关圣物 (三选一构筑) ✦'
-        : '✦ 房间清理圣物 (三选一构筑) ✦',
-      subtitle: '踏入光圈选择你的多维标签与机制改造词条',
-      costGold: 0,
-      color: this.currentRoom.type === RoomType.ELITE ? '#fbbf24' : '#38bdf8',
-      active: true,
-      pulseTimer: 0
-    });
+    // A boss chest replaces the clear altar; neither reward is guaranteed.
+    const rewardChance = this.currentRoom.type === RoomType.ELITE ? 0.60 : 0.35;
+    if (!this.combatSystem.bossChestDroppedThisRoom && Math.random() < rewardChance) {
+      this.currentRoom.interactables.push({
+        id: 'room_clear_reward',
+        kind: 'CLEAR_REWARD',
+        x: 0,
+        y: 0,
+        radius: 38,
+        title: this.currentRoom.type === RoomType.ELITE
+          ? '✦ 精英过关圣物 (三选一构筑) ✦'
+          : '✦ 房间清理圣物 (三选一构筑) ✦',
+        subtitle: '踏入光圈选择你的多维标签与机制改造词条',
+        costGold: 0,
+        color: this.currentRoom.type === RoomType.ELITE ? '#fbbf24' : '#38bdf8',
+        active: true,
+        pulseTimer: 0
+      });
+    }
 
-    // 额外掉落金币与生命补给；精英房额外掉落神话进化宝箱
+    // 金币保留，移除精英房重复赠送的进化宝箱。
     const coinCount = this.currentRoom.type === RoomType.ELITE ? 6 : 3;
     for (let i = 0; i < coinCount; i++) {
       const ang = (i * Math.PI * 2) / coinCount;
       const coin = new DropItem(DropType.GOLD_COIN, Math.cos(ang) * 65, Math.sin(ang) * 65, 15);
       coin.isMagnetized = true;
       this.combatSystem.dropItems.push(coin);
-    }
-
-    if (this.currentRoom.type === RoomType.ELITE) {
-      this.combatSystem.dropItems.push(new DropItem(DropType.BOSS_CHEST, 85, 0, 1));
     }
   }
 

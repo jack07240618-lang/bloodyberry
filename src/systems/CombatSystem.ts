@@ -26,6 +26,8 @@ export class CombatSystem {
   public projectiles: Projectile[] = [];
   public enemyProjectiles: EnemyProjectile[] = [];
   public dropItems: DropItem[] = [];
+  public bossChestRolledThisRoom = false;
+  public bossChestDroppedThisRoom = false;
 
   public spatialGrid: SpatialHashGrid<Enemy>;
   public freezeTimer = 0;
@@ -85,8 +87,8 @@ export class CombatSystem {
         player.position.x + dir.x * 16,
         player.position.y + dir.y * 16,
         62 + bladeProjRank * 7,
-        Math.round(weapon.damage * player.damageMult * (0.42 + bladeProjRank * 0.1)),
-        2 + bladeProjRank,
+        Math.round(weapon.damage * player.damageMult * (0.25 + bladeProjRank * 0.07)),
+        1 + Math.floor(bladeProjRank / 2),
         0.48
       );
       waveProj.rotation = dir.angle();
@@ -117,7 +119,7 @@ export class CombatSystem {
         proj.isCrit = true;
         proj.pierce = 999;
         proj.radius = Math.round(proj.radius * 1.32);
-        proj.damage = Math.round(proj.damage * (1.16 + singularityRank * 0.1));
+        proj.damage = Math.round(proj.damage * (1.05 + singularityRank * 0.05));
         proj.color = '#e879f9';
         proj.glowColor = '#a855f7';
         proj.tags.add(SkillTag.SINGULARITY);
@@ -127,7 +129,7 @@ export class CombatSystem {
       // 2. 【示例 A（改变形态）】：普通攻击/[投射物] 变为散射3发，飞行距离缩短，命中房间墙壁反弹
       const splitRank = player.getPassiveLevel('spinach');
       if (splitRank > 0 && proj.tags.has(SkillTag.PROJECTILE)) {
-        proj.wallBounces = Math.max(proj.wallBounces, splitRank);
+        proj.wallBounces = Math.max(proj.wallBounces, Math.ceil(splitRank / 2));
 
         const isFlyingProjectile =
           proj.type !== ProjectileType.ORBITING_ORB &&
@@ -142,7 +144,7 @@ export class CombatSystem {
           proj.maxLifetime *= durationFactor;
 
           const origDamage = proj.damage;
-          proj.damage = Math.max(1, Math.round(origDamage * 0.72));
+          proj.damage = Math.max(1, Math.round(origDamage * 0.6));
 
           const baseSpeed = proj.velocity.length();
           const baseAngle = proj.velocity.angle();
@@ -156,14 +158,14 @@ export class CombatSystem {
               proj.position.x,
               proj.position.y,
               Math.max(5, Math.round(proj.radius * 0.88)),
-              Math.max(1, Math.round(origDamage * (0.38 + splitRank * 0.06))),
+              Math.max(1, Math.round(origDamage * (0.18 + splitRank * 0.025))),
               proj.pierce,
               proj.lifetime
             );
             clone.isDecoratedClone = true;
             clone.isSingularityStrike = proj.isSingularityStrike;
             clone.isCrit = proj.isCrit;
-            clone.wallBounces = splitRank;
+            clone.wallBounces = Math.ceil(splitRank / 2);
             clone.color = proj.color;
             clone.glowColor = '#38bdf8';
             clone.velocity.set(Math.cos(ang) * baseSpeed, Math.sin(ang) * baseSpeed);
@@ -895,7 +897,7 @@ export class CombatSystem {
           enemy.burnTimer = 4.0;
           if (enemy.shockTimer > 0) {
             enemy.shockTimer = 0;
-            this.triggerElementalOverload(enemy.position, totalDamage * 1.5);
+            this.triggerElementalOverload(enemy.position, totalDamage * 0.8);
           }
         } else if (isBleedWep) {
           enemy.bleedTimer = 4.0;
@@ -905,9 +907,9 @@ export class CombatSystem {
           player.heal(1);
         }
 
-        // Shatter combo: Heavy weapons deal 2.5x damage against frozen enemies!
+        // Frozen heavy-hit synergy is limited to a 50% bonus.
         if (this.freezeTimer > 0 && isHeavyWep) {
-          totalDamage = Math.round(totalDamage * 2.5);
+          totalDamage = Math.round(totalDamage * 1.5);
         }
 
         const isDead = enemy.takeDamage(totalDamage);
@@ -1065,7 +1067,7 @@ export class CombatSystem {
         pos.x,
         pos.y,
         bomb.radius * 0.72,
-        Math.round(bomb.damage * 0.4),
+        Math.round(bomb.damage * 0.2),
         9999,
         2.5
       );
@@ -1080,9 +1082,9 @@ export class CombatSystem {
       this.spawnLightningVisual(pos, bomb.radius * 0.8, true);
     }
 
-    // 4. 若继承了主武器的 [投射物] 标签 -> 向四周环状迸发 6 枚继承全部标签的子弹
+    // 4. 若继承了主武器的 [投射物] 标签 -> 向四周环状迸发 4 枚继承全部标签的子弹
     if (tags.has(SkillTag.PROJECTILE)) {
-      const count = 6;
+      const count = 4;
       for (let i = 0; i < count; i++) {
         const ang = (i * Math.PI * 2) / count;
         const shrapnel = new Projectile(
@@ -1091,7 +1093,7 @@ export class CombatSystem {
           pos.x,
           pos.y,
           7,
-          Math.round(bomb.damage * 0.55),
+          Math.round(bomb.damage * 0.3),
           2,
           1.1
         );
@@ -1176,9 +1178,16 @@ export class CombatSystem {
       gem.isMagnetized = true;
       this.dropItems.push(gem);
 
-      // Boss drops a Mythic Boss Chest & a rich fountain of Golden Loot + Relics
+      // Bosses grant gold and reduced bonus XP; chests use a shared room roll.
       if (enemy.isBoss) {
-        this.dropItems.push(new DropItem(DropType.BOSS_CHEST, enemy.position.x, enemy.position.y, 1));
+        // One chest roll per room, including rooms with multiple bosses.
+        if (!this.bossChestRolledThisRoom) {
+          this.bossChestRolledThisRoom = true;
+          if (Math.random() < 0.45) {
+            this.bossChestDroppedThisRoom = true;
+            this.dropItems.push(new DropItem(DropType.BOSS_CHEST, enemy.position.x, enemy.position.y, 1));
+          }
+        }
         const goldCount = 12;
         for (let g = 0; g < goldCount; g++) {
           const ang = (g * Math.PI * 2) / goldCount;
@@ -1192,7 +1201,7 @@ export class CombatSystem {
           coin.isMagnetized = true;
           this.dropItems.push(coin);
         }
-        const bonusGems = 6;
+        const bonusGems = 2;
         for (let b = 0; b < bonusGems; b++) {
           const ang = (b * Math.PI * 2) / bonusGems + 0.3;
           const vGem = new DropItem(

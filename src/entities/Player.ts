@@ -17,20 +17,20 @@ export class Player extends Entity {
   public hp = 100;
   public moveSpeed = 190;
   public pickupRadius = 90;
-  public damageMult = 1.0;
+  public damageMult = 0.9;
   public armor = 0;
   public cooldownMult = 1.0;
   public areaMult = 1.0;
   public projectileCountBonus = 0;
   public critChance = 0.05;
   public xpMult = 1.0;
-  public hpRegen = 0.2;
+  public hpRegen = 0.1;
   public luck = 1.0;
 
   // Progression
   public level = 1;
   public xp = 0;
-  public nextLevelXp = 12;
+  public nextLevelXp = 24;
   public pendingLevelUps = 0;
   public gold = 0;
   public kills = 0;
@@ -67,7 +67,7 @@ export class Player extends Entity {
 
   // Active Skill 1: Shadow Dash (Spacebar)
   public dashCooldown = 0;
-  public maxDashCooldown = 2.4;
+  public maxDashCooldown = 2.8;
   public dashActiveTimer = 0;
   public dashDuration = 0.22;
   public dashDirection: Vector2 = new Vector2(1, 0);
@@ -76,7 +76,7 @@ export class Player extends Entity {
 
   // Active Skill 2: Ultimate Screen-Nuke (Q / E Key - Pentagram / Gorgeous Moon)
   public ultimateCooldown = 18.0; // Starts partially charged so player can test it after 18s!
-  public maxUltimateCooldown = 35.0;
+  public maxUltimateCooldown = 45.0;
 
   constructor(x = 0, y = 0) {
     super(x, y, 14);
@@ -173,7 +173,7 @@ export class Player extends Entity {
     }
 
     const dashRank = this.getPassiveLevel('wings');
-    const dashCdFactor = Math.max(0.55, 1.0 - dashRank * 0.08);
+    const dashCdFactor = Math.max(0.85, 1.0 - dashRank * 0.03);
     this.dashActiveTimer = this.dashDuration;
     this.dashCooldown = Math.max(0.8, this.maxDashCooldown * this.cooldownMult * dashCdFactor);
     this.iFrameTimer = Math.max(this.iFrameTimer, this.dashDuration + 0.14); // Invulnerable during dash!
@@ -228,8 +228,8 @@ export class Player extends Entity {
     while (this.xp >= this.nextLevelXp) {
       this.xp -= this.nextLevelXp;
       this.level++;
-      // Balanced progression curve so player power ramps steadily across floors
-      this.nextLevelXp = Math.floor(12 * Math.pow(1.24, this.level - 1) + (this.level * 7));
+      // Slower progression: higher entry cost and steeper late-run requirements.
+      this.nextLevelXp = Math.floor(18 * Math.pow(1.27, this.level - 1) + (this.level * 10));
       this.pendingLevelUps++;
       leveledUp = true;
     }
@@ -298,14 +298,14 @@ export class Player extends Entity {
     const singularityRank = this.getPassiveLevel('clover');
 
     const prevMaxHp = this.maxHp;
-    this.maxHp = Math.round(this.baseMaxHp + soulRank * 12);
+    this.maxHp = Math.round(this.baseMaxHp + soulRank * 5);
     if (this.maxHp > prevMaxHp && prevMaxHp > 0) {
       this.hp += (this.maxHp - prevMaxHp);
     }
 
     this.moveSpeed = this.baseSpeed;
-    this.armor = Math.max(this.armor, armorRank > 1 ? armorRank - 1 : 0);
-    this.pickupRadius = this.basePickupRadius * (1 + attractRank * 0.25);
+    this.armor = Math.max(this.armor, Math.floor(armorRank / 2));
+    this.pickupRadius = this.basePickupRadius * (1 + attractRank * 0.1);
 
     // 【示例 C（风险与机制转化）】：若拥有“湮灭第四律令”，彻底取消随机暴击率概念（归零），转化为每第4次攻击必触发范围穿透奇点！
     if (singularityRank > 0) {

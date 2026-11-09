@@ -541,236 +541,236 @@ export const PASSIVE_I18N: Record<string, { zh: LocalizedPassiveText; en: Locali
   spinach: {
     zh: {
       name: '棱镜折射',
-      description: '投射物变为 3 发扇形散射，射程缩短 30%，触墙可反弹',
+      description: "三发散射：主弹60%伤害，侧弹较弱，射程缩短32%",
       perLevel: [
-        '投射物散射 3 发 · 射程 -30% · 触墙反弹 1 次',
-        '散射伤害提升 · 触墙连续反弹 2 次',
-        '散射伤害提升 · 触墙连续反弹 3 次',
-        '散射伤害提升 · 触墙连续反弹 4 次',
-        '全额散射伤害 · 触墙连续反弹 5 次'
+        "侧弹伤害 20.5% · 触墙反弹 1 次",
+        "侧弹伤害 23% · 触墙反弹 1 次",
+        "侧弹伤害 25.5% · 触墙反弹 2 次",
+        "侧弹伤害 28% · 触墙反弹 2 次",
+        "侧弹伤害 30.5% · 触墙反弹 3 次"
       ]
     },
     en: {
       name: 'Prism Splitter',
-      description: 'Projectiles split into a 3-shot fan, -30% range, ricochet off walls.',
+      description: "3-shot fan: 60% main damage, weaker side shots, -32% range.",
       perLevel: [
-        'Projectiles split into 3 · -30% range · 1 wall bounce',
-        'Increased split damage · 2 wall bounces',
-        'Increased split damage · 3 wall bounces',
-        'Increased split damage · 4 wall bounces',
-        'Full split damage · 5 wall bounces'
+        "Side shot damage 20.5% · 1 wall bounce(s)",
+        "Side shot damage 23% · 1 wall bounce(s)",
+        "Side shot damage 25.5% · 2 wall bounce(s)",
+        "Side shot damage 28% · 2 wall bounce(s)",
+        "Side shot damage 30.5% · 3 wall bounce(s)"
       ]
     }
   },
   wings: {
     zh: {
       name: '跃迁余烬',
-      description: '冲刺时在原地留下延迟晶核，继承主武器属性并引爆',
+      description: "冲刺留下较小晶核，继承主武器标签；每级冲刺冷却减少3%",
       perLevel: [
-        '冲刺原地留下延迟晶核 · 继承主武器属性引爆',
-        '晶核爆炸范围 +18 · 冲刺冷却加快',
-        '晶核爆炸范围 +36 · 引爆时环状发射 8 枚弹体',
-        '晶核爆炸范围 +54 · 引爆时附加持续火海与雷暴',
-        '超大范围元素奇点引爆 · 全额触发命中特效'
+        "晶核伤害 110% · 半径 70 · 冲刺冷却 -3%",
+        "晶核伤害 130% · 半径 80 · 冲刺冷却 -6%",
+        "晶核伤害 150% · 半径 90 · 冲刺冷却 -9%",
+        "晶核伤害 170% · 半径 100 · 冲刺冷却 -12%",
+        "晶核伤害 190% · 半径 110 · 冲刺冷却 -15%"
       ]
     },
     en: {
       name: 'Volatile Dash',
-      description: 'Dashing leaves a delayed core that inherits main weapon traits.',
+      description: "Dash leaves a smaller core with main weapon tags; -3% dash cooldown per rank.",
       perLevel: [
-        'Dash leaves a delayed blast core with main weapon tags',
-        'Blast radius +18 · Faster dash cooldown',
-        'Blast radius +36 · Emits 8 radial projectiles on detonation',
-        'Blast radius +54 · Leaves lingering fire & lightning',
-        'Massive singularity blast · Triggers all on-hit effects'
+        "Core damage 110% · Radius 70 · Dash cooldown -3%",
+        "Core damage 130% · Radius 80 · Dash cooldown -6%",
+        "Core damage 150% · Radius 90 · Dash cooldown -9%",
+        "Core damage 170% · Radius 100 · Dash cooldown -12%",
+        "Core damage 190% · Radius 110 · Dash cooldown -15%"
       ]
     }
   },
   clover: {
     zh: {
       name: '湮灭律令',
-      description: '移除暴击率，每第 4 次攻击转化为无限穿透的引力奇点',
+      description: "移除随机暴击，每第4次攻击转为穿透奇点，降低增伤与聚怪范围",
       perLevel: [
-        '暴击率归零 · 每第 4 次攻击造成穿透伤害并聚拢敌人',
-        '第 4 击引力半径扩大至 225 · 穿透伤害提升',
-        '第 4 击引力半径扩大至 250 · 聚怪力度提升',
-        '第 4 击引力半径扩大至 275 · 附加破甲震荡波',
-        '每第 4 次攻击化为大范围引力深渊'
+        "第4击伤害倍率 1.10 · 聚怪半径 112 · 溅射15%",
+        "第4击伤害倍率 1.15 · 聚怪半径 124 · 溅射15%",
+        "第4击伤害倍率 1.20 · 聚怪半径 136 · 溅射15%",
+        "第4击伤害倍率 1.25 · 聚怪半径 148 · 溅射15%",
+        "第4击伤害倍率 1.30 · 聚怪半径 160 · 溅射15%"
       ]
     },
     en: {
       name: 'Singularity Edict',
-      description: 'Removes Crit Chance; every 4th attack becomes a piercing gravity well.',
+      description: "Removes random crits; every 4th attack pierces, with reduced damage and pull.",
       perLevel: [
-        '0% Crit · Every 4th attack pierces and pulls nearby foes',
-        '4th strike pull radius 225 · Increased pierce damage',
-        '4th strike pull radius 250 · Stronger vortex pull',
-        '4th strike pull radius 275 · Sunder shockwave on hit',
-        'Every 4th attack triggers an abyssal gravity singularity'
+        "4th strike damage x1.10 · Pull radius 112 · 15% splash",
+        "4th strike damage x1.15 · Pull radius 124 · 15% splash",
+        "4th strike damage x1.20 · Pull radius 136 · 15% splash",
+        "4th strike damage x1.25 · Pull radius 148 · 15% splash",
+        "4th strike damage x1.30 · Pull radius 160 · 15% splash"
       ]
     }
   },
   empty_tome: {
     zh: {
       name: '炎爆烙印',
-      description: '投射物命中时引发范围烈焰爆炸并点燃目标',
+      description: "投射物首次命中触发小范围炎爆，附加2秒灼烧",
       perLevel: [
-        '投射物命中触发范围炎爆 · 附加 4 秒灼烧',
-        '炎爆半径扩大 · 爆炸伤害提升至 60%',
-        '炎爆半径扩大 · 爆炸伤害提升至 75%',
-        '炎爆半径扩大 · 爆炸伤害提升至 90%',
-        '投射物命中引发连锁烈焰新星'
+        "炎爆伤害 16% · 半径 41 · 灼烧2秒",
+        "炎爆伤害 20% · 半径 46 · 灼烧2秒",
+        "炎爆伤害 24% · 半径 51 · 灼烧2秒",
+        "炎爆伤害 28% · 半径 56 · 灼烧2秒",
+        "炎爆伤害 32% · 半径 61 · 灼烧2秒"
       ]
     },
     en: {
       name: 'Pyro Brand',
-      description: 'Projectiles trigger fiery explosions on impact and ignite foes.',
+      description: "First projectile hit triggers a small blast and 2s burn.",
       perLevel: [
-        'Projectile hits trigger AoE fire blast · 4s burn',
-        'Larger blast radius · 60% blast damage',
-        'Larger blast radius · 75% blast damage',
-        'Larger blast radius · 90% blast damage',
-        'Projectile hits unleash chained solar novas'
+        "Blast damage 16% · Radius 41 · 2s burn",
+        "Blast damage 20% · Radius 46 · 2s burn",
+        "Blast damage 24% · Radius 51 · 2s burn",
+        "Blast damage 28% · Radius 56 · 2s burn",
+        "Blast damage 32% · Radius 61 · 2s burn"
       ]
     }
   },
   duplicator: {
     zh: {
       name: '幻影剑气',
-      description: '近战挥砍时额外发射穿透剑气，继承投射物联动',
+      description: "近战附加一道低伤害剑气，降低穿透数量",
       perLevel: [
-        '近战攻击额外激发 1 道穿透剑气',
-        '剑气穿透 +2 · 伤害提升 · 可触发反弹与炎爆',
-        '近战挥砍激发巨型次元刃贯穿直线敌人'
+        "剑气伤害 32% · 穿透 1",
+        "剑气伤害 39% · 穿透 2",
+        "剑气伤害 46% · 穿透 2"
       ]
     },
     en: {
       name: 'Phantom Blade Qi',
-      description: 'Melee attacks fire an extra piercing sword wave with Projectile tags.',
+      description: "Melee adds one weaker sword wave with limited pierce.",
       perLevel: [
-        'Melee swings launch 1 piercing sword wave',
-        'Wave pierce +2 · Higher damage · Triggers bounces & blasts',
-        'Melee swings unleash a giant dimensional blade beam'
+        "Wave damage 32% · Pierce 1",
+        "Wave damage 39% · Pierce 2",
+        "Wave damage 46% · Pierce 2"
       ]
     }
   },
   attractorb: {
     zh: {
       name: '电弧导管',
-      description: '连锁或过载命中时弹射闪电链，遇火触发超载爆炸',
+      description: "连锁或过载命中弹射较弱电弧，感电持续2秒",
       perLevel: [
-        '命中弹射 2 道雷电链 · 遇火触发超载爆破',
-        '弹射目标 +1 · 感电延长 · 牵引范围扩大',
-        '弹射目标 +2 · 连锁电弧伤害提升',
-        '弹射目标 +3 · 连锁电弧伤害大幅提升',
-        '命中时在敌群间形成瞬发雷电网'
+        "电弧伤害 15.5% · 最多 1 个额外目标 · 拾取范围 +10%",
+        "电弧伤害 19% · 最多 1 个额外目标 · 拾取范围 +20%",
+        "电弧伤害 22.5% · 最多 2 个额外目标 · 拾取范围 +30%",
+        "电弧伤害 26% · 最多 2 个额外目标 · 拾取范围 +40%",
+        "电弧伤害 29.5% · 最多 3 个额外目标 · 拾取范围 +50%"
       ]
     },
     en: {
       name: 'Arc Conductor',
-      description: 'Chain/Overload hits bounce lightning arcs and overload burning foes.',
+      description: "Chain/Overload hits create weaker arcs with 2s shock.",
       perLevel: [
-        'Hits bounce 2 lightning arcs · Overloads burning targets',
-        '+1 arc bounce · Longer shock · Wider pickup magnet',
-        '+2 arc bounces · Increased chain lightning damage',
-        '+3 arc bounces · High chain lightning damage',
-        'Hits weave an instant lightning grid across enemies'
+        "Arc damage 15.5% · Up to 1 extra targets · Pickup +10%",
+        "Arc damage 19% · Up to 1 extra targets · Pickup +20%",
+        "Arc damage 22.5% · Up to 2 extra targets · Pickup +30%",
+        "Arc damage 26% · Up to 2 extra targets · Pickup +40%",
+        "Arc damage 29.5% · Up to 3 extra targets · Pickup +50%"
       ]
     }
   },
   hollow_heart: {
     zh: {
       name: '缚魂灵瓮',
-      description: '击杀敌人时在原地生成追踪缚魂弹攻击周围目标',
+      description: "累积击杀生成较弱缚魂弹，每级生命上限增加5",
       perLevel: [
-        '每击杀 5 名敌人生成追踪缚魂弹',
-        '每击杀 4 名敌人生成缚魂弹 · 穿透 +1 · 生命上限提升',
-        '每击杀 3 名敌人生成缚魂弹 · 伤害 +50%',
-        '每击杀 2 名敌人生成缚魂弹 · 联动散射与炎爆',
-        '每次击杀均释放高穿透缚魂弹幕'
+        "每击杀 10 名敌人生成缚魂弹 · 生命上限 +5 · 穿透 1",
+        "每击杀 9 名敌人生成缚魂弹 · 生命上限 +10 · 穿透 2",
+        "每击杀 8 名敌人生成缚魂弹 · 生命上限 +15 · 穿透 2",
+        "每击杀 7 名敌人生成缚魂弹 · 生命上限 +20 · 穿透 3",
+        "每击杀 6 名敌人生成缚魂弹 · 生命上限 +25 · 穿透 3"
       ]
     },
     en: {
       name: 'Soul Vessel',
-      description: 'Defeating enemies spawns homing soul bolts from their remains.',
+      description: "Accumulated kills spawn weaker soul bolts; +5 Max HP per rank.",
       perLevel: [
-        'Every 5 kills spawns a homing soul bolt',
-        'Every 4 kills spawns bolt · +1 Pierce · +Max HP',
-        'Every 3 kills spawns bolt · +50% bolt damage',
-        'Every 2 kills spawns bolt · Synergizes with split & pyro',
-        'Every kill unleashes high-pierce soul barrages'
+        "Soul bolt every 10 kills · +5 Max HP · Pierce 1",
+        "Soul bolt every 9 kills · +10 Max HP · Pierce 2",
+        "Soul bolt every 8 kills · +15 Max HP · Pierce 2",
+        "Soul bolt every 7 kills · +20 Max HP · Pierce 3",
+        "Soul bolt every 6 kills · +25 Max HP · Pierce 3"
       ]
     }
   },
   crown: {
     zh: {
       name: '链式殉爆',
-      description: '处于灼烧或感电的敌人阵亡时引发范围殉爆',
+      description: "仅灼烧或感电敌人阵亡时，概率触发小范围殉爆",
       perLevel: [
-        '异常状态敌人阵亡时 100% 引发范围殉爆',
-        '殉爆半径扩大 · 普通敌人阵亡有 45% 概率殉爆',
-        '殉爆伤害 +50% · 点燃波及目标',
-        '殉爆半径大幅扩大 · 可连环引爆敌群',
-        '阵亡目标引发全房连环超新星爆破'
+        "异常敌人阵亡殉爆概率 30% · 半径 46",
+        "异常敌人阵亡殉爆概率 35% · 半径 52",
+        "异常敌人阵亡殉爆概率 40% · 半径 58",
+        "异常敌人阵亡殉爆概率 45% · 半径 64",
+        "异常敌人阵亡殉爆概率 50% · 半径 70"
       ]
     },
     en: {
       name: 'Chain Detonation',
-      description: 'Burning or shocked enemies detonate violently when slain.',
+      description: "Only burning/shocked foes can trigger a small death blast.",
       perLevel: [
-        'Slain burning/shocked foes 100% detonate in an AoE',
-        'Wider blast · Normal foes have 45% chance to detonate',
-        'Blast damage +50% · Ignites all affected enemies',
-        'Massive blast radius · Chains across dense hordes',
-        'Slain foes trigger room-wide supernova chain reactions'
+        "Status death blast chance 30% · Radius 46",
+        "Status death blast chance 35% · Radius 52",
+        "Status death blast chance 40% · Radius 58",
+        "Status death blast chance 45% · Radius 64",
+        "Status death blast chance 50% · Radius 70"
       ]
     }
   },
   pummarola: {
     zh: {
       name: '鲜血圣杯',
-      description: '近战与召唤命中时附加流血，并按概率汲取生命',
+      description: "近战与召唤附加2秒流血，低概率恢复1点生命",
       perLevel: [
-        '命中附加流血 · 28% 概率汲取恢复生命',
-        '流血伤害提升 · 汲取概率提升至 34%',
-        '每次触发鲜血汲取恢复 2 点生命',
-        '汲取概率提升至 46% · 溢出治疗转化为护盾',
-        '近战与召唤攻击化为持续吸血领域'
+        "汲取概率 8% · 每次恢复1点生命 · 流血2秒",
+        "汲取概率 10% · 每次恢复1点生命 · 流血2秒",
+        "汲取概率 12% · 每次恢复1点生命 · 流血2秒",
+        "汲取概率 14% · 每次恢复1点生命 · 流血2秒",
+        "汲取概率 16% · 每次恢复1点生命 · 流血2秒"
       ]
     },
     en: {
       name: 'Crimson Chalice',
-      description: 'Melee and Summon hits inflict Bleed and leech health.',
+      description: "Melee/Summon inflicts 2s Bleed with a low chance to heal 1 HP.",
       perLevel: [
-        'Inflicts Bleed on hit · 28% chance to leech HP',
-        'Higher Bleed damage · 34% leech chance',
-        'Restores 2 HP per life-leech proc',
-        '46% leech chance · Overheal grants barrier',
-        'Melee & Summon attacks become a perpetual vampiric field'
+        "8% leech chance · Heal 1 HP · 2s Bleed",
+        "10% leech chance · Heal 1 HP · 2s Bleed",
+        "12% leech chance · Heal 1 HP · 2s Bleed",
+        "14% leech chance · Heal 1 HP · 2s Bleed",
+        "16% leech chance · Heal 1 HP · 2s Bleed"
       ]
     }
   },
   armor: {
     zh: {
       name: '逆鳞寒霜',
-      description: '受到伤害时爆发极寒新星，冻结并震退周围敌人',
+      description: "受击触发较弱寒霜新星与短暂冻结，每两级增加1护甲",
       perLevel: [
-        '受击爆发极寒新星 · 冻结敌人 2.2 秒并反击',
-        '新星范围扩大 · 冻结 2.6 秒 · 护甲减伤 +1',
-        '反击伤害 +60% · 冻结延长至 3.0 秒',
-        '新星范围大幅扩大 · 冻结目标受重击伤害翻倍',
-        '受击瞬间冰封全房并重置冲刺冷却'
+        "新星半径 110 · 冻结 0.75 秒 · 护甲 +0",
+        "新星半径 125 · 冻结 0.90 秒 · 护甲 +1",
+        "新星半径 140 · 冻结 1.05 秒 · 护甲 +1",
+        "新星半径 155 · 冻结 1.20 秒 · 护甲 +2",
+        "新星半径 170 · 冻结 1.35 秒 · 护甲 +2"
       ]
     },
     en: {
       name: 'Frost Aegis',
-      description: 'Taking damage unleashes a Frost Nova that freezes all nearby foes.',
+      description: "Taking damage triggers a weaker frost nova and brief freeze; +1 Armor per 2 ranks.",
       perLevel: [
-        'Taking damage triggers Frost Nova · Freezes foes 2.2s',
-        'Larger nova radius · 2.6s freeze · +1 Armor',
-        '+60% nova damage · 3.0s freeze duration',
-        'Massive nova · Frozen foes take 2.5x heavy shatter damage',
-        'Freezes entire room on hit & resets Dash cooldown'
+        "Nova radius 110 · Freeze 0.75s · +0 Armor",
+        "Nova radius 125 · Freeze 0.90s · +1 Armor",
+        "Nova radius 140 · Freeze 1.05s · +1 Armor",
+        "Nova radius 155 · Freeze 1.20s · +2 Armor",
+        "Nova radius 170 · Freeze 1.35s · +2 Armor"
       ]
     }
   }

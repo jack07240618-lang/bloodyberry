@@ -203,7 +203,7 @@ export class BuildEventBus {
     if (splitRank > 0 && weapon.hasTag(SkillTag.PROJECTILE)) {
       const scattered: Projectile[] = [];
       const spreadAngles = [-0.26, 0, 0.26]; // 3发扇形散射角度 (~15度)
-      const bounceCount = splitRank; // 1级反弹1次，2级反弹2次...
+      const bounceCount = Math.ceil(splitRank / 2); // Ranks 1/2: 1 bounce; 3/4: 2; 5: 3.
       const durationFactor = 0.68;   // 飞行距离/持续时间缩短
 
       for (const orig of finalProjectiles) {
@@ -227,7 +227,7 @@ export class BuildEventBus {
                   orig.position.x,
                   orig.position.y,
                   orig.radius * 0.92,
-                  Math.round(orig.damage * (0.75 + splitRank * 0.1)),
+                  Math.round(orig.damage * (0.18 + splitRank * 0.025)),
                   orig.pierce,
                   orig.maxLifetime * durationFactor
                 );
@@ -261,7 +261,7 @@ export class BuildEventBus {
         p.isCrit = true;
         p.pierce = 999; // 必定无限穿透
         p.radius = Math.round(p.radius * 1.45);
-        p.damage = Math.round(p.damage * (1.35 + singularityRank * 0.25));
+        p.damage = Math.round(p.damage * (1.05 + singularityRank * 0.05));
         p.color = '#e879f9';
         p.glowColor = '#a855f7';
         p.tags.add(SkillTag.SINGULARITY);
@@ -287,8 +287,8 @@ export class BuildEventBus {
         player.position.x + dir.x * 18,
         player.position.y + dir.y * 18,
         58 + bladeProjRank * 8,
-        Math.round(weapon.damage * player.damageMult * (0.65 + bladeProjRank * 0.2)),
-        3 + bladeProjRank,
+        Math.round(weapon.damage * player.damageMult * (0.25 + bladeProjRank * 0.07)),
+        1 + Math.floor(bladeProjRank / 2),
         0.55
       );
       waveProj.rotation = dir.x >= 0 ? 1 : -1;
@@ -312,7 +312,7 @@ export class BuildEventBus {
 
     // 1. 【示例 C 命中效果】：第4次攻击触发范围穿透震荡波 + 强力吸附周围敌人 (Singularity Vacuum)
     if (projectile.isSingularityStrike) {
-      const pullRadius = 155 + player.getPassiveLevel('clover') * 20;
+      const pullRadius = 100 + player.getPassiveLevel('clover') * 12;
       const nearby = combatSystem.spatialGrid.queryRadius(enemy.position, pullRadius);
       combatSystem.particleSystem.emitHit(enemy.position.x, enemy.position.y, '#e879f9', 8);
 
@@ -324,10 +324,10 @@ export class BuildEventBus {
           const dist = pullDir.length();
           if (dist > 8) {
             pullDir.normalize();
-            other.position.addScaled(pullDir, Math.min(dist * 0.45, 52));
+            other.position.addScaled(pullDir, Math.min(dist * 0.25, 28));
           }
           // 造成范围穿透溅射伤害
-          const splashDmg = Math.max(1, Math.round(damage * 0.35));
+          const splashDmg = Math.max(1, Math.round(damage * 0.15));
           const killed = other.takeDamage(splashDmg);
           combatSystem.damageTextSystem.addDamage(other.position.x, other.position.y, splashDmg, true);
           if (killed) {
@@ -343,15 +343,15 @@ export class BuildEventBus {
     const pyroRank = player.getPassiveLevel('empty_tome');
     if (pyroRank > 0 && projectile.tags.has(SkillTag.PROJECTILE) && !projectile.hasTriggeredPyroBurst) {
       projectile.hasTriggeredPyroBurst = true; // 每颗投射物首次命中触发炎爆，避免无限递归
-      const blastRadius = 52 + pyroRank * 8;
-      const blastDmg = Math.max(1, Math.round(damage * (0.28 + pyroRank * 0.08)));
-      enemy.burnTimer = 3.5;
+      const blastRadius = 36 + pyroRank * 5;
+      const blastDmg = Math.max(1, Math.round(damage * (0.12 + pyroRank * 0.04)));
+      enemy.burnTimer = 2.0;
       combatSystem.particleSystem.emitHit(enemy.position.x, enemy.position.y, '#f97316', 6);
 
       const victims = combatSystem.spatialGrid.queryRadius(enemy.position, blastRadius);
       for (const v of victims) {
         if (!v.active) continue;
-        v.burnTimer = 3.5;
+        v.burnTimer = 2.0;
         const killed = v.takeDamage(blastDmg);
         combatSystem.damageTextSystem.addDamage(v.position.x, v.position.y, blastDmg, false);
         if (killed) {
@@ -365,12 +365,12 @@ export class BuildEventBus {
     // "带有 [连锁] 或 [过载] 标签的技能命中时，向周围额外弹射雷电链；若目标处于 [火焰] 灼烧则触发电磁过载爆炸"
     const arcRank = player.getPassiveLevel('attractorb');
     if (arcRank > 0 && (projectile.tags.has(SkillTag.CHAIN) || projectile.tags.has(SkillTag.OVERLOAD))) {
-      enemy.shockTimer = 3.5;
-      const neighbors = combatSystem.getNearestEnemies(enemy.position, 140, 1 + arcRank);
+      enemy.shockTimer = 2.0;
+      const neighbors = combatSystem.getNearestEnemies(enemy.position, 110, 1 + Math.ceil(arcRank / 2));
       for (const n of neighbors) {
         if (n === enemy || !n.active) continue;
-        const arcDmg = Math.max(1, Math.round(damage * (0.26 + arcRank * 0.08)));
-        n.shockTimer = 3.0;
+        const arcDmg = Math.max(1, Math.round(damage * (0.12 + arcRank * 0.035)));
+        n.shockTimer = 2.0;
         combatSystem.spawnLightningVisual(n.position, 22, false);
         const killed = n.takeDamage(arcDmg);
         combatSystem.damageTextSystem.addDamage(n.position.x, n.position.y, arcDmg, false);
@@ -385,9 +385,9 @@ export class BuildEventBus {
     // "带有 [近战] 或 [召唤] 标签的攻击命中流血/灼烧敌人时，汲取生命精华并释放血色新星"
     const leechRank = player.getPassiveLevel('pummarola');
     if (leechRank > 0 && (projectile.tags.has(SkillTag.MELEE) || projectile.tags.has(SkillTag.SUMMON))) {
-      enemy.bleedTimer = 3.5;
-      if (Math.random() < 0.16 + leechRank * 0.05) {
-        player.heal(1 + Math.floor(leechRank / 3));
+      enemy.bleedTimer = 2.0;
+      if (Math.random() < 0.06 + leechRank * 0.02) {
+        player.heal(1);
         combatSystem.particleSystem.emitHit(enemy.position.x, enemy.position.y, '#f43f5e', 4);
       }
     }
@@ -402,7 +402,7 @@ export class BuildEventBus {
     // 1. 【击杀联动】：亡语幽灵召唤 (hollow_heart / soul_remnant)
     // "每击杀 5 名敌人，在尸体处召唤一颗具有 [召唤][投射物] 标签的追踪噬魂弹"
     const soulRank = player.getPassiveLevel('hollow_heart');
-    if (soulRank > 0 && player.kills % Math.max(3, 7 - soulRank) === 0) {
+    if (soulRank > 0 && player.kills % Math.max(6, 11 - soulRank) === 0) {
       const target = combatSystem.getNearestEnemies(enemy.position, 500, 1)[0];
       const dir = target
         ? target.position.clone().sub(enemy.position).normalize()
@@ -414,8 +414,8 @@ export class BuildEventBus {
         enemy.position.x,
         enemy.position.y,
         9,
-        Math.round((14 + player.level * 2.2) * (1 + soulRank * 0.18)),
-        1 + soulRank,
+        Math.round((9 + player.level * 1.2) * (1 + soulRank * 0.1)),
+        1 + Math.floor(soulRank / 2),
         2.0
       );
       wraithBolt.velocity.copy(dir).multiplyScalar(430);
@@ -429,9 +429,9 @@ export class BuildEventBus {
     // 2. 【击杀联动】：过载链式尸爆 (crown / overload_detonation)
     // "被带有 [火焰] 或 [过载] 标签状态影响下的敌人死亡时，原地引发过载殉爆"
     const detonateRank = player.getPassiveLevel('crown');
-    if (detonateRank > 0 && (enemy.burnTimer > 0 || enemy.shockTimer > 0 || Math.random() < 0.25)) {
-      const radius = 58 + detonateRank * 10;
-      const blastDmg = Math.round((12 + player.level * 2) * (1 + detonateRank * 0.18));
+    if (detonateRank > 0 && (enemy.burnTimer > 0 || enemy.shockTimer > 0) && Math.random() < 0.25 + detonateRank * 0.05) {
+      const radius = 40 + detonateRank * 6;
+      const blastDmg = Math.round((8 + player.level) * (1 + detonateRank * 0.1));
       combatSystem.particleSystem.emitHit(enemy.position.x, enemy.position.y, '#facc15', 10);
 
       const nearby = combatSystem.spatialGrid.queryRadius(enemy.position, radius);
@@ -468,14 +468,14 @@ export class BuildEventBus {
     }
 
     const baseDmg = primaryWeapon
-      ? Math.round(primaryWeapon.damage * player.damageMult * (1.6 + bombRank * 0.45))
-      : Math.round(45 * (1 + bombRank * 0.4));
+      ? Math.round(primaryWeapon.damage * player.damageMult * (0.9 + bombRank * 0.2))
+      : Math.round(25 * (1 + bombRank * 0.2));
 
     combatSystem.spawnDelayedTraitBomb({
       position: startPosition.clone(),
       timer: 0.85,
       maxTimer: 0.85,
-      radius: 85 + bombRank * 18,
+      radius: 60 + bombRank * 10,
       damage: baseDmg,
       inheritedTags,
       sourceWeaponId: primaryWeapon ? primaryWeapon.id : 'dash_bomb'
@@ -491,16 +491,16 @@ export class BuildEventBus {
     const aegisRank = player.getPassiveLevel('armor');
     if (aegisRank <= 0) return;
 
-    const novaRadius = 150 + aegisRank * 25;
-    const novaDamage = Math.round((35 + player.level * 6) * (1 + aegisRank * 0.3));
-    combatSystem.freezeEnemies(1.8 + aegisRank * 0.4);
+    const novaRadius = 95 + aegisRank * 15;
+    const novaDamage = Math.round((18 + player.level * 3) * (1 + aegisRank * 0.15));
+    combatSystem.freezeEnemies(0.6 + aegisRank * 0.15);
     combatSystem.particleSystem.emitHit(player.position.x, player.position.y, '#38bdf8', 18);
 
     const nearby = combatSystem.spatialGrid.queryRadius(player.position, novaRadius);
     for (const e of nearby) {
       if (!e.active) continue;
       const pushDir = e.position.clone().sub(player.position);
-      e.applyKnockback(pushDir, 340);
+      e.applyKnockback(pushDir, 220);
       const killed = e.takeDamage(novaDamage);
       combatSystem.damageTextSystem.addDamage(e.position.x, e.position.y, novaDamage, true);
       if (killed) {
