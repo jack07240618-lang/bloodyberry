@@ -40,7 +40,8 @@ jobs:
         run: npm run test:balance && npm run test:parry
 
       - name: Stamp deployed version
-        run: node -e "require('fs').writeFileSync('dist/version.json', JSON.stringify({commit: process.env.GITHUB_SHA, builtAt: new Date().toISOString()}) + '\n')"
+        run: |
+          node -e "require('fs').writeFileSync('dist/version.json', JSON.stringify({commit: process.env.GITHUB_SHA, builtAt: new Date().toISOString()}) + '\n')"
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
