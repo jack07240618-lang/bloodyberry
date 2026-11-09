@@ -14,6 +14,7 @@ import { SaveManager } from './persistence/SaveManager';
 import { CHARACTERS, CharacterInfo } from './persistence/CharacterSelect';
 import gsap from 'gsap';
 import { UIManager, UpgradeOption } from './ui/UIManager';
+import { getSkillBarLayout } from './ui/SkillBarLayout';
 import { ALL_WEAPON_DEFINITIONS } from './weapons/WeaponRegistry';
 import { PASSIVE_DEFINITIONS } from './passives/PassiveRegistry';
 import { AmbientParticleSystem } from './systems/AmbientParticleSystem';
@@ -296,6 +297,8 @@ class GameEngine {
       this.companionSystem.toggleMode(this.player, this.combatSystem);
       this.sound.playShoot('wand');
     }
+
+    if (this.input.wasKeyPressed('KeyC')) this.player.tryParry();
 
     this.player.update(dt);
     this.companionSystem.update(dt, this.player, this.combatSystem);
@@ -898,26 +901,27 @@ class GameEngine {
       }
     }
 
-    // Check Bottom-Center Active Skill Buttons (Dash & Ultimate & Companion)
-    const slotW = 128;
-    const slotH = 38;
-    const gap = 14;
-    const totalW = slotW * 3 + gap * 2;
-    const startX = this.camera.viewportWidth / 2 - totalW / 2;
+    const { slotW, slotH, gap, startX, y: skillY } = getSkillBarLayout(
+      this.camera.viewportWidth, this.camera.viewportHeight
+    );
     const dashX = startX;
     const ultX = startX + slotW + gap;
-    const skillY = this.camera.viewportHeight - 54;
 
     if (my >= skillY && my <= skillY + slotH) {
       if (mx >= dashX && mx <= dashX + slotW) {
         this.uiManager.hoveredButton = 'dash_skill';
       } else if (mx >= ultX && mx <= ultX + slotW) {
         this.uiManager.hoveredButton = 'ult_skill';
+      } else if (mx >= startX + (slotW + gap) * 2 && mx <= startX + (slotW + gap) * 2 + slotW) {
+        this.uiManager.hoveredButton = 'parry_skill';
+      } else if (mx >= startX + (slotW + gap) * 3 && mx <= startX + (slotW + gap) * 3 + slotW) {
+        this.uiManager.hoveredButton = 'companion_skill';
       }
     }
   }
 
-  private handleHUDClick(_mx: number, _my: number): void {
+  private handleHUDClick(mx: number, my: number): void {
+    this.updateHUDHover(mx, my);
     if (this.uiManager.hoveredButton === 'open_settings') {
       this.isSettingsOpen = true;
       this.uiManager.hoveredButton = null;
@@ -928,6 +932,11 @@ class GameEngine {
       this.activatePlayerDash();
     } else if (this.uiManager.hoveredButton === 'ult_skill') {
       this.activatePlayerUltimate();
+    } else if (this.uiManager.hoveredButton === 'parry_skill') {
+      this.player.tryParry();
+    } else if (this.uiManager.hoveredButton === 'companion_skill') {
+      this.companionSystem.toggleMode(this.player, this.combatSystem);
+      this.sound.playShoot('wand');
     }
   }
 

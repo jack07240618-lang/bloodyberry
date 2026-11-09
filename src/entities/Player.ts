@@ -4,6 +4,7 @@ import { Weapon } from '../weapons/Weapon';
 import { PASSIVE_DEFINITIONS } from '../passives/PassiveRegistry';
 import { SpriteRenderer } from '../renderer/SpriteRenderer';
 import { SkillTag } from '../systems/BuildSystem';
+import { renderGuardEffect } from '../renderer/GuardEffects';
 
 export class Player extends Entity {
   public characterId = 'antonio';
@@ -78,6 +79,12 @@ export class Player extends Entity {
   public ultimateCooldown = 18.0; // Starts partially charged so player can test it after 18s!
   public maxUltimateCooldown = 45.0;
 
+  public readonly maxParryCooldown = 4.5;
+  public readonly parryWindow = 0.24;
+  public parryCooldown = 0;
+  public parryActiveTimer = 0;
+  public parrySuccessTimer = 0;
+
   constructor(x = 0, y = 0) {
     super(x, y, 14);
     this.recalculateStats();
@@ -88,6 +95,9 @@ export class Player extends Entity {
     if (this.isDead) return;
 
     this.timeSurvived += dt;
+    this.parryCooldown = Math.max(0, this.parryCooldown - dt);
+    this.parryActiveTimer = Math.max(0, this.parryActiveTimer - dt);
+    this.parrySuccessTimer = Math.max(0, this.parrySuccessTimer - dt);
 
     // Handle i-frames & visual flash
     if (this.iFrameTimer > 0) {
@@ -162,7 +172,7 @@ export class Player extends Entity {
   }
 
   public tryDash(): boolean {
-    if (this.isDead || this.dashCooldown > 0 || this.dashActiveTimer > 0) return false;
+    if (this.isDead || this.dashCooldown > 0 || this.dashActiveTimer > 0 || this.parryActiveTimer > 0) return false;
 
     this.lastDashStartPosition.copy(this.position);
 
@@ -182,6 +192,21 @@ export class Player extends Entity {
 
   public isUltimateReady(): boolean {
     return !this.isDead && this.ultimateCooldown <= 0;
+  }
+
+  public tryParry(): boolean {
+    if (this.isDead || this.parryCooldown > 0 || this.dashActiveTimer > 0) return false;
+    this.parryCooldown = this.maxParryCooldown;
+    this.parryActiveTimer = this.parryWindow;
+    return true;
+  }
+
+  public completeParry(): boolean {
+    if (this.isDead || this.parryActiveTimer <= 0) return false;
+    this.parryActiveTimer = 0;
+    this.parrySuccessTimer = 0.5;
+    this.iFrameTimer = Math.max(this.iFrameTimer, 0.18);
+    return true;
   }
 
   public triggerUltimate(): boolean {
@@ -339,6 +364,7 @@ export class Player extends Entity {
 
     ctx.save();
     ctx.translate(this.position.x, this.position.y);
+    renderGuardEffect(ctx, this.parryActiveTimer, this.parrySuccessTimer);
 
     // Soft radial aura glow beneath player feet (Golden/Purple when Ultimate is Ready!)
     const ultReady = this.isUltimateReady();

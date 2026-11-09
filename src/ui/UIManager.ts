@@ -1,4 +1,5 @@
 import { Player } from '../entities/Player';
+import { getSkillBarLayout } from './SkillBarLayout';
 import { Enemy } from '../enemies/Enemy';
 import { Camera } from '../core/Camera';
 import { SoundSynthesizer } from '../core/SoundSynthesizer';
@@ -475,13 +476,7 @@ export class UIManager {
     player: Player,
     companionSystem?: CompanionSystem
   ): void {
-    const slotW = 108;
-    const slotH = 36;
-    const gap = 12;
-    const totalCount = companionSystem ? 3 : 2;
-    const totalW = totalCount * slotW + (totalCount - 1) * gap;
-    const startX = width / 2 - totalW / 2;
-    const y = height - 52;
+    const { slotW, slotH, gap, startX, y } = getSkillBarLayout(width, height, !!companionSystem);
 
     const drawSkillPlate = (
       bx: number,
@@ -540,11 +535,11 @@ export class UIManager {
       ctx.textBaseline = 'middle';
       ctx.fillStyle = ready ? '#f8fafc' : '#94a3b8';
       ctx.font = `600 10px ${UI_FONT}`;
-      ctx.fillText(keyLabel, bx + 38, by + 12.5);
+      ctx.fillText(keyLabel, bx + 38, by + 12.5, slotW - 42);
 
       ctx.fillStyle = ready ? accentColor : '#64748b';
       ctx.font = `500 9px ${MONO_FONT}`;
-      ctx.fillText(subLabel, bx + 38, by + 24.5);
+      ctx.fillText(subLabel, bx + 38, by + 24.5, slotW - 42);
       ctx.restore();
     };
 
@@ -587,11 +582,19 @@ export class UIManager {
       ultReady ? 'Q / E' : `${Math.ceil(player.ultimateCooldown)}s`
     );
 
-    // Skill 3: Soul Companion Mode [F]
+    const parryReady = player.parryCooldown <= 0;
+    drawSkillPlate(
+      startX + (slotW + gap) * 2, y,
+      parryReady ? 1 : 1 - player.parryCooldown / player.maxParryCooldown,
+      parryReady, '#34d399', 'armor', t('弹反', 'PARRY'),
+      parryReady ? 'C' : `${player.parryCooldown.toFixed(1)}s`
+    );
+
+    // Skill 4: Soul Companion Mode [F]
     if (companionSystem) {
       const isAnchored = companionSystem.mode === 'ANCHOR';
       drawSkillPlate(
-        startX + (slotW + gap) * 2,
+        startX + (slotW + gap) * 3,
         y,
         1,
         true,

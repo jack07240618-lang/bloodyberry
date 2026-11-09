@@ -11,6 +11,7 @@
 | Input | Action |
 |---|---|
 | **W, A, S, D** or **Arrow Keys** | Move character |
+| **C / Parry HUD button** | Active parry: 0.24s window, 4.5s cooldown; reflect flying bullets or interrupt melee. Ground hazards must be dodged. |
 | **Mouse / Touch Screen** | Virtual joystick / directional steering & UI click |
 | **1, 2, 3, 4** | Select level-up upgrade option |
 | **Enter / Space** | Select / Claim / Start run / Close modal |

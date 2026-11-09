@@ -55,6 +55,12 @@ export class Enemy extends Entity {
   public chargeTimer = 0;
   public chargeDirection: Vector2 = new Vector2();
   public attackCooldown = 0;
+  public attackState: 'IDLE' | 'WINDUP' | 'STRIKE' | 'RECOVERY' = 'IDLE';
+  public attackStateTimer = 0;
+  public readonly attackWindupDuration = 0.55;
+  public attackDirection = new Vector2(1, 0);
+  public attackHasHit = false;
+  public staggerTimer = 0;
 
   // Elemental Status Effects (Synergy Reactions)
   public burnTimer = 0;
@@ -157,6 +163,31 @@ export class Enemy extends Entity {
       this.knockback.set(0, 0);
     }
 
+    if (this.staggerTimer > 0) {
+      this.staggerTimer = Math.max(0, this.staggerTimer - dt);
+      return;
+    }
+
+    // Non-boss attacks commit to a direction before their damaging frames.
+    if (!this.isBoss && this.type !== EnemyType.MINOTAUR && this.attackState !== 'IDLE') {
+      this.attackStateTimer = Math.max(0, this.attackStateTimer - dt);
+      if (this.attackStateTimer <= 0) {
+        if (this.attackState === 'WINDUP') {
+          this.attackState = 'STRIKE';
+          this.attackStateTimer = 0.16;
+          if (this.type === EnemyType.RANGED_SPITTER && spawnProjectileCallback) {
+            spawnProjectileCallback(new EnemyProjectile(this.position.x, this.position.y, this.attackDirection, 180, this.attackDamage));
+          }
+        } else if (this.attackState === 'STRIKE') {
+          this.attackState = 'RECOVERY';
+          this.attackStateTimer = this.type === EnemyType.RANGED_SPITTER ? 1.7 : 0.9;
+        } else {
+          this.attackState = 'IDLE';
+        }
+      }
+      return;
+    }
+
     // AI Behaviors
     switch (this.type) {
       case EnemyType.MINOTAUR:
@@ -191,6 +222,11 @@ export class Enemy extends Entity {
   private updateStandardSwarmAI(dt: number, player: Player, separation: Vector2): void {
     const toPlayer = player.position.clone().sub(this.position);
     const dist = toPlayer.length();
+
+    if (this.type !== EnemyType.MINOTAUR && dist <= this.radius + player.radius + 12) {
+      this.beginAttack(player);
+      return;
+    }
 
     if (dist > 1) {
       toPlayer.normalize();
@@ -246,12 +282,41 @@ export class Enemy extends Entity {
       this.position.addScaled(toPlayer, this.moveSpeed * dt);
     }
 
-    this.attackCooldown -= dt;
-    if (this.attackCooldown <= 0 && dist < 380 && spawnProjectileCallback) {
-      this.attackCooldown = 2.4;
-      const spitDir = player.position.clone().sub(this.position).normalize();
-      spawnProjectileCallback(new EnemyProjectile(this.position.x, this.position.y, spitDir, 180, 12));
+    if (dist < 380 && spawnProjectileCallback) {
+      this.beginAttack(player);
     }
+  }
+
+  private beginAttack(player: Player): void {
+    this.attackState = 'WINDUP';
+    this.attackStateTimer = this.attackWindupDuration;
+    this.attackHasHit = false;
+    this.attackDirection.copy(player.position).sub(this.position);
+    if (this.attackDirection.lengthSq() < 0.001) this.attackDirection.set(this.facingDirection, 0);
+    this.attackDirection.normalize();
+    this.facingDirection = this.attackDirection.x >= 0 ? 1 : -1;
+  }
+
+  public canStrikePlayer(player: Player): boolean {
+    if (!this.active || this.isSpawning() || this.staggerTimer > 0) return false;
+    const offset = player.position.clone().sub(this.position);
+    if (this.isBoss) return offset.length() <= this.radius + player.radius;
+    if (this.type === EnemyType.MINOTAUR) {
+      return this.chargeState === 'CHARGING' && offset.length() <= this.radius + player.radius;
+    }
+    return this.type !== EnemyType.RANGED_SPITTER && this.attackState === 'STRIKE' && !this.attackHasHit &&
+      offset.length() <= this.radius + player.radius + 16 &&
+      (offset.lengthSq() < 1 || offset.normalize().dot(this.attackDirection) >= 0.2);
+  }
+
+  public interruptByParry(): void {
+    if (this.isBoss) return;
+    this.attackState = 'RECOVERY';
+    this.attackStateTimer = 0.9;
+    this.attackHasHit = true;
+    this.chargeState = 'COOLDOWN';
+    this.chargeTimer = 1.2;
+    this.staggerTimer = 0.8;
   }
 
   private updateBossAI(dt: number, player: Player, separation: Vector2, spawnProjectileCallback?: (proj: EnemyProjectile) => void): void {
@@ -833,18 +898,7 @@ export class Enemy extends Entity {
       ctx.fill();
     }
 
-    // Minotaur Charge Telegraph Indicator (Glowing Red Line + Warning Ring)
-    if (this.type === EnemyType.MINOTAUR && this.chargeState === 'TELEGRAPH') {
-      ctx.save();
-      ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
-      ctx.lineWidth = 3;
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(this.chargeDirection.x * 160, this.chargeDirection.y * 160);
-      ctx.stroke();
-      ctx.restore();
-    }
+    this.renderAttackTelegraph(ctx);
 
     // Boss Volumetric Rim-Light Halo, Rising Shadow-Embers & Skill Telegraphs
     if (this.isBoss) {
@@ -1111,8 +1165,22 @@ export class Enemy extends Entity {
     // Direction flip
     ctx.scale(this.facingDirection, 1);
 
-    // Render crisp pixel-art sprite (automatically swaps to white silhouette when hitFlashTimer > 0)
+    // Pull back/compress during the tell, then snap forward on release.
+    ctx.save();
+    if (!this.isBoss) {
+      const winding = this.attackState === 'WINDUP' || this.chargeState === 'TELEGRAPH';
+      const p = this.chargeState === 'TELEGRAPH'
+        ? 1 - Math.max(0, this.chargeTimer) / 0.75
+        : 1 - this.attackStateTimer / this.attackWindupDuration;
+      if (winding) {
+        ctx.translate(-5 * p, 2 * p);
+        ctx.scale(1 + p * 0.12, 1 - p * 0.12);
+      } else if (this.attackState === 'STRIKE') {
+        ctx.translate(6, -2);
+      }
+    }
     this.renderProceduralGraphic(ctx);
+    ctx.restore();
 
     // Render Elemental Status Indicators (Burn / Shock / Bleed)
     if (this.burnTimer > 0) {
@@ -1145,6 +1213,47 @@ export class Enemy extends Entity {
         this.renderEnemyMicroHealthBar(ctx);
       }
     }
+  }
+
+  private renderAttackTelegraph(ctx: CanvasRenderingContext2D): void {
+    if (this.isBoss) return;
+    const charging = this.type === EnemyType.MINOTAUR && this.chargeState === 'TELEGRAPH';
+    const winding = this.attackState === 'WINDUP' || charging;
+    const striking = this.attackState === 'STRIKE';
+    if (!winding && !striking && this.staggerTimer <= 0) return;
+    const p = charging ? 1 - Math.max(0, this.chargeTimer) / 0.75
+      : winding ? 1 - this.attackStateTimer / this.attackWindupDuration : 1;
+    const direction = charging ? this.chargeDirection : this.attackDirection;
+    const r = this.radius + 16;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = this.staggerTimer > 0 ? this.staggerTimer / 0.8 : 0.4 + p * 0.6;
+    // Feathered ground bounce with an obsidian-red body and warm metallic rim.
+    const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, r * 1.5);
+    glow.addColorStop(0, this.staggerTimer > 0 ? 'rgba(52,211,153,0.4)' : 'rgba(127,29,29,0.16)');
+    glow.addColorStop(0.5, this.staggerTimer > 0 ? 'rgba(16,185,129,0.28)' : 'rgba(239,68,68,0.28)');
+    glow.addColorStop(0.75, 'rgba(251,191,36,0.22)');
+    glow.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.save(); ctx.translate(0, this.radius * 0.5); ctx.scale(1, 0.48);
+    ctx.fillStyle = glow; ctx.beginPath(); ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    if (this.staggerTimer <= 0) {
+      // A soft directional light tongue communicates the committed attack vector.
+      ctx.save(); ctx.rotate(direction.angle()); ctx.translate(r * 0.6, 0); ctx.scale(charging ? 3.2 : 1.6, 0.48);
+      const cone = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+      cone.addColorStop(0, 'rgba(254,240,138,0.42)');
+      cone.addColorStop(0.4, 'rgba(239,68,68,0.24)'); cone.addColorStop(1, 'rgba(239,68,68,0)');
+      ctx.fillStyle = cone; ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+      // Converging, filled gold lancet at the striking hand/mouth.
+      const fx = direction.x * (this.radius + 4), fy = direction.y * (this.radius + 4) - 5;
+      const flareR = 5 + p * 9;
+      const flare = ctx.createRadialGradient(fx, fy, 0, fx, fy, flareR);
+      flare.addColorStop(0, 'rgba(255,251,235,0.95)');
+      flare.addColorStop(0.2, 'rgba(251,191,36,0.8)');
+      flare.addColorStop(1, 'rgba(239,68,68,0)');
+      ctx.fillStyle = flare; ctx.beginPath(); ctx.arc(fx, fy, flareR, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
   }
 
   private renderProceduralGraphic(ctx: CanvasRenderingContext2D): void {
