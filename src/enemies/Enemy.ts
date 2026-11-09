@@ -309,16 +309,6 @@ export class Enemy extends Entity {
       (offset.lengthSq() < 1 || offset.normalize().dot(this.attackDirection) >= 0.2);
   }
 
-  public interruptByParry(): void {
-    if (this.isBoss) return;
-    this.attackState = 'RECOVERY';
-    this.attackStateTimer = 0.9;
-    this.attackHasHit = true;
-    this.chargeState = 'COOLDOWN';
-    this.chargeTimer = 1.2;
-    this.staggerTimer = 0.8;
-  }
-
   private updateBossAI(dt: number, player: Player, separation: Vector2, spawnProjectileCallback?: (proj: EnemyProjectile) => void): void {
     // Phase 2 Enrage check (< 50% HP)
     if (this.bossPhase === 1 && this.hp <= this.maxHp * 0.5) {

@@ -10,7 +10,6 @@ import { DamageTextSystem } from './DamageTextSystem';
 import { MapSystem } from './MapSystem';
 import { SoundSynthesizer } from '../core/SoundSynthesizer';
 import { Camera } from '../core/Camera';
-import { t } from '../core/I18n';
 import { BuildEventBus, DelayedTraitBomb, SkillTag, TAG_METADATA } from './BuildSystem';
 import type { Weapon } from '../weapons/Weapon';
 
@@ -518,24 +517,6 @@ export class CombatSystem {
     this.freezeTimer = duration;
   }
 
-  private finishActiveParry(player: Player, source: Vector2, enemy?: Enemy): boolean {
-    if (!player.completeParry()) return false;
-    const direction = source.clone().sub(player.position);
-    if (direction.lengthSq() < 0.001) direction.set(player.facingDirection, 0);
-    direction.normalize();
-    if (enemy) {
-      enemy.interruptByParry();
-      enemy.applyKnockback(direction, enemy.isBoss ? 100 : 300);
-    }
-    this.sound.playParry();
-    this.particleSystem.emitSlashImpact(source.x, source.y, direction.angle(), '#34d399', true);
-    this.particleSystem.emitHit(player.position.x, player.position.y, '#fef3c7', 12);
-    this.damageTextSystem.addStatusText(player.position.x, player.position.y - 32, t('弹反', 'PARRY'), '#a7f3d0', 12);
-    this.camera.triggerShake(3);
-    this.activeHitStopCallback?.(0.055);
-    return true;
-  }
-
   public update(dt: number, player: Player, onLevelUp: () => void, onBossChestOpen: () => void, onHitStop?: (duration: number) => void): void {
     this.currentPlayerRef = player;
     this.activeHitStopCallback = onHitStop;
@@ -602,19 +583,6 @@ export class CombatSystem {
       if (!ep.active) {
         this.enemyProjectiles.splice(i, 1);
         continue;
-      }
-
-      // Active guard precedes automatic sword deflection and player damage.
-      // Ground hazards (meteor zones) must still be dodged.
-      if (ep.canDamagePlayer() && ep.visualType !== 'METEOR_ZONE' &&
-          ep.position.distanceTo(player.position) <= player.radius + ep.radius + 22 &&
-          this.finishActiveParry(player, ep.position)) {
-        const target = this.getNearestEnemies(ep.position, 720, 1)[0];
-        const direction = target
-          ? target.position.clone().sub(ep.position)
-          : ep.velocity.clone().multiplyScalar(-1);
-        if (direction.lengthSq() < 0.001) direction.set(player.facingDirection, 0);
-        ep.reflect(direction, Math.max(1, Math.round(ep.damage * 1.6)));
       }
 
       // 4a. Check if any active Sword Qi (WHIP_SLASH) deflects this hostile projectile
@@ -728,23 +696,21 @@ export class CombatSystem {
       // Enemy vs Player collision (enemies still materializing in their Soul Knight summoning portal do not deal contact damage)
       if (!isFrozen && enemy.canStrikePlayer(player)) {
         enemy.attackHasHit = true;
-        if (!this.finishActiveParry(player, enemy.position, enemy)) {
-          const dmgTaken = player.takeDamage(enemy.attackDamage);
-          if (dmgTaken > 0) {
-            this.damageTextSystem.addPlayerDamage(player.position.x, player.position.y, dmgTaken);
-            this.camera.triggerShake(6);
-            this.sound.playPlayerHurt();
-            this.buildEventBus.emitOnDamaged({
-              player,
-              damageTaken: dmgTaken,
-              attackerPosition: enemy.position,
-              combatSystem: this
-            });
+        const dmgTaken = player.takeDamage(enemy.attackDamage);
+        if (dmgTaken > 0) {
+          this.damageTextSystem.addPlayerDamage(player.position.x, player.position.y, dmgTaken);
+          this.camera.triggerShake(6);
+          this.sound.playPlayerHurt();
+          this.buildEventBus.emitOnDamaged({
+            player,
+            damageTaken: dmgTaken,
+            attackerPosition: enemy.position,
+            combatSystem: this
+          });
 
-            // Push enemy back slightly on player impact
-            const bounceDir = enemy.position.clone().sub(player.position);
-            enemy.applyKnockback(bounceDir, 180);
-          }
+          // Push enemy back slightly on player impact
+          const bounceDir = enemy.position.clone().sub(player.position);
+          enemy.applyKnockback(bounceDir, 180);
         }
       }
     }

@@ -9,7 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "simulate": "tsx src/simulation/simulate.ts",
     "test:balance": "tsx src/simulation/balance.test.ts",
-    "test:parry": "tsx src/simulation/parry.test.ts"
+    "test:combat": "tsx src/simulation/combat.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.13.9",

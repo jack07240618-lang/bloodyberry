@@ -37,7 +37,7 @@ jobs:
         run: npm run build
 
       - name: Check gameplay regressions
-        run: npm run test:balance && npm run test:parry
+        run: npm run test:balance && npm run test:combat
 
       - name: Stamp deployed version
         run: |

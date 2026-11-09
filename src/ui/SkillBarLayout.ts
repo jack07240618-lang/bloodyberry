@@ -1,6 +1,6 @@
 // Rendering and pointer hit testing share the same responsive geometry.
 export function getSkillBarLayout(width: number, height: number, hasCompanion = true) {
-  const count = hasCompanion ? 4 : 3;
+  const count = hasCompanion ? 3 : 2;
   const gap = width < 480 ? 6 : 12;
   const slotW = Math.min(108, (width - 20 - gap * (count - 1)) / count);
   const slotH = 36;

@@ -582,19 +582,11 @@ export class UIManager {
       ultReady ? 'Q / E' : `${Math.ceil(player.ultimateCooldown)}s`
     );
 
-    const parryReady = player.parryCooldown <= 0;
-    drawSkillPlate(
-      startX + (slotW + gap) * 2, y,
-      parryReady ? 1 : 1 - player.parryCooldown / player.maxParryCooldown,
-      parryReady, '#34d399', 'armor', t('弹反', 'PARRY'),
-      parryReady ? 'C' : `${player.parryCooldown.toFixed(1)}s`
-    );
-
-    // Skill 4: Soul Companion Mode [F]
+    // Skill 3: Soul Companion Mode [F]
     if (companionSystem) {
       const isAnchored = companionSystem.mode === 'ANCHOR';
       drawSkillPlate(
-        startX + (slotW + gap) * 3,
+        startX + (slotW + gap) * 2,
         y,
         1,
         true,

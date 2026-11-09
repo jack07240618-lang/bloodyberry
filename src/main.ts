@@ -298,8 +298,6 @@ class GameEngine {
       this.sound.playShoot('wand');
     }
 
-    if (this.input.wasKeyPressed('KeyC')) this.player.tryParry();
-
     this.player.update(dt);
     this.companionSystem.update(dt, this.player, this.combatSystem);
 
@@ -913,8 +911,6 @@ class GameEngine {
       } else if (mx >= ultX && mx <= ultX + slotW) {
         this.uiManager.hoveredButton = 'ult_skill';
       } else if (mx >= startX + (slotW + gap) * 2 && mx <= startX + (slotW + gap) * 2 + slotW) {
-        this.uiManager.hoveredButton = 'parry_skill';
-      } else if (mx >= startX + (slotW + gap) * 3 && mx <= startX + (slotW + gap) * 3 + slotW) {
         this.uiManager.hoveredButton = 'companion_skill';
       }
     }
@@ -932,8 +928,6 @@ class GameEngine {
       this.activatePlayerDash();
     } else if (this.uiManager.hoveredButton === 'ult_skill') {
       this.activatePlayerUltimate();
-    } else if (this.uiManager.hoveredButton === 'parry_skill') {
-      this.player.tryParry();
     } else if (this.uiManager.hoveredButton === 'companion_skill') {
       this.companionSystem.toggleMode(this.player, this.combatSystem);
       this.sound.playShoot('wand');
