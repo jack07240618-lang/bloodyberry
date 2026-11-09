@@ -103,3 +103,21 @@ assert.equal(leech.hp, 51);
 withRandom(0.2, () => bus.emitOnHit({ player: leech, projectile: hit, enemy: target, damage: 10, isFourthStroke: false, combatSystem: combat }));
 assert.equal(leech.hp, 51);
 console.log('Balance regression checks passed: progression, reward boundaries, multi-boss cap, reset, scatter, leech.');
+
+// Room paint uses a shuffled set of three with no repeats across set boundaries.
+// Room setup must also remain usable in the headless combat simulator.
+for (const roll of [0, 0.49, 0.999]) {
+  withRandom(roll, () => {
+    const manager = new RoomManager(combatFixture());
+    const paintings: number[] = [];
+    for (let room = 1; room <= 12; room++) {
+      if (room > 1) manager.loadRoom(room, RoomType.COMBAT);
+      paintings.push((manager as any).previousSigil);
+      assert.equal((manager as any).floorSigil, null, 'paint is rasterized only when rendered');
+    }
+    for (let i = 0; i < paintings.length; i += 3) {
+      assert.equal(new Set(paintings.slice(i, i + 3)).size, 3);
+    }
+    for (let i = 1; i < paintings.length; i++) assert.notEqual(paintings[i], paintings[i - 1]);
+  });
+}

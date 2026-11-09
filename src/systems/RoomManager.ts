@@ -8,6 +8,7 @@ import { Destructible } from '../entities/Destructible';
 import { Camera } from '../core/Camera';
 import { SkillTag } from './BuildSystem';
 import { t } from '../core/I18n';
+import { createFloorSigil } from './FloorSigil';
 
 /**
  * 房间状态机枚举 (Room State Machine)
@@ -169,6 +170,10 @@ export class RoomManager {
   public readonly wallThickness = 44;
 
   // 波次刷怪延迟计时器
+  private floorSigil: HTMLCanvasElement | null = null;
+  private floorSigilSeed = 0;
+  private sigilBag: number[] = [];
+  private previousSigil = -1;
   private waveSpawnDelayTimer = 0;
   private isSpawningWave = false;
   private transitionBannerTimer = 0;
@@ -234,6 +239,22 @@ export class RoomManager {
     const biomeIndex = (roomNumber - 1) % 5;
     this.combatSystem.mapSystem.currentBiomeIndex = biomeIndex;
     this.combatSystem.sound.setBiomeBGMHint(biomeIndex);
+
+    // Shuffle all three paintings before reusing one; avoid repeats at bag boundaries.
+    if (this.sigilBag.length === 0) {
+      this.sigilBag = [0, 1, 2];
+      for (let i = 2; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [this.sigilBag[i], this.sigilBag[j]] = [this.sigilBag[j], this.sigilBag[i]];
+      }
+      if (this.sigilBag[2] === this.previousSigil) {
+        [this.sigilBag[0], this.sigilBag[2]] = [this.sigilBag[2], this.sigilBag[0]];
+      }
+    }
+    this.previousSigil = this.sigilBag.pop()!;
+    this.floorSigilSeed = Math.floor(Math.random() * 0xffffffff);
+    this.floorSigil = null;
+
 
     // 随机对称切换本关屋顶三条光线的斜射方向（-1: 左上->右下，+1: 右上->左下；相邻关卡高概率对称翻转）
     if (roomNumber === 1) {
@@ -1229,7 +1250,6 @@ export class RoomManager {
         wallStroke: '#2e254a',
         borderOuter: '#78350f',
         borderUnlocked: '#f59e0b',
-        sigilStroke: 'rgba(217, 119, 6, 0.26)',
         sconceCore: '#fde047',
         sconceMid: 'rgba(251, 191, 36, 0.55)',
         sconceOuter: 'rgba(234, 88, 12, 0.22)',
@@ -1245,7 +1265,6 @@ export class RoomManager {
         wallStroke: '#1e3a5f',
         borderOuter: '#0369a1',
         borderUnlocked: '#38bdf8',
-        sigilStroke: 'rgba(56, 189, 248, 0.28)',
         sconceCore: '#e0f2fe',
         sconceMid: 'rgba(56, 189, 248, 0.55)',
         sconceOuter: 'rgba(14, 165, 233, 0.22)',
@@ -1261,7 +1280,6 @@ export class RoomManager {
         wallStroke: '#1e4632',
         borderOuter: '#15803d',
         borderUnlocked: '#34d399',
-        sigilStroke: 'rgba(52, 211, 153, 0.26)',
         sconceCore: '#bbf7d0',
         sconceMid: 'rgba(52, 211, 153, 0.52)',
         sconceOuter: 'rgba(16, 185, 129, 0.22)',
@@ -1277,7 +1295,6 @@ export class RoomManager {
         wallStroke: '#4a2016',
         borderOuter: '#9a3412',
         borderUnlocked: '#f97316',
-        sigilStroke: 'rgba(249, 115, 22, 0.30)',
         sconceCore: '#fef08a',
         sconceMid: 'rgba(249, 115, 22, 0.60)',
         sconceOuter: 'rgba(220, 38, 38, 0.26)',
@@ -1293,7 +1310,6 @@ export class RoomManager {
         wallStroke: '#351d66',
         borderOuter: '#6b21a8',
         borderUnlocked: '#c084fc',
-        sigilStroke: 'rgba(192, 132, 252, 0.28)',
         sconceCore: '#f5d0fe',
         sconceMid: 'rgba(192, 132, 252, 0.55)',
         sconceOuter: 'rgba(147, 51, 234, 0.24)',
@@ -1315,52 +1331,10 @@ export class RoomManager {
     ctx.fillRect(-hw - 1000, -hh, 1000, hh * 2);                 // Left outside
     ctx.fillRect(hw, -hh, 1000, hh * 2);                         // Right outside
 
-    // 2. 生态主题圣殿地砖镶嵌阵纹 (Biome Sanctuary Floor Mosaic)
+    // 2. Static cult paint decal, cached on entry and grounded in the stone material.
     ctx.save();
-    const rotSlow = this.elapsedSeconds * 0.08;
-    ctx.strokeStyle = theme.sigilStroke;
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, 168, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = meta.glowColor;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, 152, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // 12 瓣彩绘玻璃花窗叶瓣
-    ctx.save();
-    ctx.rotate(rotSlow);
-    const petals = 12;
-    for (let i = 0; i < petals; i++) {
-      const ang = (i * Math.PI * 2) / petals;
-      ctx.save();
-      ctx.rotate(ang);
-      ctx.fillStyle = i % 2 === 0 ? 'rgba(217, 119, 6, 0.05)' : 'rgba(139, 92, 246, 0.05)';
-      ctx.strokeStyle = i % 2 === 0 ? theme.sigilStroke : meta.glowColor;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(32, 0);
-      ctx.quadraticCurveTo(95, -24, 148, 0);
-      ctx.quadraticCurveTo(95, 24, 32, 0);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-    }
-    ctx.restore();
-
-    // 内层逆向旋转八芒星圣印
-    ctx.save();
-    ctx.rotate(-rotSlow * 1.4);
-    ctx.strokeStyle = theme.sigilStroke;
-    ctx.lineWidth = 1.5;
-    for (let s = 0; s < 2; s++) {
-      ctx.rotate(Math.PI / 4);
-      ctx.strokeRect(-74, -74, 148, 148);
-    }
-    ctx.restore();
+    this.floorSigil ??= createFloorSigil(this.previousSigil, this.floorSigilSeed, this.currentRoom.biomeIndex);
+    ctx.drawImage(this.floorSigil, -220, -220);
 
     // 地面四向石板走道引导线
     ctx.strokeStyle = 'rgba(148, 163, 184, 0.10)';
