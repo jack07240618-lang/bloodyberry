@@ -886,28 +886,24 @@ export class RoomManager {
           this.combatSystem.particleSystem.emitHit(trap.x, trap.y, '#cbd5e1', 4);
         }
 
-        // 周期 2.15s ~ 2.96s 之间利刺完全弹出，每 0.35s 结算一次穿刺放血伤害与十字刀光特效
+        // 周期 2.15s ~ 2.96s 之间利刺完全弹出，对踏入地刺范围且未处于冲刺/无敌帧的主角造成穿刺伤害（不再伤害敌人）
         const isSpikesUp = trap.cycleTimer >= 2.15 && trap.cycleTimer <= 2.96;
-        const crossedTick = Math.floor(prevTimer * 3.2) !== Math.floor(trap.cycleTimer * 3.2);
-        if (isSpikesUp && crossedTick) {
-          const pos = new Vector2(trap.x, trap.y);
-          const victims = this.combatSystem.spatialGrid.queryRadius(pos, trap.radius * 1.06);
-          for (const e of victims) {
-            if (!e.active || e.isSpawning()) continue;
-            e.bleedTimer = 4.5;
-            const spikeDmg = Math.round(32 + this.currentRoom.roomNumber * 9);
-            const killed = e.takeDamage(spikeDmg);
-            this.combatSystem.damageTextSystem.addDamage(e.position.x, e.position.y, spikeDmg, true);
-            this.combatSystem.particleSystem.emitSlashImpact(
-              e.position.x,
-              e.position.y,
-              -Math.PI / 2 + (Math.random() - 0.5) * 0.5,
-              '#ef4444',
-              true
-            );
-            if (killed) {
-              player.kills++;
-              this.combatSystem.handleEnemyDeath(e);
+        if (isSpikesUp && !player.isDead && player.iFrameTimer <= 0 && player.dashActiveTimer <= 0) {
+          const distToPlayer = Math.hypot(player.position.x - trap.x, player.position.y - trap.y);
+          if (distToPlayer <= trap.radius * 0.92 + player.radius * 0.55) {
+            const spikeDmg = Math.round(10 + this.currentRoom.roomNumber * 2);
+            const actualDmg = player.takeDamage(spikeDmg);
+            if (actualDmg > 0) {
+              this.combatSystem.damageTextSystem.addPlayerDamage(player.position.x, player.position.y, actualDmg);
+              this.combatSystem.sound.playPlayerHurt();
+              this.combatSystem.camera.triggerShake(4.5);
+              this.combatSystem.particleSystem.emitSlashImpact(
+                player.position.x,
+                player.position.y,
+                -Math.PI / 2 + (Math.random() - 0.5) * 0.4,
+                '#ef4444',
+                true
+              );
             }
           }
         }
