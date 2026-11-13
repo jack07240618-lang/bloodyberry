@@ -204,93 +204,159 @@ export class DropItem extends Entity {
 
   private renderPotion(ctx: CanvasRenderingContext2D, bob: number): void {
     ctx.translate(0, bob);
-    ctx.shadowColor = '#ef4444';
-    ctx.shadowBlur = 10;
 
-    // Vial bottle
-    ctx.fillStyle = '#dc2626';
+    // Soft crimson aura
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const halo = ctx.createRadialGradient(0, 2, 1, 0, 2, 14);
+    halo.addColorStop(0, 'rgba(239, 68, 68, 0.45)');
+    halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = halo;
     ctx.beginPath();
-    ctx.arc(0, 2, 7, 0, Math.PI * 2);
+    ctx.arc(0, 2, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // 3D Shaded Crimson Blood Phial
+    const vialGrad = ctx.createRadialGradient(-2.5, -0.5, 1, 0, 2, 8);
+    vialGrad.addColorStop(0, '#fca5a5');
+    vialGrad.addColorStop(0.45, '#dc2626');
+    vialGrad.addColorStop(1, '#450a0a');
+    ctx.fillStyle = vialGrad;
+    ctx.beginPath();
+    ctx.arc(0, 2, 7.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.1;
+    ctx.stroke();
+
+    // Gilded collar & cork stopper
+    ctx.fillStyle = '#d97706';
+    ctx.fillRect(-3.2, -7, 6.4, 2.5);
+    ctx.fillStyle = '#78350f';
+    ctx.beginPath();
+    ctx.roundRect(-2.2, -10.5, 4.4, 3.8, 1);
     ctx.fill();
 
-    // Bottle neck & cork
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(-3, -7, 6, 4);
-    ctx.fillStyle = '#78350f';
-    ctx.fillRect(-2, -9, 4, 3);
+    // Glass crescent specular & holy cross
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.arc(0, 2, 5.2, Math.PI * 1.1, Math.PI * 1.55);
+    ctx.stroke();
 
-    // Cross on vial
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(-1.5, -1, 3, 6);
-    ctx.fillRect(-3, 0.5, 6, 3);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.fillRect(-1, -0.5, 2, 5);
+    ctx.fillRect(-2.5, 1, 5, 2);
   }
 
   private renderMagnet(ctx: CanvasRenderingContext2D, bob: number): void {
     ctx.translate(0, bob);
-    ctx.shadowColor = '#38bdf8';
-    ctx.shadowBlur = 10;
 
-    // Horseshoe magnet
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#ef4444';
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const halo = ctx.createRadialGradient(0, 0, 1, 0, 0, 14);
+    halo.addColorStop(0, 'rgba(56, 189, 248, 0.45)');
+    halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, 14, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Forged arcane horseshoe magnet with metallic gradient
+    const magGrad = ctx.createLinearGradient(-8, -8, 8, 6);
+    magGrad.addColorStop(0, '#f87171');
+    magGrad.addColorStop(0.5, '#b91c1c');
+    magGrad.addColorStop(1, '#450a0a');
+    ctx.lineWidth = 4.2;
+    ctx.lineCap = 'butt';
+    ctx.strokeStyle = magGrad;
     ctx.beginPath();
     ctx.arc(0, 0, 7, Math.PI, 0, true);
     ctx.stroke();
 
-    // Silver tips
-    ctx.strokeStyle = '#f1f5f9';
-    ctx.beginPath();
-    ctx.moveTo(-7, 0);
-    ctx.lineTo(-7, 6);
-    ctx.moveTo(7, 0);
-    ctx.lineTo(7, 6);
-    ctx.stroke();
+    // Beveled silver-steel poles
+    ctx.fillStyle = '#e2e8f0';
+    ctx.fillRect(-9.1, 0, 4.2, 5.5);
+    ctx.fillRect(4.9, 0, 4.2, 5.5);
+    ctx.fillStyle = '#38bdf8';
+    ctx.fillRect(-8.5, 4.2, 3, 1.5);
+    ctx.fillRect(5.5, 4.2, 3, 1.5);
   }
 
   private renderClock(ctx: CanvasRenderingContext2D, bob: number): void {
     ctx.translate(0, bob);
-    ctx.shadowColor = '#06b6d4';
-    ctx.shadowBlur = 12;
 
-    // Golden pocket watch
-    ctx.fillStyle = '#fbbf24';
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const halo = ctx.createRadialGradient(0, 0, 1, 0, 0, 15);
+    halo.addColorStop(0, 'rgba(6, 182, 212, 0.48)');
+    halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = halo;
     ctx.beginPath();
-    ctx.arc(0, 0, 8, 0, Math.PI * 2);
+    ctx.arc(0, 0, 15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Top crown ring
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.arc(0, -10, 2.2, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 3D Shaded Antique Brass Pocket Watch
+    const bezelGrad = ctx.createLinearGradient(-8, -8, 8, 8);
+    bezelGrad.addColorStop(0, '#fef08a');
+    bezelGrad.addColorStop(0.5, '#d97706');
+    bezelGrad.addColorStop(1, '#78350f');
+    ctx.fillStyle = bezelGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, 8.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Clock face
-    ctx.fillStyle = '#083344';
+    // Deep astral dial face
+    const dialGrad = ctx.createRadialGradient(-1.5, -1.5, 1, 0, 0, 6.2);
+    dialGrad.addColorStop(0, '#0e7490');
+    dialGrad.addColorStop(1, '#04141d');
+    ctx.fillStyle = dialGrad;
     ctx.beginPath();
-    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.arc(0, 0, 6.2, 0, Math.PI * 2);
     ctx.fill();
 
-    // Hands
+    // Gilded hands
     ctx.strokeStyle = '#67e8f9';
-    ctx.lineWidth = 1.5;
+    ctx.lineWidth = 1.4;
     ctx.beginPath();
     ctx.moveTo(0, 0);
-    ctx.lineTo(0, -4);
+    ctx.lineTo(0, -4.2);
     ctx.moveTo(0, 0);
-    ctx.lineTo(3, 1);
+    ctx.lineTo(3.2, 1.2);
     ctx.stroke();
   }
 
   private renderChest(ctx: CanvasRenderingContext2D, bob: number): void {
     ctx.translate(0, bob);
 
-    // 1. Vertical Golden Sunbeam Pillar behind Boss Chest
+    // 1. Feathered Volumetric Golden Sunbeam & Ground Halo (No hard rectangle edges)
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const pillarGrad = ctx.createLinearGradient(-16, 0, 16, 0);
-    pillarGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    pillarGrad.addColorStop(0.5, 'rgba(251, 191, 36, 0.32)');
+    ctx.save();
+    ctx.translate(0, -35);
+    ctx.scale(1, 3.2);
+    const pillarGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 22);
+    pillarGrad.addColorStop(0, 'rgba(251, 191, 36, 0.34)');
+    pillarGrad.addColorStop(0.5, 'rgba(251, 191, 36, 0.12)');
     pillarGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = pillarGrad;
-    ctx.fillRect(-16, -120, 32, 130);
+    ctx.beginPath();
+    ctx.arc(0, 0, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
-    // Radial Ground Halo
     const halo = ctx.createRadialGradient(0, 2, 2, 0, 2, 30);
-    halo.addColorStop(0, 'rgba(250, 204, 21, 0.65)');
+    halo.addColorStop(0, 'rgba(250, 204, 21, 0.62)');
     halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = halo;
     ctx.beginPath();
@@ -298,26 +364,40 @@ export class DropItem extends Entity {
     ctx.fill();
     ctx.restore();
 
-    // 2. Ornate Royal Crimson-Gold Treasure Chest
-    ctx.fillStyle = '#450a0a';
-    ctx.fillRect(-15, -7, 30, 18);
-    ctx.fillStyle = '#991b1b';
-    ctx.fillRect(-13, -5, 26, 14);
-
-    // Beveled Golden Straps & Studs
-    ctx.fillStyle = '#fbbf24';
-    ctx.fillRect(-15, -7, 4, 18);
-    ctx.fillRect(11, -7, 4, 18);
-    ctx.fillRect(-15, -7, 30, 3);
-    ctx.fillRect(-15, 8, 30, 3);
-
-    // Domed Vaulted Lid
-    ctx.fillStyle = '#b91c1c';
+    // 2. 3D Shaded Royal Crimson-Gold Reliquary Chest
+    const bodyGrad = ctx.createLinearGradient(-15, -7, 15, 11);
+    bodyGrad.addColorStop(0, '#991b1b');
+    bodyGrad.addColorStop(0.55, '#5b0c14');
+    bodyGrad.addColorStop(1, '#1e0408');
+    ctx.fillStyle = bodyGrad;
     ctx.beginPath();
-    ctx.ellipse(0, -7, 15, 6.5, 0, Math.PI, 0);
+    ctx.roundRect(-15, -7, 30, 18, 3);
     ctx.fill();
-    ctx.strokeStyle = '#fde047';
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+    // Beveled Golden Straps
+    const strapGrad = ctx.createLinearGradient(-15, -7, 15, 11);
+    strapGrad.addColorStop(0, '#fef08a');
+    strapGrad.addColorStop(0.5, '#d97706');
+    strapGrad.addColorStop(1, '#92400e');
+    ctx.fillStyle = strapGrad;
+    ctx.fillRect(-11, -7, 3.5, 18);
+    ctx.fillRect(7.5, -7, 3.5, 18);
+    ctx.fillRect(-15, -7, 30, 2.5);
+
+    // Domed Vaulted Lid with 3D Shading
+    const lidGrad = ctx.createLinearGradient(0, -14, 0, -7);
+    lidGrad.addColorStop(0, '#dc2626');
+    lidGrad.addColorStop(1, '#7f1d1d');
+    ctx.fillStyle = lidGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, -7, 15, 6.8, 0, Math.PI, 0);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.6;
     ctx.stroke();
 
     // Center Ruby Lock Escutcheon
@@ -327,28 +407,41 @@ export class DropItem extends Entity {
     ctx.fill();
     ctx.fillStyle = '#ef4444';
     ctx.beginPath();
-    ctx.arc(0, 0, 2.2, 0, Math.PI * 2);
+    ctx.arc(0, 0, 2.3, 0, Math.PI * 2);
     ctx.fill();
   }
 
   private renderCoin(ctx: CanvasRenderingContext2D, bob: number): void {
     ctx.translate(0, bob);
-    ctx.shadowColor = '#f59e0b';
-    ctx.shadowBlur = 6;
 
-    ctx.fillStyle = '#fbbf24';
+    // 3D Shaded Antique Gothic Gold Crown Coin (No modern '$' symbol)
+    const coinGrad = ctx.createLinearGradient(-6, -6, 6, 6);
+    coinGrad.addColorStop(0, '#fef08a');
+    coinGrad.addColorStop(0.5, '#f59e0b');
+    coinGrad.addColorStop(1, '#92400e');
+    ctx.fillStyle = coinGrad;
     ctx.beginPath();
     ctx.arc(0, 0, 6, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.strokeStyle = '#d97706';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#b45309';
+    ctx.lineWidth = 1.2;
     ctx.stroke();
 
-    ctx.fillStyle = '#92400e';
-    ctx.font = 'bold 7px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('$', 0, 0);
+    // Inner recessed ring & Gothic diamond relief
+    ctx.strokeStyle = 'rgba(120, 53, 15, 0.65)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.arc(0, 0, 4.1, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.fillStyle = '#fef9c3';
+    ctx.beginPath();
+    ctx.moveTo(0, -2.6);
+    ctx.lineTo(2.1, 0);
+    ctx.lineTo(0, 2.6);
+    ctx.lineTo(-2.1, 0);
+    ctx.closePath();
+    ctx.fill();
   }
 }

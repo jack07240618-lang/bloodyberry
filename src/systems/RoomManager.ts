@@ -2240,24 +2240,53 @@ export class RoomManager {
         ctx.restore();
       }
 
-      // 哥特八角黄铜熔炉柱座
-      ctx.fillStyle = '#130f24';
+      // 哥特八角黄铜熔炉柱座 (3D Shaded Octagonal Brass Brazier)
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.58)';
       ctx.beginPath();
-      ctx.arc(0, 0, 24, 0, Math.PI * 2);
+      ctx.ellipse(2, 6, 26, 20, 0, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = isFiring ? '#f59e0b' : '#b45309';
-      ctx.lineWidth = 3;
+
+      const rimGrad = ctx.createLinearGradient(-24, -24, 24, 24);
+      rimGrad.addColorStop(0, '#334155');
+      rimGrad.addColorStop(0.5, '#130f24');
+      rimGrad.addColorStop(1, '#06080f');
+      ctx.fillStyle = rimGrad;
+      ctx.beginPath();
+      for (let i = 0; i < 8; i++) {
+        const a = (i * Math.PI) / 4 + Math.PI / 8;
+        const px = Math.cos(a) * 24;
+        const py = Math.sin(a) * 24;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = isFiring ? '#fbbf24' : '#b45309';
+      ctx.lineWidth = 2.4;
       ctx.stroke();
 
-      // 十字喷火龙口浮雕
-      ctx.fillStyle = '#78350f';
-      ctx.fillRect(-26, -4, 52, 8);
-      ctx.fillRect(-4, -26, 8, 52);
-
-      ctx.fillStyle = isFiring ? '#ffffff' : '#ea580c';
+      // 十字鎏金喷火龙口浮雕 (Beveled Cross Grate)
+      const strutGrad = ctx.createLinearGradient(-25, -4, 25, 4);
+      strutGrad.addColorStop(0, '#78350f');
+      strutGrad.addColorStop(0.5, '#d97706');
+      strutGrad.addColorStop(1, '#78350f');
+      ctx.fillStyle = strutGrad;
       ctx.beginPath();
-      ctx.arc(0, 0, 10, 0, Math.PI * 2);
+      ctx.roundRect(-25, -4, 50, 8, 2);
+      ctx.roundRect(-4, -25, 8, 50, 2);
       ctx.fill();
+
+      const coreGrad = ctx.createRadialGradient(-2, -2, 1, 0, 0, 11);
+      coreGrad.addColorStop(0, isFiring ? '#ffffff' : '#fef08a');
+      coreGrad.addColorStop(0.5, isFiring ? '#f59e0b' : '#ea580c');
+      coreGrad.addColorStop(1, '#7c2d12');
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, 10.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
     } else if (trap.kind === 'EXPLOSIVE_BARREL') {
       const pulse = 1 + Math.sin(trap.cycleTimer * 6) * 0.05;
       ctx.scale(pulse, pulse);
