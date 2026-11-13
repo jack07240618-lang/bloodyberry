@@ -667,81 +667,247 @@ export class MapSystem {
       s.type === 'FRENZY' ? '#ef4444' : s.type === 'GREED' ? '#fbbf24' : '#34d399';
     const subColor =
       s.type === 'FRENZY' ? '#f97316' : s.type === 'GREED' ? '#fef08a' : '#38bdf8';
+    const glowRgb =
+      s.type === 'FRENZY' ? '239, 68, 68' : s.type === 'GREED' ? '251, 191, 36' : '52, 211, 153';
+    const facetDark =
+      s.type === 'FRENZY' ? '#7f1d1d' : s.type === 'GREED' ? '#92400e' : '#065f46';
+    const facetLight =
+      s.type === 'FRENZY' ? '#fca5a5' : s.type === 'GREED' ? '#fef08a' : '#a7f3d0';
+    const pulse = 0.88 + Math.sin(s.pulseTimer * 2.4) * 0.12;
 
-    // 1. Vertical Celestial Pillar Beam from Sky (High Rarity Boss Relic Indicator)
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const beamW = 22 + Math.sin(s.pulseTimer * 2.5) * 4;
-    const beamGrad = ctx.createLinearGradient(-beamW, 0, beamW, 0);
-    beamGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    beamGrad.addColorStop(0.5, s.type === 'FRENZY' ? 'rgba(239, 68, 68, 0.28)' : s.type === 'GREED' ? 'rgba(251, 191, 36, 0.28)' : 'rgba(52, 211, 153, 0.28)');
-    beamGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.fillStyle = beamGrad;
-    ctx.fillRect(-beamW, -280, beamW * 2, 288);
-
-    // 2. Double Rotating Sacred Ritual Rings on Ground
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.5;
+    // 1. 2.5D Ground Contact Shadow & Perspective Ritual Sigil
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.68)';
     ctx.beginPath();
-    ctx.arc(0, 4, s.radius + Math.sin(s.pulseTimer * 2) * 3, 0, Math.PI * 2);
+    ctx.ellipse(2, 10, 26, 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.translate(0, 6);
+    ctx.scale(1, 0.5);
+    ctx.globalCompositeOperation = 'lighter';
+
+    const sigilGlow = ctx.createRadialGradient(0, 0, 2, 0, 0, s.radius * 1.15);
+    sigilGlow.addColorStop(0, `rgba(${glowRgb}, ${0.26 * pulse})`);
+    sigilGlow.addColorStop(0.65, `rgba(${glowRgb}, ${0.08 * pulse})`);
+    sigilGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = sigilGlow;
+    ctx.beginPath();
+    ctx.arc(0, 0, s.radius * 1.15, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.rotate(s.pulseTimer * 0.35);
+    ctx.strokeStyle = `rgba(${glowRgb}, 0.55)`;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.arc(0, 0, s.radius * 0.92, 0, Math.PI * 2);
     ctx.stroke();
 
     ctx.strokeStyle = subColor;
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([6, 4]);
+    ctx.globalAlpha = 0.45;
+    ctx.lineWidth = 1.2;
+    ctx.setLineDash([7, 5]);
     ctx.beginPath();
-    ctx.arc(0, 4, s.radius * 0.72, 0, Math.PI * 2);
+    ctx.arc(0, 0, s.radius * 0.68, 0, Math.PI * 2);
     ctx.stroke();
     ctx.setLineDash([]);
+
+    // 4 Cardinal Rune Ticks
+    for (let i = 0; i < 4; i++) {
+      const a = (i * Math.PI) / 2;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * (s.radius * 0.72), Math.sin(a) * (s.radius * 0.72));
+      ctx.lineTo(Math.cos(a) * (s.radius * 0.98), Math.sin(a) * (s.radius * 0.98));
+      ctx.stroke();
+    }
+    ctx.restore();
     ctx.restore();
 
-    // 3. Ornate Gothic Stepped Stone Altar Base with Gold Trim
-    ctx.fillStyle = '#0f172a';
-    ctx.fillRect(-16, 0, 32, 8);
-    ctx.fillStyle = '#1e293b';
-    ctx.fillRect(-12, -20, 24, 22);
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(-9, -18, 18, 18);
-    ctx.strokeStyle = '#fbbf24';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(-12, -20, 24, 22);
-
-    // 4. Floating Multi-Faceted Boss Relic Crystal & Orbiting Runes
+    // 2. Feathered Volumetric Light Column (No hard rectangle edges)
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const bob = Math.sin(s.pulseTimer * 3) * 4;
-    ctx.fillStyle = color;
+    ctx.translate(0, -45);
+    ctx.scale(1, 3.6);
+    const beamGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 32 * pulse);
+    beamGrad.addColorStop(0, `rgba(${glowRgb}, ${0.22 * pulse})`);
+    beamGrad.addColorStop(0.45, `rgba(${glowRgb}, ${0.09 * pulse})`);
+    beamGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = beamGrad;
     ctx.beginPath();
-    ctx.moveTo(0, -38 + bob);
-    ctx.lineTo(11, -24 + bob);
-    ctx.lineTo(0, -12 + bob);
-    ctx.lineTo(-11, -24 + bob);
-    ctx.closePath();
-    ctx.fill();
-
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.moveTo(0, -34 + bob);
-    ctx.lineTo(5, -24 + bob);
-    ctx.lineTo(0, -16 + bob);
-    ctx.lineTo(-5, -24 + bob);
-    ctx.closePath();
+    ctx.arc(0, 0, 32 * pulse, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
-    // 5. Golden Crown Title Above Boss Altar
-    ctx.fillStyle = '#fef08a';
-    ctx.font = '900 10px "Cinzel", serif';
+    // 3. Sculpted 2.5D Gothic Stepped Obsidian Altar with Gold Filigree
+    // Lower chamfered plinth
+    const plinthGrad = ctx.createLinearGradient(-20, 2, 20, 10);
+    plinthGrad.addColorStop(0, '#1e293b');
+    plinthGrad.addColorStop(0.5, '#0f172a');
+    plinthGrad.addColorStop(1, '#060913');
+    ctx.fillStyle = plinthGrad;
+    ctx.beginPath();
+    ctx.moveTo(-17, 0);
+    ctx.lineTo(17, 0);
+    ctx.lineTo(21, 9);
+    ctx.lineTo(-21, 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(217, 119, 6, 0.7)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Main altar body with 3D side shading
+    const bodyGrad = ctx.createLinearGradient(-14, -20, 14, 0);
+    bodyGrad.addColorStop(0, '#27344a');
+    bodyGrad.addColorStop(0.35, '#172033');
+    bodyGrad.addColorStop(1, '#090d16');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.moveTo(-13, -19);
+    ctx.lineTo(13, -19);
+    ctx.lineTo(15, 1);
+    ctx.lineTo(-15, 1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+
+    // Recessed Gothic pointed-arch niche
+    ctx.fillStyle = '#04060c';
+    ctx.beginPath();
+    ctx.moveTo(-6, -1);
+    ctx.lineTo(-6, -10);
+    ctx.quadraticCurveTo(-6, -15, 0, -17);
+    ctx.quadraticCurveTo(6, -15, 6, -10);
+    ctx.lineTo(6, -1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = `rgba(${glowRgb}, 0.55)`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Glowing inlaid rune inside niche
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(0, -13);
+    ctx.lineTo(0, -4);
+    ctx.moveTo(-3, -9);
+    ctx.lineTo(3, -9);
+    ctx.stroke();
+    ctx.restore();
+
+    // Top beveled altar capital & specular lip
+    const capGrad = ctx.createLinearGradient(-16, -24, 16, -18);
+    capGrad.addColorStop(0, '#334155');
+    capGrad.addColorStop(0.5, '#1e293b');
+    capGrad.addColorStop(1, '#0f172a');
+    ctx.fillStyle = capGrad;
+    ctx.beginPath();
+    ctx.moveTo(-16, -22);
+    ctx.lineTo(16, -22);
+    ctx.lineTo(14, -18);
+    ctx.lineTo(-14, -18);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+    ctx.fillRect(-14, -22, 28, 1.5);
+
+    // 4. Floating Multi-Faceted Volumetric Relic Crystal & Orbiting Motes
+    const bob = Math.sin(s.pulseTimer * 2.6) * 3.5;
+    const cy = -33 + bob;
+
+    // Soft crystal halo
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const haloGrad = ctx.createRadialGradient(0, cy, 1, 0, cy, 20 * pulse);
+    haloGrad.addColorStop(0, `rgba(${glowRgb}, 0.55)`);
+    haloGrad.addColorStop(0.5, `rgba(${glowRgb}, 0.18)`);
+    haloGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = haloGrad;
+    ctx.beginPath();
+    ctx.arc(0, cy, 20 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Top-left bright facet
+    ctx.fillStyle = facetLight;
+    ctx.beginPath();
+    ctx.moveTo(0, cy - 13);
+    ctx.lineTo(0, cy);
+    ctx.lineTo(-9, cy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Top-right mid facet
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, cy - 13);
+    ctx.lineTo(9, cy);
+    ctx.lineTo(0, cy);
+    ctx.closePath();
+    ctx.fill();
+
+    // Bottom-left mid facet
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-9, cy);
+    ctx.lineTo(0, cy);
+    ctx.lineTo(0, cy + 12);
+    ctx.closePath();
+    ctx.fill();
+
+    // Bottom-right deep shadow facet
+    ctx.fillStyle = facetDark;
+    ctx.beginPath();
+    ctx.moveTo(0, cy);
+    ctx.lineTo(9, cy);
+    ctx.lineTo(0, cy + 12);
+    ctx.closePath();
+    ctx.fill();
+
+    // Specular ridge & gold collar
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, cy - 13);
+    ctx.lineTo(0, cy + 12);
+    ctx.stroke();
+
+    // Orbiting rune sparks
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (let i = 0; i < 3; i++) {
+      const ang = s.pulseTimer * 1.4 + (i * Math.PI * 2) / 3;
+      const mx = Math.cos(ang) * 14;
+      const my = cy + Math.sin(ang) * 5;
+      ctx.fillStyle = subColor;
+      ctx.beginPath();
+      ctx.arc(mx, my, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+
+    // 5. Minimalist Gothic Crest Label
+    ctx.fillStyle = 'rgba(254, 240, 138, 0.85)';
+    ctx.font = '700 9px "Cinzel", serif';
     ctx.textAlign = 'center';
-    ctx.shadowColor = '#000000';
-    ctx.shadowBlur = 6;
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+    ctx.shadowBlur = 5;
     const label =
       s.type === 'FRENZY'
-        ? '★ BOSS ALTAR: WARLORD (+75% DMG) ★'
+        ? 'WARLORD SHRINE'
         : s.type === 'GREED'
-        ? '★ BOSS ALTAR: ASCENSION (+40% DMG & GOLD) ★'
-        : '★ BOSS ALTAR: IMMORTAL (+35% DMG & FULL HEAL) ★';
-    ctx.fillText(label, 0, -45);
+        ? 'ASCENSION SHRINE'
+        : 'IMMORTAL SHRINE';
+    ctx.fillText(label, 0, -54);
 
     ctx.restore();
   }

@@ -1879,59 +1879,107 @@ export class RoomManager {
     const r = p.radius;
 
     // 1. 地面立体环境光遮蔽投影 (2.5D Ground Drop Shadow)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.68)';
     ctx.beginPath();
-    ctx.ellipse(4, 10, r * 1.15, r * 0.78, 0, 0, Math.PI * 2);
+    ctx.ellipse(3, 10, r * 1.18, r * 0.78, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. 底座八角石阶基石 (Stepped Plinth Base)
-    ctx.fillStyle = '#090d16';
-    ctx.fillRect(-r, -r * 0.65, r * 2, r * 1.65);
+    // 2. 底座倒角石阶基石 (Chamfered Stepped Plinth Base)
+    const plinthGrad = ctx.createLinearGradient(-r, 0, r, r);
+    plinthGrad.addColorStop(0, '#1e293b');
+    plinthGrad.addColorStop(0.5, '#0b101b');
+    plinthGrad.addColorStop(1, '#05070d');
+    ctx.fillStyle = plinthGrad;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.94, -r * 0.65);
+    ctx.lineTo(r * 0.94, -r * 0.65);
+    ctx.lineTo(r * 1.04, r * 0.96);
+    ctx.lineTo(-r * 1.04, r * 0.96);
+    ctx.closePath();
+    ctx.fill();
     ctx.strokeStyle = theme.borderUnlocked;
-    ctx.lineWidth = 1.6;
-    ctx.strokeRect(-r, -r * 0.65, r * 2, r * 1.65);
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
 
-    // 3. 2.5D 立柱正面阴影柱身 (Vertical Column Shaft)
-    ctx.fillStyle = theme.pillarSide;
-    ctx.fillRect(-r * 0.86, -r * 1.15, r * 1.72, r * 1.9);
+    // 3. 2.5D 凹槽哥特立柱正面柱身 (3D Shaded Fluted Column Shaft)
+    const shaftGrad = ctx.createLinearGradient(-r * 0.86, 0, r * 0.86, 0);
+    shaftGrad.addColorStop(0, theme.pillarTop);
+    shaftGrad.addColorStop(0.35, theme.pillarSide);
+    shaftGrad.addColorStop(1, '#070a12');
+    ctx.fillStyle = shaftGrad;
+    ctx.beginPath();
+    ctx.roundRect(-r * 0.86, -r * 1.15, r * 1.72, r * 1.9, 2);
+    ctx.fill();
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
     ctx.lineWidth = 1;
-    ctx.strokeRect(-r * 0.86, -r * 1.15, r * 1.72, r * 1.9);
+    ctx.stroke();
 
-    // 4. 柱顶斜切高光台面 (Top Beveled Capital)
-    ctx.fillStyle = theme.pillarTop;
-    ctx.fillRect(-r * 0.92, -r * 1.28, r * 1.84, r * 1.18);
+    // 两侧立柱凹槽竖纹
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.fillRect(-r * 0.64, -r * 0.15, 2.5, r * 0.85);
+    ctx.fillRect(r * 0.64 - 2.5, -r * 0.15, 2.5, r * 0.85);
+
+    // 4. 柱顶斜切高光台面 (Top Beveled Gothic Capital)
+    const capGrad = ctx.createLinearGradient(-r * 0.95, -r * 1.3, r * 0.95, -r * 0.1);
+    capGrad.addColorStop(0, theme.pillarTop);
+    capGrad.addColorStop(1, theme.pillarSide);
+    ctx.fillStyle = capGrad;
+    ctx.beginPath();
+    ctx.roundRect(-r * 0.95, -r * 1.28, r * 1.9, r * 1.16, 3);
+    ctx.fill();
     ctx.strokeStyle = theme.borderUnlocked;
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(-r * 0.92, -r * 1.28, r * 1.84, r * 1.18);
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
 
     // 顶部高光切面线
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
-    ctx.fillRect(-r * 0.88, -r * 1.25, r * 1.76, 3);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.24)';
+    ctx.fillRect(-r * 0.88, -r * 1.25, r * 1.76, 2.5);
 
-    // 5. 柱心镶嵌发光能量晶核 / 符文徽记 (Glowing Biome Energy Core)
+    // 哥特尖拱凹龛 (Recessed Gothic Arch Niche)
+    const cy = -r * 0.68;
+    ctx.fillStyle = '#04060c';
+    ctx.beginPath();
+    ctx.moveTo(-7, cy + 9);
+    ctx.lineTo(-7, cy - 2);
+    ctx.quadraticCurveTo(-7, cy - 9, 0, cy - 11);
+    ctx.quadraticCurveTo(7, cy - 9, 7, cy - 2);
+    ctx.lineTo(7, cy + 9);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // 5. 柱心镶嵌发光能量晶核 / 切面棱镜 (Glowing Faceted Biome Crystal)
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     const pulse = 0.85 + Math.sin(this.elapsedSeconds * 4 + p.x * 0.05) * 0.15;
-    const gemGrad = ctx.createRadialGradient(0, -r * 0.68, 1, 0, -r * 0.68, r * 0.72 * pulse);
+    const gemGrad = ctx.createRadialGradient(0, cy, 1, 0, cy, r * 0.72 * pulse);
     gemGrad.addColorStop(0, '#ffffff');
     gemGrad.addColorStop(0.45, theme.pillarGem);
     gemGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = gemGrad;
     ctx.beginPath();
-    ctx.arc(0, -r * 0.68, r * 0.72 * pulse, 0, Math.PI * 2);
-    ctx.fill();
-
-    // 菱形晶石切面
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.moveTo(0, -r * 0.68 - 7);
-    ctx.lineTo(6, -r * 0.68);
-    ctx.lineTo(0, -r * 0.68 + 7);
-    ctx.lineTo(-6, -r * 0.68);
-    ctx.closePath();
+    ctx.arc(0, cy, r * 0.72 * pulse, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+
+    // 菱形晶石双面切面
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(0, cy - 7);
+    ctx.lineTo(0, cy + 7);
+    ctx.lineTo(-5.5, cy);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = theme.pillarGem;
+    ctx.beginPath();
+    ctx.moveTo(0, cy - 7);
+    ctx.lineTo(5.5, cy);
+    ctx.lineTo(0, cy + 7);
+    ctx.closePath();
+    ctx.fill();
 
     ctx.restore();
   }
@@ -2753,188 +2801,361 @@ export class RoomManager {
     ctx.save();
     ctx.translate(item.x, item.y);
 
-    const bob = Math.sin(item.pulseTimer) * 4;
+    const bob = Math.sin(item.pulseTimer) * 3.5;
+    const pulse = 0.88 + Math.sin(item.pulseTimer * 1.6) * 0.12;
 
-    // 1. 地面哥特八芒星圣光法阵
+    // 1. 地面接触投影与 2.5D 透视哥特圣光法阵
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+    ctx.beginPath();
+    ctx.ellipse(2, 10, 23, 10, 0, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.save();
+    ctx.translate(0, 7);
+    ctx.scale(1, 0.5);
     ctx.globalCompositeOperation = 'lighter';
-    const auraR = item.radius + Math.sin(item.pulseTimer * 1.5) * 3;
-    ctx.strokeStyle = item.color;
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.arc(0, 6, auraR, 0, Math.PI * 2);
-    ctx.stroke();
+    const auraR = item.radius + Math.sin(item.pulseTimer * 1.5) * 2.5;
 
-    ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(0, 6, auraR * 0.76, 0, Math.PI * 2);
-    ctx.stroke();
-
-    const glow = ctx.createRadialGradient(0, 4, 2, 0, 4, item.radius * 1.35);
+    const glow = ctx.createRadialGradient(0, 0, 2, 0, 0, auraR * 1.35);
     glow.addColorStop(0, item.color);
     glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.globalAlpha = 0.28;
+    ctx.globalAlpha = 0.24 * pulse;
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(0, 4, item.radius * 1.35, 0, Math.PI * 2);
+    ctx.arc(0, 0, auraR * 1.35, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
 
-    // 2. 黑曜石雕刻祭坛底座 (Carved Stone Altar Pedestal)
-    ctx.fillStyle = '#130f22';
-    ctx.strokeStyle = '#d97706';
+    ctx.globalAlpha = 0.55;
+    ctx.strokeStyle = item.color;
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.roundRect(-18, 2, 36, 12, 3);
-    ctx.fill();
+    ctx.arc(0, 0, auraR * 0.95, 0, Math.PI * 2);
     ctx.stroke();
 
-    // 3. 根据圣物类型绘制专属哥特雕塑 (Bespoke Gothic Reliquary Sculpture)
     ctx.save();
-    ctx.translate(0, -12 + bob);
+    ctx.rotate(item.pulseTimer * 0.35);
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.45)';
+    ctx.lineWidth = 1.1;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.arc(0, 0, auraR * 0.72, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.restore();
+    ctx.restore();
+
+    // 2. 2.5D 阶梯式黑曜石鎏金雕刻祭坛底座 (Sculpted Stepped Obsidian Pedestal)
+    const stepGrad = ctx.createLinearGradient(-22, 4, 22, 14);
+    stepGrad.addColorStop(0, '#1e293b');
+    stepGrad.addColorStop(0.5, '#0f172a');
+    stepGrad.addColorStop(1, '#050811');
+    ctx.fillStyle = stepGrad;
+    ctx.beginPath();
+    ctx.moveTo(-19, 3);
+    ctx.lineTo(19, 3);
+    ctx.lineTo(22, 13);
+    ctx.lineTo(-22, 13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(217, 119, 6, 0.75)';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    const slabGrad = ctx.createLinearGradient(-17, -2, 17, 6);
+    slabGrad.addColorStop(0, '#334155');
+    slabGrad.addColorStop(0.5, '#172033');
+    slabGrad.addColorStop(1, '#090d16');
+    ctx.fillStyle = slabGrad;
+    ctx.beginPath();
+    ctx.roundRect(-17, -2, 34, 7, 2);
+    ctx.fill();
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // 底座顶部高光边与正面凹刻符文槽
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.22)';
+    ctx.fillRect(-15, -1.5, 30, 1.5);
+    ctx.fillStyle = '#04060c';
+    ctx.fillRect(-5, 6, 10, 4);
+    ctx.fillStyle = item.color;
+    ctx.fillRect(-3, 7, 6, 2);
+
+    // 3. 根据圣物类型绘制 2.5D 专属哥特立体雕塑 (Bespoke 2.5D Gothic Reliquary Sculpture)
+    ctx.save();
+    ctx.translate(0, -14 + bob);
 
     switch (item.kind) {
       case 'SHOP_UPGRADE': {
-        // 铁匠黑曜石铁砧与熔火符文战锤
-        ctx.fillStyle = '#334155';
-        ctx.strokeStyle = '#fbbf24';
-        ctx.lineWidth = 1.5;
+        // 精锻黑铁双角铁砧 + 熔火符文战锤
+        const anvilGrad = ctx.createLinearGradient(-16, 4, 16, 14);
+        anvilGrad.addColorStop(0, '#64748b');
+        anvilGrad.addColorStop(0.45, '#334155');
+        anvilGrad.addColorStop(1, '#0f172a');
+        ctx.fillStyle = anvilGrad;
         ctx.beginPath();
-        ctx.moveTo(-16, 6);
-        ctx.lineTo(16, 6);
+        ctx.moveTo(-17, 5);
+        ctx.lineTo(14, 5);
+        ctx.lineTo(18, 8);
+        ctx.lineTo(9, 10);
         ctx.lineTo(11, 14);
         ctx.lineTo(-11, 14);
+        ctx.lineTo(-9, 9);
         ctx.closePath();
         ctx.fill();
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1.2;
         ctx.stroke();
 
-        // 悬浮锻造神锤
-        ctx.rotate(-0.35 + Math.sin(item.pulseTimer * 2) * 0.15);
-        ctx.fillStyle = '#78350f';
-        ctx.fillRect(-2, -12, 4, 18);
+        // 悬浮熔火符文战锤
+        ctx.save();
+        ctx.translate(0, -4);
+        ctx.rotate(-0.35 + Math.sin(item.pulseTimer * 2) * 0.14);
+        const shaftGrad = ctx.createLinearGradient(-2, -12, 2, 8);
+        shaftGrad.addColorStop(0, '#92400e');
+        shaftGrad.addColorStop(1, '#451a03');
+        ctx.fillStyle = shaftGrad;
+        ctx.fillRect(-2, -10, 4, 18);
         ctx.fillStyle = '#fbbf24';
-        ctx.fillRect(-10, -16, 20, 8);
+        ctx.fillRect(-2.5, 6, 5, 3);
+
+        const headGrad = ctx.createLinearGradient(-11, -16, 11, -8);
+        headGrad.addColorStop(0, '#fde047');
+        headGrad.addColorStop(0.5, '#d97706');
+        headGrad.addColorStop(1, '#78350f');
+        ctx.fillStyle = headGrad;
+        ctx.beginPath();
+        ctx.roundRect(-10, -16, 20, 8, 2);
+        ctx.fill();
+        ctx.strokeStyle = '#fef08a';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // 锤面熔火符文核
+        ctx.fillStyle = '#f97316';
+        ctx.beginPath();
+        ctx.arc(0, -12, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
         break;
       }
 
       case 'SHOP_HEAL_REROLL': {
-        // 哥特鎏金圣血水晶瓶
-        ctx.fillStyle = '#10b981';
-        ctx.strokeStyle = '#fde047';
-        ctx.lineWidth = 1.8;
+        // 哥特切面翡翠圣血水晶药瓶
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const phialHalo = ctx.createRadialGradient(0, 2, 2, 0, 2, 16);
+        phialHalo.addColorStop(0, 'rgba(16, 185, 129, 0.45)');
+        phialHalo.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = phialHalo;
+        ctx.beginPath();
+        ctx.arc(0, 2, 16, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        const bottleGrad = ctx.createRadialGradient(-3, -2, 2, 0, 2, 12);
+        bottleGrad.addColorStop(0, '#6ee7b7');
+        bottleGrad.addColorStop(0.55, '#059669');
+        bottleGrad.addColorStop(1, '#064e3b');
+        ctx.fillStyle = bottleGrad;
         ctx.beginPath();
         ctx.arc(0, 2, 11, 0, Math.PI * 2);
         ctx.fill();
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1.5;
         ctx.stroke();
+
+        // 瓶肩鎏金颈环与瓶塞
+        ctx.fillStyle = '#d97706';
+        ctx.fillRect(-4.5, -11, 9, 3);
         ctx.fillStyle = '#fef08a';
-        ctx.fillRect(-4, -14, 8, 6);
-        // 十字圣印
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-5, 0, 10, 3);
-        ctx.fillRect(-1.5, -3.5, 3, 10);
+        ctx.beginPath();
+        ctx.roundRect(-3.5, -16, 7, 5, 1.5);
+        ctx.fill();
+
+        // 玻璃弯月高光 & 圣十字徽记
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(0, 2, 8, Math.PI * 1.1, Math.PI * 1.55);
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillRect(-4.5, 0.5, 9, 2.5);
+        ctx.fillRect(-1.25, -2.75, 2.5, 9);
         break;
       }
 
       case 'EVENT_BLOOD_PACT': {
-        // 猩红双角献祭圣爵 (Crimson Blood Chalice)
-        ctx.fillStyle = '#991b1b';
-        ctx.strokeStyle = '#fbbf24';
-        ctx.lineWidth = 1.8;
+        // 猩红双角献祭圣爵 (3D Shaded Crimson Blood Chalice)
+        const stemGrad = ctx.createLinearGradient(-9, 4, 9, 14);
+        stemGrad.addColorStop(0, '#fde047');
+        stemGrad.addColorStop(0.5, '#d97706');
+        stemGrad.addColorStop(1, '#78350f');
+        ctx.fillStyle = stemGrad;
+        ctx.fillRect(-2.5, 5, 5, 7);
+        ctx.beginPath();
+        ctx.moveTo(-10, 14);
+        ctx.lineTo(10, 14);
+        ctx.lineTo(6, 11);
+        ctx.lineTo(-6, 11);
+        ctx.closePath();
+        ctx.fill();
+
+        const cupGrad = ctx.createLinearGradient(-12, -5, 12, 6);
+        cupGrad.addColorStop(0, '#dc2626');
+        cupGrad.addColorStop(0.5, '#991b1b');
+        cupGrad.addColorStop(1, '#450a0a');
+        ctx.fillStyle = cupGrad;
         ctx.beginPath();
         ctx.arc(0, -4, 12, 0, Math.PI, false);
         ctx.closePath();
         ctx.fill();
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 1.6;
         ctx.stroke();
-        ctx.fillStyle = '#f59e0b';
-        ctx.fillRect(-3, 6, 6, 8);
-        ctx.fillRect(-9, 12, 18, 3);
-        // 升腾血珠
-        ctx.fillStyle = '#ef4444';
+
+        // 升腾魔血光球
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const orbGrad = ctx.createRadialGradient(-1, -12, 1, 0, -11, 7);
+        orbGrad.addColorStop(0, '#fecaca');
+        orbGrad.addColorStop(0.45, '#ef4444');
+        orbGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = orbGrad;
         ctx.beginPath();
-        ctx.arc(0, -10, 4, 0, Math.PI * 2);
+        ctx.arc(0, -11, 7, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
         break;
       }
 
       case 'EVENT_STAR_GRACE': {
-        // 星界三环浑天仪 (Celestial Astrolabe)
-        ctx.strokeStyle = '#7dd3fc';
-        ctx.lineWidth = 1.8;
+        // 星界三环黄铜浑天仪 (3D Brass & Starlight Astrolabe)
+        ctx.strokeStyle = '#d97706';
+        ctx.lineWidth = 2.2;
         ctx.beginPath();
         ctx.arc(0, 0, 14, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.strokeStyle = '#fde047';
+
+        ctx.strokeStyle = '#7dd3fc';
+        ctx.lineWidth = 1.4;
         ctx.beginPath();
         ctx.ellipse(0, 0, 14, 6, item.pulseTimer * 0.6, 0, Math.PI * 2);
         ctx.stroke();
-        ctx.fillStyle = '#ffffff';
+
+        ctx.strokeStyle = '#fde047';
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.arc(0, 0, 5, 0, Math.PI * 2);
+        ctx.ellipse(0, 0, 14, 5, -item.pulseTimer * 0.45 + 0.8, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 中心星核辉光
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const starGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, 9);
+        starGrad.addColorStop(0, '#ffffff');
+        starGrad.addColorStop(0.45, '#38bdf8');
+        starGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = starGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 9, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
         break;
       }
 
       case 'CURSED_BLOOD_CHEST':
       case 'SHOP_RELIC_BOX': {
-        // 锁链封印圣物秘匣 (Chained Reliquary Coffer)
-        ctx.fillStyle = item.kind === 'CURSED_BLOOD_CHEST' ? '#4c0519' : '#2e1065';
-        ctx.strokeStyle = item.kind === 'CURSED_BLOOD_CHEST' ? '#f43f5e' : '#fbbf24';
-        ctx.lineWidth = 2;
+        // 铁箍封印圣物秘匣 (Iron-Strapped Gothic Reliquary Coffer)
+        const isCursed = item.kind === 'CURSED_BLOOD_CHEST';
+        const boxGrad = ctx.createLinearGradient(-15, -10, 15, 12);
+        boxGrad.addColorStop(0, isCursed ? '#881337' : '#4c1d95');
+        boxGrad.addColorStop(0.55, isCursed ? '#4c0519' : '#2e1065');
+        boxGrad.addColorStop(1, '#090d16');
+        ctx.fillStyle = boxGrad;
         ctx.beginPath();
-        ctx.roundRect(-14, -8, 28, 20, 4);
+        ctx.roundRect(-15, -9, 30, 21, 4);
         ctx.fill();
+        ctx.strokeStyle = isCursed ? '#f43f5e' : '#fbbf24';
+        ctx.lineWidth = 1.6;
         ctx.stroke();
-        // 中央魔眼/宝石锁扣
-        ctx.fillStyle = item.color;
+
+        // 双道铆钉金属箍带
+        ctx.fillStyle = isCursed ? 'rgba(244, 63, 94, 0.35)' : 'rgba(251, 191, 36, 0.35)';
+        ctx.fillRect(-9, -9, 3, 21);
+        ctx.fillRect(6, -9, 3, 21);
+
+        // 中央发光魔眼/宝石锁扣
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        const eyeGrad = ctx.createRadialGradient(0, 2, 1, 0, 2, 7);
+        eyeGrad.addColorStop(0, '#ffffff');
+        eyeGrad.addColorStop(0.45, item.color);
+        eyeGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = eyeGrad;
         ctx.beginPath();
-        ctx.arc(0, 2, 4.5, 0, Math.PI * 2);
+        ctx.arc(0, 2, 7, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
         break;
       }
 
       default: {
-        // CLEAR_REWARD: 圣翼加冕棱镜圣物核
+        // CLEAR_REWARD: 圣翼加冕切面棱镜圣物核
         ctx.strokeStyle = '#fbbf24';
         ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(-20, -4);
-        ctx.quadraticCurveTo(-12, -14, -6, 2);
-        ctx.moveTo(20, -4);
-        ctx.quadraticCurveTo(12, -14, 6, 2);
+        ctx.moveTo(-21, -5);
+        ctx.quadraticCurveTo(-13, -15, -6, 2);
+        ctx.moveTo(-17, 1);
+        ctx.quadraticCurveTo(-11, -7, -6, 4);
+        ctx.moveTo(21, -5);
+        ctx.quadraticCurveTo(13, -15, 6, 2);
+        ctx.moveTo(17, 1);
+        ctx.quadraticCurveTo(11, -7, 6, 4);
         ctx.stroke();
+
+        // 4-facet crystal
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.moveTo(0, -16);
+        ctx.lineTo(0, 0);
+        ctx.lineTo(-10, 0);
+        ctx.closePath();
+        ctx.fill();
 
         ctx.fillStyle = item.color;
         ctx.beginPath();
         ctx.moveTo(0, -16);
-        ctx.lineTo(12, 0);
+        ctx.lineTo(10, 0);
         ctx.lineTo(0, 14);
-        ctx.lineTo(-12, 0);
+        ctx.lineTo(-10, 0);
         ctx.closePath();
+        ctx.globalAlpha = 0.85;
         ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.5;
+        ctx.globalAlpha = 1;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+        ctx.lineWidth = 1.2;
         ctx.stroke();
         break;
       }
     }
     ctx.restore();
 
-    // 4. 垂直丁达尔圣物光柱 (Volumetric Reliquary Light Beam - 替代原本繁杂的3行中文悬浮字)
+    // 4. 柔和羽化垂直丁达尔圣光柱 (Feathered Volumetric Reliquary Glow - 无生硬梯形硬边)
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    const beamGrad = ctx.createLinearGradient(0, 6, 0, -95);
+    ctx.translate(0, -28);
+    ctx.scale(1, 2.7);
+    const beamGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 26 * pulse);
     beamGrad.addColorStop(0, item.color);
-    beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.14)');
+    beamGrad.addColorStop(0.45, 'rgba(255, 255, 255, 0.12)');
     beamGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    ctx.globalAlpha = 0.26;
+    ctx.globalAlpha = 0.24 * pulse;
     ctx.fillStyle = beamGrad;
     ctx.beginPath();
-    ctx.moveTo(-16, 6);
-    ctx.lineTo(16, 6);
-    ctx.lineTo(26, -95);
-    ctx.lineTo(-26, -95);
-    ctx.closePath();
+    ctx.arc(0, 0, 26 * pulse, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
