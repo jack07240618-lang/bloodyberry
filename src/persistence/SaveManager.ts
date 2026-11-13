@@ -5,7 +5,7 @@ export interface SaveData {
   unlockedCharacters: string[];
 }
 
-const ALL_CHARACTER_IDS = ['antonio', 'imelda', 'gennaro', 'arca', 'pasqualina', 'mortaccio'];
+const ALL_CHARACTER_IDS = ['antonio', 'imelda', 'gennaro', 'arca'];
 
 const DEFAULT_SAVE: SaveData = {
   highScoreSeconds: 0,
@@ -59,18 +59,11 @@ export class SaveManager {
       this.data.highScoreSeconds = Math.round(timeSeconds);
     }
 
-    // Check unlocks
-    if (this.data.lifetimeKills >= 200 && !this.data.unlockedCharacters.includes('gennaro')) {
-      this.data.unlockedCharacters.push('gennaro');
-    }
-    if (this.data.lifetimeKills >= 500 && !this.data.unlockedCharacters.includes('arca')) {
-      this.data.unlockedCharacters.push('arca');
-    }
-    if (this.data.lifetimeKills >= 1000 && !this.data.unlockedCharacters.includes('pasqualina')) {
-      this.data.unlockedCharacters.push('pasqualina');
-    }
-    if (this.data.lifetimeKills >= 1500 && !this.data.unlockedCharacters.includes('mortaccio')) {
-      this.data.unlockedCharacters.push('mortaccio');
+    // All 4 core hero archetypes are unlocked by default for instant foolproof play
+    for (const cid of ALL_CHARACTER_IDS) {
+      if (!this.data.unlockedCharacters.includes(cid)) {
+        this.data.unlockedCharacters.push(cid);
+      }
     }
 
     this.save();

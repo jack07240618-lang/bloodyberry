@@ -11,7 +11,7 @@ import { RoomManager, RoomType } from './systems/RoomManager';
 import { WEAPON_DEFAULT_TAGS } from './systems/BuildSystem';
 import { CompanionSystem } from './systems/CompanionSystem';
 import { SaveManager } from './persistence/SaveManager';
-import { CHARACTERS, CharacterInfo } from './persistence/CharacterSelect';
+import { CHARACTERS, CharacterInfo, getBranchById, getCharacterById } from './persistence/CharacterSelect';
 import gsap from 'gsap';
 import { UIManager, UpgradeOption } from './ui/UIManager';
 import { getSkillBarLayout } from './ui/SkillBarLayout';
@@ -32,6 +32,7 @@ enum GameState {
   CHARACTER_SELECT = 'CHARACTER_SELECT',
   PLAYING = 'PLAYING',
   LEVEL_UP = 'LEVEL_UP',
+  BRANCH_SELECT = 'BRANCH_SELECT',
   CHEST_REWARD = 'CHEST_REWARD',
   GAME_OVER = 'GAME_OVER',
   PAUSED = 'PAUSED'
@@ -63,6 +64,7 @@ class GameEngine {
   private player: Player;
   private levelUpOptions: UpgradeOption[] = [];
   private selectedUpgradeIdx = 0;
+  private selectedBranchIdx = 0;
   private chestReward: UpgradeOption | null = null;
   private hitStopTimer = 0;
   private wasBossPresent = false;
@@ -132,6 +134,8 @@ class GameEngine {
         this.updateSettingsHover(mx, my);
       } else if (this.state === GameState.LEVEL_UP) {
         this.updateLevelUpHover(mx, my);
+      } else if (this.state === GameState.BRANCH_SELECT) {
+        this.updateBranchSelectHover(mx, my);
       } else if (this.state === GameState.CHARACTER_SELECT) {
         this.updateCharSelectHover(mx, my);
       } else if (this.state === GameState.GAME_OVER) {
@@ -155,6 +159,8 @@ class GameEngine {
         this.handleCharSelectClick(mx, my);
       } else if (this.state === GameState.LEVEL_UP) {
         this.handleLevelUpClick(mx, my);
+      } else if (this.state === GameState.BRANCH_SELECT) {
+        this.handleBranchSelectClick(mx, my);
       } else if (this.state === GameState.CHEST_REWARD) {
         this.handleChestClick(mx, my);
       } else if (this.state === GameState.GAME_OVER) {
@@ -233,6 +239,10 @@ class GameEngine {
 
       case GameState.LEVEL_UP:
         this.updateLevelUpInput();
+        break;
+
+      case GameState.BRANCH_SELECT:
+        this.updateBranchSelectInput();
         break;
 
       case GameState.CHEST_REWARD:
@@ -357,11 +367,73 @@ class GameEngine {
     this.ambientParticles.update(dt, this.player.position);
   }
 
-  // --- Level Up Logic ---
+  // --- Level Up & Late-Game Ascendancy Branch Logic ---
   private triggerLevelUp(): void {
+    if (this.player.level >= 5 && !this.player.branchTriggered) {
+      this.player.branchTriggered = true;
+      this.selectedBranchIdx = 0;
+      this.uiManager.hoveredBranchIndex = -1;
+      this.state = GameState.BRANCH_SELECT;
+      return;
+    }
     this.levelUpOptions = this.generateUpgradeOptions();
     this.selectedUpgradeIdx = 0;
     this.state = GameState.LEVEL_UP;
+  }
+
+  private updateBranchSelectInput(): void {
+    if (this.input.wasKeyPressed('Digit1')) {
+      this.selectBranch(0);
+    } else if (this.input.wasKeyPressed('Digit2')) {
+      this.selectBranch(1);
+    } else if (this.input.wasKeyPressed('ArrowLeft') || this.input.wasKeyPressed('ArrowRight')) {
+      this.selectedBranchIdx = this.selectedBranchIdx === 0 ? 1 : 0;
+    } else if (this.input.wasKeyPressed('Enter') || this.input.wasKeyPressed('Space')) {
+      this.selectBranch(this.selectedBranchIdx);
+    }
+  }
+
+  private updateBranchSelectHover(mx: number, my: number): void {
+    const w = this.camera.viewportWidth;
+    const h = this.camera.viewportHeight;
+    const cardW = Math.min(280, (w - 64) / 2);
+    const cardH = 290;
+    const gap = 24;
+    const totalW = cardW * 2 + gap;
+    const startX = w / 2 - totalW / 2;
+    const startY = h * 0.25;
+
+    this.uiManager.hoveredBranchIndex = -1;
+    for (let i = 0; i < 2; i++) {
+      const cx = startX + i * (cardW + gap);
+      if (mx >= cx && mx <= cx + cardW && my >= startY && my <= startY + cardH) {
+        this.uiManager.hoveredBranchIndex = i;
+        this.selectedBranchIdx = i;
+        break;
+      }
+    }
+  }
+
+  private handleBranchSelectClick(_mx: number, _my: number): void {
+    if (this.uiManager.hoveredBranchIndex >= 0) {
+      this.selectBranch(this.uiManager.hoveredBranchIndex);
+    }
+  }
+
+  private selectBranch(index: number): void {
+    const char = getCharacterById(this.player.characterId);
+    const branch = char.branches[index];
+    if (!branch) return;
+
+    this.player.selectedBranch = branch.id;
+    this.player.branchColor = branch.color;
+    this.player.branchAscendFlashTimer = 1.1;
+    this.player.recalculateStats();
+    this.sound.playLevelUp();
+    this.particleSystem.emitHit(this.player.position.x, this.player.position.y, branch.color, 24);
+    this.camera.triggerShake(8);
+
+    this.state = GameState.PLAYING;
   }
 
   private generateUpgradeOptions(): UpgradeOption[] {
@@ -458,8 +530,22 @@ class GameEngine {
       ];
     }
 
-    // 三选一构筑界面：优先保证至少有1~2项机制遗物(PASSIVE)以凸显标签联动体验
-    const shuffled = pool.sort(() => Math.random() - 0.5);
+    // 傻瓜化推荐标记：高亮契合当前分化路线或主武器的选项，并优先保证顺滑成型
+    const activeBranch = getBranchById(this.player.characterId, this.player.selectedBranch);
+    const charInfo = getCharacterById(this.player.characterId);
+    for (const opt of pool) {
+      const matchesWeapon = opt.id === charInfo.startingWeapon;
+      const matchesBranch = activeBranch && opt.tags
+        ? opt.tags.some(tag => activeBranch.recommendedTags.includes(tag))
+        : false;
+      opt.isRecommended = matchesWeapon || matchesBranch;
+    }
+
+    const shuffled = pool.sort((a, b) => {
+      const scoreA = (a.isRecommended ? 1 : 0) + Math.random() * 1.4;
+      const scoreB = (b.isRecommended ? 1 : 0) + Math.random() * 1.4;
+      return scoreB - scoreA;
+    });
     return shuffled.slice(0, Math.min(3, shuffled.length));
   }
 
@@ -778,9 +864,9 @@ class GameEngine {
       }
     }
 
-    const cardW = 168;
-    const cardH = 232;
-    const gap = 16;
+    const cardW = 200;
+    const cardH = 252;
+    const gap = 20;
     const totalW = CHARACTERS.length * cardW + (CHARACTERS.length - 1) * gap;
     const startX = Math.max(20, w / 2 - totalW / 2);
     const startY = h * 0.215;
@@ -1009,6 +1095,14 @@ class GameEngine {
         this.levelUpOptions,
         this.selectedUpgradeIdx,
         this.player
+      );
+    } else if (this.state === GameState.BRANCH_SELECT) {
+      this.uiManager.renderBranchSelectModal(
+        this.ctx,
+        w,
+        h,
+        getCharacterById(this.player.characterId),
+        this.selectedBranchIdx
       );
     } else if (this.state === GameState.CHEST_REWARD) {
       this.uiManager.renderBossChestModal(

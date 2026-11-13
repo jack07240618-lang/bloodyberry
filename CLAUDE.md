@@ -80,7 +80,7 @@ src/
 │   ├── SpriteRenderer.ts          # 高精度程序化角色/怪物矢量精灵渲染器
 │   └── WebGLPostProcessor.ts      # WebGL 屏幕后处理管线
 ├── persistence/
-│   ├── CharacterSelect.ts         # 4名可选英雄角色定义与初始特性
+│   ├── CharacterSelect.ts         # 4名核心英雄原型与每名角色Lv.5双线后期分化定义
 │   └── SaveManager.ts             # LocalStorage 金币、历史最高记录与局外天赋存档
 └── ui/
     └── UIManager.ts               # 玻璃拟态 HUD、3栏升级构筑面板、宝箱抽奖、设置面板与角色选择界面
@@ -145,6 +145,14 @@ src/
   - **Boss 登场音乐**：当 Boss 降临时，立即触发 [`playBossWarning`](src/core/SoundSynthesizer.ts)（深渊管风琴低频轰鸣 + 三声巴洛克减五度丧钟），同时 `playBGM('BOSS')` 保存当前普通战斗曲目的步长进度 `savedBattleStep`，立即从第 0 步奏响 148 BPM 的高燃 Boss 专属交响曲；当 Boss 被讨伐后，自动恢复 `savedBattleStep` 继续 6 首 BGM 歌单的顺序播放。
 - **双套随机触发交互音效（Set A / Set B）**：
   - 局内所有交互动作（[`playShrineInteract`](src/core/SoundSynthesizer.ts) 圣物/铁匠/诅咒祭坛、[`playChestOpen`](src/core/SoundSynthesizer.ts) 开宝箱、[`playPortalTransition`](src/core/SoundSynthesizer.ts) 进出传送门、[`playItemPickup`](src/core/SoundSynthesizer.ts) 金币/药水/遗物拾取、[`playLevelUp`](src/core/SoundSynthesizer.ts) 升级、[`playUIConfirm`](src/core/SoundSynthesizer.ts) UI 确认、[`playParry`](src/core/SoundSynthesizer.ts) 弹反）均内置 **Set A 与 Set B 两套和谐声学变体**，每次触发时按 `Math.random() < 0.5` 随机播放一套。
+
+### 3. 4 大核心角色与双线后期分化（`CharacterSelect.ts` & `UIManager.ts` & `CombatSystem.ts`）
+- **极简傻瓜化上手**：开局 4 选 1 职业卡片直接以大字定位徽章（`近战吸血` / `奥术追踪` / `高速影刃` / `爆破轰炸`）与双线分化预览呈现；升级 3 选 1 卡片自动根据当前分化路线高亮 **`★ 推荐`** 角标。
+- **Lv.5 命途觉醒二选一（`GameState.BRANCH_SELECT` -> `renderBranchSelectModal`）**：
+  1. **安东尼奥 (Antonio · 近战吸血)**：`猩红狂战士`（越残血攻速越快+血爆+击杀回血） / `圣光裁决者`（高护甲+剑气弹反回血并反击追踪圣剑）。
+  2. **伊梅尔达 (Imelda · 奥术追踪)**：`永冻星灵`（冻结减速+击杀碎裂追踪冰晶） / `棱镜雷霆`（连锁天雷电弧+弹射棱镜激光大招）。
+  3. **杰纳罗 (Gennaro · 高速影刃)**：`千刃幻影`（冲刺留下自动射刀的暗影分身） / `暗影处决者`（高暴击+5层印记爆破处决）。
+  4. **阿尔卡 (Arca · 爆破轰炸)**：`末日爆破狂`（超大范围+火球生成持久熔岩火海） / `深渊死灵师`（击杀概率唤出自动追踪死神飞镰收割）。
 
 ---
 

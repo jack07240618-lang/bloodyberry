@@ -255,6 +255,20 @@ export class CombatSystem {
       combatSystem: this
     });
 
+    // Gennaro [千刃幻影] 分化：冲刺在起点留下自动发射穿透飞刀的暗影分身（最多共存 3 个）
+    if (player.selectedBranch === 'gennaro_phantom') {
+      if (player.shadowClones.length >= 3) {
+        player.shadowClones.shift();
+      }
+      player.shadowClones.push({
+        x: player.lastDashStartPosition.x,
+        y: player.lastDashStartPosition.y,
+        timer: 6.0,
+        fireTimer: 0.15,
+        facing: player.facingDirection
+      });
+    }
+
     const hits = this.spatialGrid.queryRadius(origin, 72);
     for (const enemy of hits) {
       if (!enemy.active) continue;
@@ -293,10 +307,10 @@ export class CombatSystem {
       const dist = enemy.position.distanceTo(player.position);
       if (dist > 650) continue; // Screen-wide radius around player
 
-      // Apply character-specific elemental effects
-      if (player.characterId === 'arca') {
+      // Apply character/branch-specific elemental effects
+      if (player.characterId === 'arca' && player.selectedBranch !== 'arca_necro') {
         enemy.burnTimer = 6.0;
-      } else if (player.characterId === 'pasqualina') {
+      } else if (player.selectedBranch === 'imelda_storm') {
         enemy.shockTimer = 6.0;
       } else if (player.characterId === 'antonio' || player.characterId === 'gennaro') {
         enemy.bleedTimer = 6.0;
@@ -316,22 +330,26 @@ export class CombatSystem {
       }
     }
 
-    // Character-Specific Secondary Ultimate Projectiles & Mechanics!
-    switch (player.characterId) {
-      case 'antonio': {
-        // CRIMSON CROSS: Heals 25% Max HP + launches 4 giant Heaven Swords outward
-        const healAmt = Math.round(player.maxHp * 0.25);
+    // Character & Late-Game Branch-Specific Secondary Ultimate Projectiles & Mechanics!
+    const ultKey = player.selectedBranch || player.characterId;
+    switch (ultKey) {
+      case 'antonio':
+      case 'antonio_berserker': {
+        // CRIMSON CROSS / BLOODSTORM CLEAVE: Heals 25% (40% Berserker) Max HP + launches 8 (12 Berserker) Crimson Heaven Swords
+        const isBerserk = ultKey === 'antonio_berserker';
+        const healAmt = Math.round(player.maxHp * (isBerserk ? 0.40 : 0.25));
         player.heal(healAmt);
         this.damageTextSystem.addHeal(player.position.x, player.position.y, healAmt);
-        for (let i = 0; i < 8; i++) {
-          const ang = (i * Math.PI * 2) / 8;
+        const count = isBerserk ? 12 : 8;
+        for (let i = 0; i < count; i++) {
+          const ang = (i * Math.PI * 2) / count;
           const p = new Projectile(
             ProjectileType.BOOMERANG,
             'cross',
             player.position.x,
             player.position.y,
-            20,
-            Math.round(baseUltDamage * 0.6),
+            isBerserk ? 24 : 20,
+            Math.round(baseUltDamage * (isBerserk ? 0.75 : 0.6)),
             999,
             2.2
           );
@@ -343,101 +361,68 @@ export class CombatSystem {
         break;
       }
 
-      case 'imelda': {
-        // STARFALL PENTAGRAM: Freezes all enemies for 3.5s + fires 20 arcane star bolts
-        this.freezeEnemies(3.5);
-        for (let i = 0; i < 20; i++) {
-          const ang = (i * Math.PI * 2) / 20;
+      case 'antonio_arbiter': {
+        // SANCTUARY AEGIS: 2.5s Invulnerability + 12 Sacred Heaven Swords
+        player.iFrameTimer = Math.max(player.iFrameTimer, 2.5);
+        const healAmt = Math.round(player.maxHp * 0.20);
+        player.heal(healAmt);
+        this.damageTextSystem.addHeal(player.position.x, player.position.y, healAmt);
+        for (let i = 0; i < 12; i++) {
+          const ang = (i * Math.PI * 2) / 12;
+          const p = new Projectile(
+            ProjectileType.BOOMERANG,
+            'cross',
+            player.position.x,
+            player.position.y,
+            22,
+            Math.round(baseUltDamage * 0.7),
+            999,
+            2.4
+          );
+          p.isEvolved = true;
+          p.velocity.set(Math.cos(ang) * 500, Math.sin(ang) * 500);
+          p.color = '#fde047';
+          p.glowColor = '#f59e0b';
+          this.addProjectile(p);
+        }
+        break;
+      }
+
+      case 'imelda':
+      case 'imelda_frost': {
+        // STARFALL PENTAGRAM / ABSOLUTE ZERO: Freezes all enemies + fires 20 (24 Frost) arcane star comets
+        const isFrost = ultKey === 'imelda_frost';
+        this.freezeEnemies(isFrost ? 4.5 : 3.5);
+        const count = isFrost ? 24 : 20;
+        for (let i = 0; i < count; i++) {
+          const ang = (i * Math.PI * 2) / count;
           const p = new Projectile(
             ProjectileType.DIRECT_BOLT,
             'magic_wand',
             player.position.x,
             player.position.y,
-            10,
-            Math.round(baseUltDamage * 0.5),
-            4,
-            1.8
+            isFrost ? 12 : 10,
+            Math.round(baseUltDamage * (isFrost ? 0.65 : 0.5)),
+            5,
+            1.9
           );
           p.velocity.set(Math.cos(ang) * 520, Math.sin(ang) * 520);
-          p.color = '#c084fc';
-          p.glowColor = '#38bdf8';
+          p.color = isFrost ? '#38bdf8' : '#c084fc';
+          p.glowColor = isFrost ? '#bae6fd' : '#38bdf8';
           this.addProjectile(p);
         }
         break;
       }
 
-      case 'gennaro': {
-        // PHANTOM BLADESTORM: Resets Dash cooldown + fires 32 piercing shadow daggers in a spiral
-        player.dashCooldown = 0;
-        for (let i = 0; i < 32; i++) {
-          const ang = (i * Math.PI * 2) / 32;
-          const p = new Projectile(
-            ProjectileType.PIERCING_DAGGER,
-            'knife',
-            player.position.x,
-            player.position.y,
-            9,
-            Math.round(baseUltDamage * 0.55),
-            8,
-            1.6
-          );
-          p.velocity.set(Math.cos(ang) * 620, Math.sin(ang) * 620);
-          p.color = '#34d399';
-          p.glowColor = '#10b981';
-          this.addProjectile(p);
-        }
-        break;
-      }
-
-      case 'arca': {
-        // HELLFIRE CATACLYSM: Spawns 8 lingering magma pools + 12 giant Hellfire meteors
-        for (let i = 0; i < 8; i++) {
-          const ang = (i * Math.PI * 2) / 8;
-          const dist = 110 + (i % 2) * 70;
-          const pool = new Projectile(
-            ProjectileType.GROUND_FIRE,
-            'holy_water',
-            player.position.x + Math.cos(ang) * dist,
-            player.position.y + Math.sin(ang) * dist,
-            62,
-            Math.round(baseUltDamage * 0.35),
-            9999,
-            4.0
-          );
-          pool.isEvolved = true;
-          pool.color = '#f97316';
-          pool.glowColor = '#ef4444';
-          this.addProjectile(pool);
-        }
-        for (let i = 0; i < 12; i++) {
-          const ang = (i * Math.PI * 2) / 12;
-          const fb = new Projectile(
-            ProjectileType.FIREBALL,
-            'fire_wand',
-            player.position.x,
-            player.position.y,
-            18,
-            Math.round(baseUltDamage * 0.7),
-            999,
-            2.0
-          );
-          fb.velocity.set(Math.cos(ang) * 420, Math.sin(ang) * 420);
-          fb.color = '#f97316';
-          fb.glowColor = '#dc2626';
-          this.addProjectile(fb);
-        }
-        break;
-      }
-
-      case 'pasqualina': {
-        // PRISMATIC THUNDER: Strikes 12 sky thunderbolts + 12 bouncing Runetracer lasers
-        for (let i = 0; i < 12; i++) {
-          const ang = (i * Math.PI * 2) / 12;
+      case 'imelda_storm': {
+        // PRISMATIC THUNDER: Strikes 18 sky thunderbolts + 12 bouncing Runetracer prism lasers
+        for (let i = 0; i < 18; i++) {
+          const ang = (i * Math.PI * 2) / 18;
           const lPos = new Vector2(
-            player.position.x + Math.cos(ang) * (120 + Math.random() * 180),
-            player.position.y + Math.sin(ang) * (120 + Math.random() * 180)
+            player.position.x + Math.cos(ang) * (110 + Math.random() * 190),
+            player.position.y + Math.sin(ang) * (110 + Math.random() * 190)
           );
-          this.spawnLightningVisual(lPos, 55, true);
+          this.spawnLightningVisual(lPos, 62, true);
         }
         for (let i = 0; i < 12; i++) {
           const ang = (i * Math.PI * 2) / 12;
@@ -446,21 +431,126 @@ export class CombatSystem {
             'runetracer',
             player.position.x,
             player.position.y,
-            12,
-            Math.round(baseUltDamage * 0.6),
+            13,
+            Math.round(baseUltDamage * 0.65),
             999,
-            2.6
+            2.8
           );
-          rt.velocity.set(Math.cos(ang) * 500, Math.sin(ang) * 500);
+          rt.velocity.set(Math.cos(ang) * 520, Math.sin(ang) * 520);
           this.addProjectile(rt);
         }
         break;
       }
 
-      case 'mortaccio': {
-        // DEATH SPIRAL HARVEST: Hurls 16 giant Grim Reaper Scythes outward + heals 20 HP
-        player.heal(20);
-        this.damageTextSystem.addHeal(player.position.x, player.position.y, 20);
+      case 'gennaro':
+      case 'gennaro_phantom': {
+        // PHANTOM BLADESTORM / INFINITE BLADES: Resets Dash cooldown + fires 32 (40 Phantom) piercing shadow daggers
+        player.dashCooldown = 0;
+        const isPhantom = ultKey === 'gennaro_phantom';
+        const count = isPhantom ? 40 : 32;
+        for (let i = 0; i < count; i++) {
+          const ang = (i * Math.PI * 2) / count;
+          const p = new Projectile(
+            ProjectileType.PIERCING_DAGGER,
+            'knife',
+            player.position.x,
+            player.position.y,
+            9,
+            Math.round(baseUltDamage * (isPhantom ? 0.65 : 0.55)),
+            8,
+            1.7
+          );
+          p.velocity.set(Math.cos(ang) * 640, Math.sin(ang) * 640);
+          p.color = '#34d399';
+          p.glowColor = '#10b981';
+          this.addProjectile(p);
+        }
+        break;
+      }
+
+      case 'gennaro_executioner': {
+        // PHANTOM EXECUTE: Multi-hit critical execution barrage on priority targets
+        player.dashCooldown = 0;
+        const targets = this.getNearestEnemies(player.position, 620, 6);
+        for (const tEnemy of targets) {
+          const execDmg = Math.round(baseUltDamage * 1.45);
+          const killed = tEnemy.takeDamage(execDmg);
+          this.damageTextSystem.addDamage(tEnemy.position.x, tEnemy.position.y, execDmg, true);
+          this.particleSystem.emitSlashImpact(tEnemy.position.x, tEnemy.position.y, Math.random() * Math.PI * 2, '#a3e635', true);
+          if (killed) {
+            player.kills++;
+            this.handleEnemyDeath(tEnemy, true);
+          }
+        }
+        for (let i = 0; i < 24; i++) {
+          const ang = (i * Math.PI * 2) / 24;
+          const p = new Projectile(
+            ProjectileType.PIERCING_DAGGER,
+            'knife',
+            player.position.x,
+            player.position.y,
+            10,
+            Math.round(baseUltDamage * 0.6),
+            8,
+            1.6
+          );
+          p.isCrit = true;
+          p.velocity.set(Math.cos(ang) * 660, Math.sin(ang) * 660);
+          p.color = '#a3e635';
+          p.glowColor = '#84cc16';
+          this.addProjectile(p);
+        }
+        break;
+      }
+
+      case 'arca':
+      case 'arca_pyro': {
+        // HELLFIRE CATACLYSM / SOLAR CATACLYSM: Spawns lingering magma pools + giant Hellfire meteors
+        const isPyro = ultKey === 'arca_pyro';
+        const poolCount = isPyro ? 10 : 8;
+        const meteorCount = isPyro ? 16 : 12;
+        for (let i = 0; i < poolCount; i++) {
+          const ang = (i * Math.PI * 2) / poolCount;
+          const dist = 105 + (i % 2) * 75;
+          const pool = new Projectile(
+            ProjectileType.GROUND_FIRE,
+            'holy_water',
+            player.position.x + Math.cos(ang) * dist,
+            player.position.y + Math.sin(ang) * dist,
+            isPyro ? 72 : 62,
+            Math.round(baseUltDamage * (isPyro ? 0.45 : 0.35)),
+            9999,
+            isPyro ? 5.0 : 4.0
+          );
+          pool.isEvolved = true;
+          pool.color = '#f97316';
+          pool.glowColor = '#ef4444';
+          this.addProjectile(pool);
+        }
+        for (let i = 0; i < meteorCount; i++) {
+          const ang = (i * Math.PI * 2) / meteorCount;
+          const fb = new Projectile(
+            ProjectileType.FIREBALL,
+            'fire_wand',
+            player.position.x,
+            player.position.y,
+            isPyro ? 20 : 18,
+            Math.round(baseUltDamage * (isPyro ? 0.85 : 0.7)),
+            999,
+            2.1
+          );
+          fb.velocity.set(Math.cos(ang) * 440, Math.sin(ang) * 440);
+          fb.color = '#f97316';
+          fb.glowColor = '#dc2626';
+          this.addProjectile(fb);
+        }
+        break;
+      }
+
+      case 'arca_necro': {
+        // DEATH HARVEST: Hurls 16 giant Grim Reaper Scythes outward + heals 25 HP
+        player.heal(25);
+        this.damageTextSystem.addHeal(player.position.x, player.position.y, 25);
         for (let i = 0; i < 16; i++) {
           const ang = (i * Math.PI * 2) / 16;
           const sc = new Projectile(
@@ -469,12 +559,12 @@ export class CombatSystem {
             player.position.x,
             player.position.y,
             26,
-            Math.round(baseUltDamage * 0.75),
+            Math.round(baseUltDamage * 0.8),
             999,
-            2.2
+            2.3
           );
           sc.isEvolved = true;
-          sc.velocity.set(Math.cos(ang) * 380, Math.sin(ang) * 380 - 180);
+          sc.velocity.set(Math.cos(ang) * 390, Math.sin(ang) * 390 - 180);
           sc.color = '#a855f7';
           sc.glowColor = '#c084fc';
           this.addProjectile(sc);
@@ -552,7 +642,10 @@ export class CombatSystem {
       }
     }
 
-    // 1b. 更新并引爆【示例 B：冲刺延迟引爆炸弹（继承主武器全部标签）】
+    // 1b. 更新 Gennaro [千刃幻影] 冲刺暗影分身自动射刀
+    this.updateShadowClones(dt, player);
+
+    // 1c. 更新并引爆【示例 B：冲刺延迟引爆炸弹（继承主武器全部标签）】
     for (let i = this.delayedBombs.length - 1; i >= 0; i--) {
       const bomb = this.delayedBombs[i];
       bomb.timer -= dt;
@@ -604,6 +697,29 @@ export class CombatSystem {
             this.sound.playParry();
             this.particleSystem.emitSlashImpact(ep.position.x, ep.position.y, reflectDir.angle(), '#34d399', true);
             this.camera.triggerShake(2.5);
+
+            // Antonio [圣光裁决者] 分化：弹反成功回血 + 向最近敌人发射追踪圣剑
+            if (player.selectedBranch === 'antonio_arbiter') {
+              player.heal(6);
+              this.damageTextSystem.addHeal(player.position.x, player.position.y, 6);
+              if (nearestEnemy) {
+                const sword = new Projectile(
+                  ProjectileType.BOOMERANG,
+                  'cross',
+                  player.position.x,
+                  player.position.y,
+                  16,
+                  Math.round(35 * player.damageMult),
+                  6,
+                  1.5
+                );
+                sword.isDecoratedClone = true;
+                sword.velocity.copy(reflectDir).multiplyScalar(480);
+                sword.color = '#fde047';
+                sword.glowColor = '#fbbf24';
+                this.addProjectile(sword);
+              }
+            }
             break;
           }
         }
@@ -970,10 +1086,14 @@ export class CombatSystem {
           this.camera.triggerShake(5);
         }
 
+        // 后期角色命途分化 On-Hit 机制触发
+        this.applyBranchOnHit(player, enemy, proj, totalDamage);
+
         if (isDead) {
           if (srcWeapon) srcWeapon.totalKills++;
           player.kills++;
           player.reduceUltimateCooldown(0.35); // Every kill speeds up Ultimate charge!
+          this.applyBranchOnKill(player, enemy);
           this.handleEnemyDeath(enemy);
         }
 
@@ -1102,6 +1222,159 @@ export class CombatSystem {
         tags.forEach(t => shrapnel.tags.add(t));
         this.projectiles.push(shrapnel);
       }
+    }
+  }
+
+  private updateShadowClones(dt: number, player: Player): void {
+    for (let i = player.shadowClones.length - 1; i >= 0; i--) {
+      const clone = player.shadowClones[i];
+      clone.timer -= dt;
+      if (clone.timer <= 0) {
+        player.shadowClones.splice(i, 1);
+        continue;
+      }
+      clone.fireTimer -= dt;
+      if (clone.fireTimer <= 0) {
+        clone.fireTimer = 0.42;
+        const origin = new Vector2(clone.x, clone.y);
+        const nearest = this.getNearestEnemies(origin, 420, 1)[0];
+        if (nearest) {
+          const dir = nearest.position.clone().sub(origin).normalize();
+          clone.facing = dir.x >= 0 ? 1 : -1;
+          const dagger = new Projectile(
+            ProjectileType.PIERCING_DAGGER,
+            'knife',
+            clone.x,
+            clone.y,
+            8,
+            Math.round((20 + player.level * 2) * player.damageMult),
+            4,
+            1.1
+          );
+          dagger.isDecoratedClone = true;
+          dagger.velocity.copy(dir).multiplyScalar(580);
+          dagger.color = '#34d399';
+          dagger.glowColor = '#10b981';
+          this.addProjectile(dagger);
+        }
+      }
+    }
+  }
+
+  private applyBranchOnHit(player: Player, enemy: Enemy, proj: Projectile, totalDamage: number): void {
+    if (!player.selectedBranch || proj.isDecoratedClone) return;
+
+    switch (player.selectedBranch) {
+      case 'antonio_berserker': {
+        if (proj.type === ProjectileType.WHIP_SLASH && Math.random() < 0.35) {
+          this.particleSystem.emitHit(enemy.position.x, enemy.position.y, '#dc2626', 8);
+          const splash = Math.round(totalDamage * 0.45);
+          for (const near of this.spatialGrid.queryRadius(enemy.position, 68)) {
+            if (near !== enemy && near.active) {
+              near.takeDamage(splash);
+              this.damageTextSystem.addDamage(near.position.x, near.position.y, splash, false);
+            }
+          }
+        }
+        break;
+      }
+      case 'imelda_frost': {
+        if (Math.random() < 0.25) {
+          enemy.freezeTimer = Math.max(enemy.freezeTimer, 1.4);
+          enemy.chillTimer = Math.max(enemy.chillTimer, 2.5);
+        }
+        break;
+      }
+      case 'imelda_storm': {
+        if (Math.random() < 0.28) {
+          const near = this.getNearestEnemies(enemy.position, 170, 2).find(e => e !== enemy && e.active);
+          if (near) {
+            const arcDmg = Math.max(8, Math.round(totalDamage * 0.55));
+            near.takeDamage(arcDmg);
+            near.shockTimer = 2.0;
+            this.damageTextSystem.addDamage(near.position.x, near.position.y, arcDmg, true);
+            this.spawnLightningVisual(near.position, 32, false);
+          }
+        }
+        break;
+      }
+      case 'gennaro_executioner': {
+        const stacks = ((enemy as any)._execStacks || 0) + 1;
+        if (stacks >= 5) {
+          (enemy as any)._execStacks = 0;
+          const burst = Math.min(260, Math.round(enemy.maxHp * (enemy.isBoss ? 0.035 : 0.22) + totalDamage * 0.8));
+          enemy.takeDamage(burst);
+          this.damageTextSystem.addDamage(enemy.position.x, enemy.position.y - 12, burst, true);
+          this.particleSystem.emitSlashImpact(enemy.position.x, enemy.position.y, Math.random() * Math.PI, '#a3e635', true);
+        } else {
+          (enemy as any)._execStacks = stacks;
+        }
+        break;
+      }
+      case 'arca_pyro': {
+        if (proj.type === ProjectileType.FIREBALL && Math.random() < 0.45) {
+          const pool = new Projectile(
+            ProjectileType.GROUND_FIRE,
+            'holy_water',
+            enemy.position.x,
+            enemy.position.y,
+            46 * player.areaMult,
+            Math.max(8, Math.round(totalDamage * 0.35)),
+            999,
+            2.4
+          );
+          pool.isDecoratedClone = true;
+          pool.color = '#fb923c';
+          pool.glowColor = '#ef4444';
+          this.addProjectile(pool);
+        }
+        break;
+      }
+    }
+  }
+
+  private applyBranchOnKill(player: Player, enemy: Enemy): void {
+    if (!player.selectedBranch) return;
+
+    if (player.selectedBranch === 'antonio_berserker') {
+      player.heal(2);
+    } else if (player.selectedBranch === 'imelda_frost' && (enemy.freezeTimer > 0 || enemy.chillTimer > 0)) {
+      for (let i = 0; i < 4; i++) {
+        const ang = (i * Math.PI * 2) / 4;
+        const shard = new Projectile(
+          ProjectileType.DIRECT_BOLT,
+          'magic_wand',
+          enemy.position.x,
+          enemy.position.y,
+          7,
+          Math.round((18 + player.level * 2) * player.damageMult),
+          2,
+          0.9
+        );
+        shard.isDecoratedClone = true;
+        shard.velocity.set(Math.cos(ang) * 420, Math.sin(ang) * 420);
+        shard.color = '#38bdf8';
+        shard.glowColor = '#bae6fd';
+        this.addProjectile(shard);
+      }
+    } else if (player.selectedBranch === 'arca_necro' && Math.random() < 0.35) {
+      const target = this.getNearestEnemies(enemy.position, 420, 1)[0];
+      const ang = target ? target.position.clone().sub(enemy.position).angle() : Math.random() * Math.PI * 2;
+      const scythe = new Projectile(
+        ProjectileType.ARCBALLISTIC_AXE,
+        'axe',
+        enemy.position.x,
+        enemy.position.y,
+        18,
+        Math.round((26 + player.level * 3) * player.damageMult),
+        6,
+        1.4
+      );
+      scythe.isDecoratedClone = true;
+      scythe.velocity.set(Math.cos(ang) * 320, Math.sin(ang) * 320 - 110);
+      scythe.color = '#c084fc';
+      scythe.glowColor = '#a855f7';
+      this.addProjectile(scythe);
     }
   }
 

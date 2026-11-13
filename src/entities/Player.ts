@@ -7,6 +7,11 @@ import { SkillTag } from '../systems/BuildSystem';
 
 export class Player extends Entity {
   public characterId = 'antonio';
+  public selectedBranch: string | null = null;
+  public branchColor: string | null = null;
+  public branchTriggered = false;
+  public branchAscendFlashTimer = 0;
+  public shadowClones: { x: number; y: number; timer: number; fireTimer: number; facing: number }[] = [];
   // Base stats (unmodified)
   public baseMaxHp = 100;
   public baseSpeed = 190;
@@ -96,6 +101,14 @@ export class Player extends Entity {
     if (this.hurtFlashTimer > 0) {
       this.hurtFlashTimer -= dt;
     }
+    if (this.branchAscendFlashTimer > 0) {
+      this.branchAscendFlashTimer = Math.max(0, this.branchAscendFlashTimer - dt);
+    }
+
+    // Dynamic Berserker low-HP attack speed scaling
+    if (this.selectedBranch === 'antonio_berserker') {
+      this.recalculateStats();
+    }
 
     // Health Regeneration
     if (this.hp < this.maxHp && this.hpRegen > 0) {
@@ -174,8 +187,9 @@ export class Player extends Entity {
 
     const dashRank = this.getPassiveLevel('wings');
     const dashCdFactor = Math.max(0.85, 1.0 - dashRank * 0.03);
+    const branchDashFactor = this.selectedBranch === 'gennaro_phantom' ? 0.62 : 1.0;
     this.dashActiveTimer = this.dashDuration;
-    this.dashCooldown = Math.max(0.8, this.maxDashCooldown * this.cooldownMult * dashCdFactor);
+    this.dashCooldown = Math.max(0.55, this.maxDashCooldown * this.cooldownMult * dashCdFactor * branchDashFactor);
     this.iFrameTimer = Math.max(this.iFrameTimer, this.dashDuration + 0.14); // Invulnerable during dash!
     return true;
   }
@@ -304,8 +318,23 @@ export class Player extends Entity {
     }
 
     this.moveSpeed = this.baseSpeed;
-    this.armor = Math.max(this.armor, Math.floor(armorRank / 2));
+    this.armor = Math.max(
+      this.characterId === 'antonio' ? 1 : 0,
+      Math.floor(armorRank / 2) + (this.selectedBranch === 'antonio_arbiter' ? 2 : 0)
+    );
     this.pickupRadius = this.basePickupRadius * (1 + attractRank * 0.1);
+
+    // Branch-specific stat transformations
+    if (this.selectedBranch === 'antonio_berserker') {
+      const missingHpRatio = Math.max(0, Math.min(1, 1 - this.hp / Math.max(1, this.maxHp)));
+      this.cooldownMult = Math.max(0.55, 1.0 - missingHpRatio * 0.42);
+      this.damageMult = 1.18 + missingHpRatio * 0.25;
+    } else if (this.selectedBranch === 'gennaro_executioner') {
+      this.critChance = 0.30;
+    } else if (this.selectedBranch === 'arca_pyro') {
+      this.areaMult = 1.50;
+      this.cooldownMult = 0.85;
+    }
 
     // 【示例 C（风险与机制转化）】：若拥有“湮灭第四律令”，彻底取消随机暴击率概念（归零），转化为每第4次攻击必触发范围穿透奇点！
     if (singularityRank > 0) {
@@ -337,13 +366,48 @@ export class Player extends Entity {
       ctx.restore();
     }
 
+    // Render Gennaro Phantom Shadow Clones in World Space
+    for (const clone of this.shadowClones) {
+      ctx.save();
+      ctx.translate(clone.x, clone.y);
+      ctx.globalAlpha = Math.min(0.75, clone.timer * 0.8);
+      const cloneAura = ctx.createRadialGradient(0, 6, 2, 0, 6, 22);
+      cloneAura.addColorStop(0, 'rgba(52, 211, 153, 0.45)');
+      cloneAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = cloneAura;
+      ctx.beginPath();
+      ctx.ellipse(0, 6, 22, 11, 0, 0, Math.PI * 2);
+      ctx.fill();
+      SpriteRenderer.getInstance().drawSprite(ctx, spriteKey, 1, 0, -2, 38, 38, clone.facing, false);
+      ctx.restore();
+    }
+
     ctx.save();
     ctx.translate(this.position.x, this.position.y);
 
-    // Soft radial aura glow beneath player feet (Golden/Purple when Ultimate is Ready!)
+    // Ascendancy Transformation Pillar Burst (pure optical feedback upon choosing late-game branch)
+    if (this.branchAscendFlashTimer > 0 && this.branchColor) {
+      const p = this.branchAscendFlashTimer / 1.1;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = p * 0.72;
+      const colGrad = ctx.createLinearGradient(0, -180, 0, 20);
+      colGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      colGrad.addColorStop(0.5, this.branchColor);
+      colGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = colGrad;
+      ctx.fillRect(-26 * p, -180, 52 * p, 200);
+      ctx.restore();
+    }
+
+    // Soft radial aura glow beneath player feet (Branch color when ascended, Golden/Purple when Ultimate is Ready!)
     const ultReady = this.isUltimateReady();
     const auraGrad = ctx.createRadialGradient(0, 6, 2, 0, 6, this.radius * (ultReady ? 2.8 : 2.2));
-    if (ultReady) {
+    if (this.branchColor) {
+      auraGrad.addColorStop(0, ultReady ? 'rgba(250, 204, 21, 0.42)' : `${this.branchColor}55`);
+      auraGrad.addColorStop(0.55, `${this.branchColor}28`);
+      auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    } else if (ultReady) {
       auraGrad.addColorStop(0, 'rgba(250, 204, 21, 0.42)');
       auraGrad.addColorStop(0.5, 'rgba(168, 85, 247, 0.22)');
       auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');

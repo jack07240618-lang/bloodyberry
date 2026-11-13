@@ -67,6 +67,8 @@ export class Enemy extends Entity {
   public burnTickTimer = 0;
   public shockTimer = 0;
   public bleedTimer = 0;
+  public freezeTimer = 0;
+  public chillTimer = 0;
 
   // Boss mechanics (Soul Knight High-Mobility Multi-Skill State Machine)
   public bossPhase = 1;
@@ -154,6 +156,15 @@ export class Enemy extends Entity {
     if (this.burnTimer > 0) this.burnTimer = Math.max(0, this.burnTimer - dt);
     if (this.shockTimer > 0) this.shockTimer = Math.max(0, this.shockTimer - dt);
     if (this.bleedTimer > 0) this.bleedTimer = Math.max(0, this.bleedTimer - dt);
+    if (this.freezeTimer > 0) this.freezeTimer = Math.max(0, this.freezeTimer - dt);
+    if (this.chillTimer > 0) this.chillTimer = Math.max(0, this.chillTimer - dt);
+
+    // Permafrost freeze halts non-boss enemies (slows bosses by 45%)
+    const effectiveDt = this.freezeTimer > 0
+      ? (this.isBoss ? dt * 0.55 : 0)
+      : this.chillTimer > 0
+        ? dt * 0.65
+        : dt;
 
     // Decay knockback
     if (this.knockback.lengthSq() > 1) {
@@ -189,22 +200,24 @@ export class Enemy extends Entity {
     }
 
     // AI Behaviors
-    switch (this.type) {
-      case EnemyType.MINOTAUR:
-        this.updateMinotaurAI(dt, player, separationForce);
-        break;
+    if (effectiveDt > 0) {
+      switch (this.type) {
+        case EnemyType.MINOTAUR:
+          this.updateMinotaurAI(effectiveDt, player, separationForce);
+          break;
 
-      case EnemyType.RANGED_SPITTER:
-        this.updateRangedSpitterAI(dt, player, separationForce, spawnProjectileCallback);
-        break;
+        case EnemyType.RANGED_SPITTER:
+          this.updateRangedSpitterAI(effectiveDt, player, separationForce, spawnProjectileCallback);
+          break;
 
-      case EnemyType.BOSS_DEMON:
-        this.updateBossAI(dt, player, separationForce, spawnProjectileCallback);
-        break;
+        case EnemyType.BOSS_DEMON:
+          this.updateBossAI(effectiveDt, player, separationForce, spawnProjectileCallback);
+          break;
 
-      default:
-        this.updateStandardSwarmAI(dt, player, separationForce);
-        break;
+        default:
+          this.updateStandardSwarmAI(effectiveDt, player, separationForce);
+          break;
+      }
     }
 
     // Direction facing

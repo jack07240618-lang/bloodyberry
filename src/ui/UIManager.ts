@@ -20,6 +20,7 @@ export interface UpgradeOption {
   description: string;
   iconName: string;
   tags?: SkillTag[];
+  isRecommended?: boolean;
 }
 
 const UI_FONT = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "PingFang SC", "Helvetica Neue", sans-serif';
@@ -28,6 +29,7 @@ const MONO_FONT = 'ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace
 export class UIManager {
   public hoveredUpgradeIndex = -1;
   public hoveredCharacterIndex = -1;
+  public hoveredBranchIndex = -1;
   public hoveredButton: string | null = null;
 
   // Chest animation
@@ -923,6 +925,20 @@ export class UIManager {
     ctx.textBaseline = 'middle';
     ctx.fillText(isNew ? t('新获得', 'NEW') : opt.levelText, badgeX + 21, badgeY + 8.5);
 
+    if (opt.isRecommended) {
+      const recX = badgeX + 48;
+      ctx.fillStyle = 'rgba(250, 204, 21, 0.18)';
+      ctx.beginPath();
+      ctx.roundRect(recX, badgeY, 48, 16, 3);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(250, 204, 21, 0.55)';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      ctx.fillStyle = '#fde047';
+      ctx.font = `700 9px ${UI_FONT}`;
+      ctx.fillText(t('★ 推荐', '★ FIT'), recX + 24, badgeY + 8.5);
+    }
+
     // 7. Minimalist 3D Faceted Tag Gems on Top-Right
     if (opt.tags && opt.tags.length > 0) {
       let gemX = x + w - 18;
@@ -1374,10 +1390,10 @@ export class UIManager {
     ctx.font = `500 11px ${UI_FONT}`;
     ctx.fillText(t('绯红圣所 · 暗黑幸存者', 'CRIMSON SANCTUARY'), width / 2, height * 0.165);
 
-    // 3. Characters Grid (3D Sculpted Hero Tablets)
-    const cardW = 168;
-    const cardH = 232;
-    const gap = 16;
+    // 3. Characters Grid (4 Core Archetypes - 3D Sculpted Hero Tablets)
+    const cardW = 200;
+    const cardH = 252;
+    const gap = 20;
     const totalW = CHARACTERS.length * cardW + (CHARACTERS.length - 1) * gap;
     const startX = Math.max(20, width / 2 - totalW / 2);
     const startY = height * 0.215;
@@ -1543,20 +1559,180 @@ export class UIManager {
 
     const charText = getCharacterText(char.id);
 
-    // Clean Modern Name & Subtitle
+    // Clean Modern Name & Foolproof Role Pill
     ctx.textAlign = 'center';
     ctx.fillStyle = '#f8fafc';
-    ctx.font = `600 15px ${UI_FONT}`;
+    ctx.font = `600 16px ${UI_FONT}`;
     ctx.fillText(charText.name, x + w / 2, py + pSize + 22);
 
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = `500 10px ${UI_FONT}`;
-    ctx.fillText(charText.title, x + w / 2, py + pSize + 37);
+    // Bold 4-char Role Pill (一眼看懂定位)
+    const roleLabel = t(char.shortRoleZh, char.shortRoleEn);
+    const pillW = 86;
+    const pillH = 20;
+    const pillX = x + (w - pillW) / 2;
+    const pillY = py + pSize + 32;
+    ctx.fillStyle = `${char.color}26`;
+    ctx.beginPath();
+    ctx.roundRect(pillX, pillY, pillW, pillH, 10);
+    ctx.fill();
+    ctx.strokeStyle = `${char.color}88`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
 
-    // Trait & Ultimate Description
-    ctx.font = `400 10.5px ${UI_FONT}`;
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = `600 10.5px ${UI_FONT}`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(roleLabel, x + w / 2, pillY + pillH / 2 + 0.5);
+
+    // 2-Way Late-Game Divergence Preview Pills at Card Bottom
+    ctx.textBaseline = 'top';
     ctx.fillStyle = '#64748b';
-    this.wrapText(ctx, charText.traitDescription, x + 12, py + pSize + 55, w - 24, 15);
+    ctx.font = `500 9.5px ${UI_FONT}`;
+    ctx.fillText(t('后期双线分化', 'LATE ASCENDANCY'), x + w / 2, pillY + 28);
+
+    const bGap = 8;
+    const bW = (w - 28 - bGap) / 2;
+    const bY = pillY + 44;
+    for (let bi = 0; bi < 2; bi++) {
+      const br = char.branches[bi];
+      const bx = x + 14 + bi * (bW + bGap);
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+      ctx.beginPath();
+      ctx.roundRect(bx, bY, bW, 44, 5);
+      ctx.fill();
+      ctx.strokeStyle = `${br.color}66`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = br.color;
+      ctx.font = `600 10px ${UI_FONT}`;
+      ctx.fillText(t(br.nameZh, br.nameEn.split(' ')[0]), bx + bW / 2, bY + 8);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = `400 8.5px ${UI_FONT}`;
+      const subTag = t(br.badgeZh.split('·')[1]?.trim() || br.badgeZh, br.badgeEn.split('·')[1]?.trim() || br.badgeEn);
+      ctx.fillText(subTag, bx + bW / 2, bY + 25);
+    }
+
+    ctx.restore();
+  }
+
+  /**
+   * 后期命途分化二选一抉择弹窗 (Lv.5 触发：每个角色拥有 2 条截然不同的终极分化路线)
+   */
+  public renderBranchSelectModal(
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    char: CharacterInfo,
+    selectedIdx: number
+  ): void {
+    ctx.save();
+
+    // 1. Deep Atmospheric Backdrop
+    const bgGrad = ctx.createRadialGradient(width / 2, height * 0.45, 20, width / 2, height * 0.45, Math.max(width, height) * 0.8);
+    bgGrad.addColorStop(0, 'rgba(15, 23, 42, 0.86)');
+    bgGrad.addColorStop(0.6, 'rgba(6, 9, 18, 0.94)');
+    bgGrad.addColorStop(1, 'rgba(2, 4, 10, 0.97)');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    // Header
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fde047';
+    ctx.font = `600 12px ${UI_FONT}`;
+    ctx.fillText(t('命途觉醒 · 二选一分化', 'ASCENDANCY · CHOOSE YOUR PATH'), width / 2, height * 0.14);
+
+    ctx.fillStyle = '#f8fafc';
+    ctx.font = `600 24px ${UI_FONT}`;
+    ctx.fillText(t('选择你的后期终极形态', 'EVOLVE YOUR ARCHETYPE'), width / 2, height * 0.19);
+
+    const cardW = Math.min(280, (width - 64) / 2);
+    const cardH = 290;
+    const gap = 24;
+    const totalW = cardW * 2 + gap;
+    const startX = width / 2 - totalW / 2;
+    const startY = height * 0.25;
+
+    for (let i = 0; i < 2; i++) {
+      const br = char.branches[i];
+      const cx = startX + i * (cardW + gap);
+      const isHov = i === selectedIdx || i === this.hoveredBranchIndex;
+      const cy = startY + (isHov ? -4 : 0);
+
+      // Shadow
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+      ctx.beginPath();
+      ctx.roundRect(cx + 2, startY + 6, cardW, cardH, 10);
+      ctx.fill();
+
+      // Tablet body
+      const cGrad = ctx.createLinearGradient(cx, cy, cx, cy + cardH);
+      cGrad.addColorStop(0, isHov ? '#1e293b' : '#111827');
+      cGrad.addColorStop(1, '#060911');
+      ctx.fillStyle = cGrad;
+      ctx.beginPath();
+      ctx.roundRect(cx, cy, cardW, cardH, 10);
+      ctx.fill();
+
+      ctx.strokeStyle = isHov ? br.color : 'rgba(148, 163, 184, 0.28)';
+      ctx.lineWidth = isHov ? 2 : 1.2;
+      ctx.stroke();
+
+      // Top glow accent bar
+      ctx.fillStyle = br.color;
+      ctx.fillRect(cx + 20, cy + 1, cardW - 40, 2.5);
+
+      // Shortcut pill [1] / [2]
+      ctx.fillStyle = isHov ? br.color : '#1e293b';
+      ctx.beginPath();
+      ctx.arc(cx + 24, cy + 24, 12, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = isHov ? '#050811' : '#94a3b8';
+      ctx.font = `700 11px ${MONO_FONT}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${i + 1}`, cx + 24, cy + 24.5);
+
+      // Branch Badge
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = br.color;
+      ctx.font = `600 11px ${UI_FONT}`;
+      ctx.fillText(t(br.badgeZh, br.badgeEn), cx + cardW / 2, cy + 44);
+
+      // Branch Name
+      ctx.fillStyle = '#f8fafc';
+      ctx.font = `700 20px ${UI_FONT}`;
+      ctx.fillText(t(br.nameZh, br.nameEn), cx + cardW / 2, cy + 68);
+
+      // Plain-language Core Effect
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = `400 12.5px ${UI_FONT}`;
+      this.wrapText(ctx, t(br.roleSummaryZh, br.roleSummaryEn), cx + 20, cy + 112, cardW - 40, 19);
+
+      // Evolved Ultimate Box
+      const ultBoxY = cy + 178;
+      ctx.fillStyle = 'rgba(2, 6, 14, 0.78)';
+      ctx.beginPath();
+      ctx.roundRect(cx + 16, ultBoxY, cardW - 32, 88, 6);
+      ctx.fill();
+      ctx.strokeStyle = `${br.color}55`;
+      ctx.lineWidth = 1;
+      ctx.stroke();
+
+      ctx.fillStyle = '#fde047';
+      ctx.font = `600 10.5px ${UI_FONT}`;
+      ctx.fillText(t(`终极技进化 · ${br.ultNameZh}`, `EVOLVED ULT · ${br.ultNameEn}`), cx + cardW / 2, ultBoxY + 12);
+
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = `400 11.5px ${UI_FONT}`;
+      this.wrapText(ctx, t(br.ultDescZh, br.ultDescEn), cx + 26, ultBoxY + 36, cardW - 52, 17);
+    }
+
+    ctx.fillStyle = '#64748b';
+    ctx.font = `500 11px ${UI_FONT}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(t('点击卡片或按 [1] / [2] 选择分化路线', 'Click a card or press [1] / [2] to ascend'), width / 2, startY + cardH + 28);
 
     ctx.restore();
   }
