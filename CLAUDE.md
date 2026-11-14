@@ -19,22 +19,16 @@
 
 ## 二、核心设计哲学与用户审美规范（重要！修改时请严格遵守）
 
-1. **压迫感源于光影而非浮夸 UI（Minimalist UI, Maximum Optical Atmosphere）**
-   - **禁止**在屏幕正上方绘制臃肿的巨型全屏 Boss 血条，也**禁止**在 Boss 出场时弹出遮挡视野的大字警报横幅。
-   - Boss 的压迫感完全通过 **动态光影对比** 来塑造：
-     - Boss 降临与在场时，全场环境自动进入深渊蚀变暗角（`bossEclipseFactor`），并通过 [`UIManager.renderBossEclipseLightingPulse`](src/ui/UIManager.ts) 产生纯光影呼吸脉动；
-     - 每个 Boss 全程笼罩在斜射而下的**专属天顶聚光灯柱（Overhead Eclipse Spotlight）**与高对比度边缘体积光（Rim-Light Halo）中，脚下带有吞噬地面光线的深渊蚀变暗影池；
-     - Boss 血条仅保留头顶紧凑精炼的极简黑曜金血条（[`Enemy.renderBossHealthBar`](src/enemies/Enemy.ts)，`76px × 5px`），带白金受击残影（Lag Gauge）与二阶段（HP < 50%）熔岩金变色。
-2. **拒绝简笔画线条，追求 2.5D 体积渲染质感（Volumetric 2.5D Shading）**
-   - 场景物件与特效严禁只用单薄的 `stroke()` 线条勾勒，必须具备 **高光、漫反射、环境光遮蔽（AO）与 `'lighter'` 发光层**。
-   - **传送门（[`RoomManager.renderDoorPortal`](src/systems/RoomManager.ts) / [`MapSystem.renderMysteryDoor`](src/systems/MapSystem.ts)）**：采用多层黑曜石立体阶梯底座、立体拱门柱体明暗渐变、地面体积漫反射光池、多层反向旋转星云旋涡（开启态）或交叉立体熔岩锁链与脉冲封印核心（封印态）。
-   - **墙壁光源合理性（[`RoomManager.renderWallLanternSconce`](src/systems/RoomManager.ts)）**：房间四周的亮光均由安装在四壁石墙上的**哥特铸铁壁挂提灯**提供物理逻辑支撑（含锻铁支架、菱形玻璃灯笼、跳动多层火苗及向外投射的扇形暖光锥）。
-   - **穹顶三束丁达尔体积光（[`RoomManager.renderFloorGodRayCaustics`](src/systems/RoomManager.ts) & [`RoomManager.renderCeilingGodRaysOverlay`](src/systems/RoomManager.ts)）**：
-     - 严禁画成生硬的梯形/多边形！必须使用 `ctx.scale(rx, ry)` + `createRadialGradient` 二维高斯椭圆径向衰减，实现四面边缘 100% 羽化融合；
-     - 分为地面层（角色脚下的石砖漫反射光池与哥特三联窗棂光印）与空中层（主光幕、4 缕窗棂分束丁达尔光丝、屋顶入射光晕、内部随气流缓慢漂浮闪烁的丁达尔微尘颗粒）；
-     - **方向随机对称切换**：每进入新关卡时，`currentRayDirSign` 随机在 `-1`（左上角斜射向右下角）与 `+1`（右上角斜射向左下角）之间对称切换。
-   - **不规则有机血水渍（[`MapSystem.renderOrganicBloodPuddle`](src/systems/MapSystem.ts)）**：
-     - 击杀敌人后留下的地面血迹使用 10~14 个极坐标控制点配合**三段闭合贝塞尔曲线（Cubic Bezier）**绘制出带张力凸起的不规则水渍形态，配合偏心液体厚度渐变、表面湿润高光弧以及周围飞溅小液滴。
+1. **暗黑哥特极大主义（Dark Gothic Maximalist Reliquary）与清晰战场平衡**
+   - **视觉风格已升级为哥特、黑暗、极繁主义**：通过 [`src/ui/GothicOrnament.ts`](src/ui/GothicOrnament.ts) 统一提供大马士革暗纹（`applyDamaskFill`）、切角黑曜石板（`drawGothicTablet`）、鎏金卷草宝石角花（`drawFiligreeCorner`）、教堂玫瑰花窗（`drawRoseWindowMandala`）、蜡封徽章（`drawWaxSeal`）、尖券神龛（`drawPointedArchNiche`）、双翼铭牌（`drawGothicCrestBanner`）与雕刻金属玻璃血条（`drawGothicGaugeBar`）。
+   - **字体与版面**：全站引入本地打包 `@fontsource/cinzel` 衬线字体体系（`GOTHIC_DISPLAY_FONT` / `GOTHIC_BODY_FONT` / `GOTHIC_MONO_FONT`），全 UI、玩家、怪物、香炉伴侣、伤害飘字与环境余烬均统一进入黑暗哥特极大主义视觉体系；同时**维持中央战斗区与操作布局清晰可读**，不破坏既有技能槽命中区（`getSkillBarLayout`）与玩家走位视野。
+   - **Boss 压迫感与头顶雕花血条**：Boss 的压迫感继续由深渊蚀变暗角（`bossEclipseFactor`）、[`UIManager.renderBossEclipseLightingPulse`](src/ui/UIManager.ts) 与专属天顶聚光灯柱塑造；头顶保留精炼紧凑的 [`Enemy.renderBossHealthBar`](src/enemies/Enemy.ts)（`76px × 6px` 雕花圣物金属槽，带 4 段分格、50% 阶段菱形刻痕、白金受击残影 Lag Gauge、二阶段熔岩金材质与 `8.5px` `GOTHIC_DISPLAY_FONT` 首领头衔微标）。
+2. **高密度 2.5D 哥特建筑与程序化精灵质感**
+   - **64×64 多帧英雄精灵（[`SpriteRenderer.createHeroSprite`](src/renderer/SpriteRenderer.ts)）**：4 大主角与解锁英雄采用 64×64 6 帧 2.5D 立体受光阴影与深墨描边轮廓，配合脚下 **8 尖哥特星盘罗盘环**（`Player.ts`）。
+   - **教堂边界极繁建筑（[`RoomManager.renderRoomArena`](src/systems/RoomManager.ts) & [`MapSystem`](src/systems/MapSystem.ts)）**：地板切角砖石雕花、中央神圣地毯轴线、东西铁艺排水格栅、三墙彩色玻璃柳叶尖窗、南侧铸铁封印闸门及四角八边形烛台碉楼（含全局动态光照叠加）。
+   - **传送门与壁挂提灯（`renderDoorPortal` / `renderMysteryDoor` / `renderWallLanternSconce`）**：采用多层黑曜石立体阶梯底座、明暗渐变石柱拱门、地面漫反射光池、多层反向旋转星云旋涡或交叉熔岩锁链。
+   - **穹顶三束丁达尔体积光（`renderFloorGodRayCaustics` & `renderCeilingGodRaysOverlay`）**：保持二维高斯椭圆径向羽化与 `currentRayDirSign` 对称随机方向切换。
+   - **不规则有机血水渍（`renderOrganicBloodPuddle`）**：使用极坐标控制点与三段闭合贝塞尔曲线构成自然张力轮廓。
 
 ---
 
@@ -83,7 +77,8 @@ src/
 │   ├── CharacterSelect.ts         # 4名核心英雄原型与每名角色Lv.5双线后期分化定义
 │   └── SaveManager.ts             # LocalStorage 金币、历史最高记录与局外天赋存档
 └── ui/
-    └── UIManager.ts               # 玻璃拟态 HUD、3栏升级构筑面板、宝箱抽奖、设置面板与角色选择界面
+    ├── GothicOrnament.ts          # 暗黑哥特极大主义通用装饰库（玫瑰花窗、大马士革暗纹、切角石板、尖券神龛、蜡封、金属玻璃血条）
+    └── UIManager.ts               # 哥特圣匣 HUD、Loadout/进化提示升级魔典、塔罗选人卡、命途祭坛、宝箱与结算统计界面
 ```
 
 ---

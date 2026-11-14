@@ -6,9 +6,9 @@
 
 ## 一、核心美术定位（Core Identity）
 
-- **题材基调**：暗黑哥特圣殿（Dark Gothic Sanctuary）× 高对比体积光影（Volumetric Chiaroscuro）× 现代极简 3D 深板岩浮雕 UI。
-- **渲染约束**：**100% 纯原生 HTML5 Canvas 2D 程序化矢量与渐变绘制**，零外部 PNG/贴图依赖，所有质感通过多层径向渐变、线性渐变、`'lighter'` 叠加混合与物理高光/AO 阴影实时合成。
-- **反简笔画原则**：禁止只用单薄的 `stroke()` 线条勾勒场景物件、传送门或光束；所有实体与建筑必须具备**暗部投影、立体受光面、边缘高光与环境光遮蔽（AO）**。
+- **题材基调**：暗黑哥特极大主义圣殿（Dark Gothic Maximalist Cathedral）× 教堂大花窗雕饰（Cathedral Filigree & Rose Window）× 高对比体积光影（Volumetric Chiaroscuro）。
+- **渲染约束**：**100% 纯原生 HTML5 Canvas 2D 程序化矢量、大马士革暗纹缓存、与多层渐变合成**，零外部 PNG/贴图依赖；UI/角色/环境通过 [`GothicOrnament.ts`](src/ui/GothicOrnament.ts) 提供统一的高精细度哥特雕花原语与材质规范。
+- **精细化极繁准则**：保留中央战斗区域的干净辨识度，同时在圣物框体、教堂四周建筑边界、64x64 多帧 2.5D 英雄像素、圣物面板、血条与飘字上全面贯彻**黑曜石切角石板 + 烫金卷草花边 + 蜡封徽章 + 尖券神龛 + 教堂玫瑰花窗**的极大主义暗黑美学。
 
 ---
 
@@ -68,15 +68,22 @@
    - 严禁绘制规则正圆！使用 10~14 个极坐标控制点 + **三段闭合贝塞尔曲线（Cubic Bezier）**构成自然张力水渍轮廓；
    - 配合偏心液体厚度渐变、表面湿润高光弧以及周围 3~5 颗飞溅小液滴。
 3. **角色与 Boss 表现**：
-   - 角色脚下带有哥特圣所罗盘环（大招就绪时转为金色辉光），后期命途分化后脚下光环永久切换为对应分支主题色（`branchColor`）；
-   - Boss 仅保留头顶极简 3D 黑曜金血条（`76px × 5px`），带白金受击延迟残影（Lag Gauge）与二阶段（HP < 50%）熔岩金材质切换。
+   - 英雄精灵升级为 **64×64、6 帧行走序列**（`createHeroSprite`），具备多层 2.5D 暗黑哥特剪影、深墨描边轮廓与 `imageSmoothingQuality = 'high'` 锐利重采样；脚下搭载 **8 尖哥特星盘罗盘环**（大招就绪转为鎏金圣辉，Lv.5 命途觉醒切换分支主题色），头顶生命值采用共享雕刻金属玻璃槽 [`drawGothicGaugeBar`](src/ui/GothicOrnament.ts) 配合体力微导槽；
+   - 双生灵体伴侣（`CompanionSystem`）沿正弦契约线分布 **5 枚菱形鎏金铸铁香炉链环**，本体为双层锯齿鎏金圣翼包裹的雕刻黄铜圣物香炉（带镂空十字格栅、琥珀香火火星与锚定八芒星旋转圣环）；
+   - Boss 在保有斜射天顶聚光灯与深渊蚀变光影的同时，头顶采用 compact `76px × 6px` 雕花圣物金属槽 `drawGothicGaugeBar`（4 段铸铁分格 + 菱形钉帽 + 50% 二阶段菱形刻痕 + 白金受击延迟残影 Lag Gauge + `8.5px` `GOTHIC_DISPLAY_FONT` 首领头衔微标）。
 
 ---
 
-## 五、UI 与交互排版规范（Minimalist 3D Slate UI）
+## 五、UI 与交互排版规范（Dark Gothic Maximalist Reliquary UI）
 
-- **卡片质感**：深板岩线性渐变面板（`#131c2e -> #080c17`）、顶部 `1px` 镜面高光边（`rgba(255,255,255,0.12)`）、下方 `3~5px` 深色立体挤出唇边与悬浮投影。
-- **字体规范**：
-  - 界面文本：`UI_FONT`（`-apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "PingFang SC", sans-serif`）；
-  - 数值/倒计时/快捷键：`MONO_FONT`（`ui-monospace, "SF Mono", "JetBrains Mono", "Menlo", monospace`）。
-- **信息极简原则**：拒绝密集长文案与劣质 MMO 发光描边；用**职业定位徽章**、**金色 `★ 推荐` 角标**与**清晰的一句话效果说明**引导玩家零门槛上手。
+- **统一哥特图腾原语库（[`src/ui/GothicOrnament.ts`](src/ui/GothicOrnament.ts)）**：
+  - 所有全屏模态框（选人、升级、命途分化、宝箱、设置、结算）与 HUD 圣物面板统一调用 [`drawGothicTablet`](src/ui/GothicOrnament.ts)（八边形切角石板 + `64×64` 平铺大马士革四叶草暗纹 `applyDamaskFill` + 四角鎏金卷草镶红宝石角饰 `drawFiligreeCorner`）、[`drawPointedArchNiche`](src/ui/GothicOrnament.ts)（尖券哥特神龛图标槽）、[`drawWaxSeal`](src/ui/GothicOrnament.ts)（红金双色蜡封徽章）、[`drawGothicCrestBanner`](src/ui/GothicOrnament.ts)（双翼哥特铭牌）与 [`drawRoseWindowMandala`](src/ui/GothicOrnament.ts)（预缓存放射状哥特大玫瑰花窗背景）；
+  - 全屏边角采用 [`drawScreenIronFrame`](src/ui/GothicOrnament.ts) 铸铁镂空窗框装饰，HUD 左上角为八角星盘英雄徽章（含觉醒印记）、右侧顶部为居中双翼哥特计时圣匣、底部技能栏为切角鎏金魔典槽位。
+- **衬线哥特字体体系（`@fontsource/cinzel`）**：
+  - 展示标题：`GOTHIC_DISPLAY_FONT`（`"Cinzel", "Noto Serif SC", "Songti SC", "STSong", Georgia, serif`）；
+  - 正文说明：`GOTHIC_BODY_FONT`（`"Noto Serif SC", "Songti SC", "STSong", "PingFang SC", Georgia, serif`）；
+  - 数值/倒计时/飘字：`GOTHIC_MONO_FONT`（`"Cinzel", ui-monospace, "SF Mono", "JetBrains Mono", monospace`），暴击与状态飘字采用 `GOTHIC_DISPLAY_FONT` 配合深黑曜描边轮廓与鎏金闪烁星芒。
+- **高信息密度且零门槛引导**：
+  - **升级模态框**：顶部搭载 **Current Reliquary Loadout Strip**（实时展示已装备主武器、被动圣物与活跃流派羁绊计数），每张魔典卡片显示尖券神龛图标、蜡封序号、**超武进化羁绊提示（Evolution Link）**、羁绊标签宝石及 **`★ 推荐`** 徽记，底部配备鎏金重随/跳过/封印按钮；
+  - **选人界面与结算统计**：选人界面底部内置 `SaveManager` **Lifetime Chronicle Strip**（总击杀/最高分/金币生涯碑铭）；结算面板内置 4 座尖券神龛数据碑与共享 `drawGothicGaugeBar` 武器 DPS 计量条。
+  - **四周教堂边界构筑**：[`RoomManager.renderRoomArena`](src/systems/RoomManager.ts) 与 [`MapSystem`](src/systems/MapSystem.ts) 保持中心战斗视野清澈的同时，沿着场地外围铺设双道切角回廊镶边、生态主题教堂中殿红毯、东西对称铸铁地漏格栅、三墙彩色玻璃柳叶尖窗（Stained-Glass Lancet Slits）、封锁态南侧锻铁闸门（Portcullis）与四角八边形教堂烛台碉楼（含局部暖光点光源）。

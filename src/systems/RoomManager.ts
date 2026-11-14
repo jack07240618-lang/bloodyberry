@@ -9,6 +9,12 @@ import { Camera } from '../core/Camera';
 import { SkillTag } from './BuildSystem';
 import { t } from '../core/I18n';
 import { createFloorSigil } from './FloorSigil';
+import {
+  GOTHIC_DISPLAY_FONT,
+  drawCandelabraFlame,
+  drawGothicCrestBanner,
+  traceChamferedRect
+} from '../ui/GothicOrnament';
 
 /**
  * 房间状态机枚举 (Room State Machine)
@@ -1330,77 +1336,190 @@ export class RoomManager {
     // 2. Static cult paint decal, cached on entry and grounded in the stone material.
     ctx.save();
     this.floorSigil ??= createFloorSigil(this.previousSigil, this.floorSigilSeed, this.currentRoom.biomeIndex);
+
+    // 2a. Ceremonial Nave Runner Carpet (South Crypt Gate -> Center Sanctuary -> North Portal)
+    const runnerW = 78;
+    const biomeCarpetColors = ['#450a14', '#0c2742', '#0b2e22', '#421509', '#251042'];
+    const carpetFill = biomeCarpetColors[this.currentRoom.biomeIndex % biomeCarpetColors.length];
+    const runnerGrad = ctx.createLinearGradient(-runnerW / 2, 0, runnerW / 2, 0);
+    runnerGrad.addColorStop(0, 'rgba(5, 2, 8, 0.72)');
+    runnerGrad.addColorStop(0.18, carpetFill);
+    runnerGrad.addColorStop(0.5, carpetFill);
+    runnerGrad.addColorStop(0.82, carpetFill);
+    runnerGrad.addColorStop(1, 'rgba(5, 2, 8, 0.72)');
+
+    ctx.save();
+    ctx.globalAlpha = 0.56;
+    ctx.fillStyle = runnerGrad;
+    ctx.fillRect(-runnerW / 2, -hh + 18, runnerW, hh * 2 - 36);
+    // Gilded Gothic runner edge embroidery & repeating diamond weave
+    ctx.strokeStyle = 'rgba(217, 119, 6, 0.55)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-runnerW / 2 + 5, -hh + 20, runnerW - 10, hh * 2 - 40);
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.16)';
+    ctx.lineWidth = 1;
+    for (let cy = -hh + 44; cy <= hh - 44; cy += 36) {
+      if (Math.abs(cy) < 185) continue; // Keep center cult floor sigil unobstructed
+      ctx.beginPath();
+      ctx.moveTo(0, cy - 11);
+      ctx.lineTo(14, cy);
+      ctx.lineTo(0, cy + 11);
+      ctx.lineTo(-14, cy);
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
+
     ctx.drawImage(this.floorSigil, -220, -220);
 
-    // 地面四向石板走道引导线
-    ctx.strokeStyle = 'rgba(148, 163, 184, 0.10)';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(-hw + 36, -hh + 36, (hw - 36) * 2, (hh - 36) * 2);
+    // 2b. Cloister Mosaic Floor Border, Trefoil Cusps & Abyssal Floor Grates
+    const rimPad = 32;
+    ctx.strokeStyle = 'rgba(217, 119, 6, 0.22)';
+    ctx.lineWidth = 1.6;
+    traceChamferedRect(ctx, -hw + rimPad, -hh + rimPad, (hw - rimPad) * 2, (hh - rimPad) * 2, 18);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(148, 163, 184, 0.12)';
+    ctx.lineWidth = 1;
+    traceChamferedRect(ctx, -hw + rimPad + 6, -hh + rimPad + 6, (hw - rimPad - 6) * 2, (hh - rimPad - 6) * 2, 14);
+    ctx.stroke();
+
+    // Subtle Gothic Iron Drainage Grates symmetrically flanking central aisle
+    const grates = [
+      [-310, -145],
+      [310, -145],
+      [-310, 145],
+      [310, 145]
+    ];
+    for (const [gx, gy] of grates) {
+      ctx.fillStyle = 'rgba(3, 2, 8, 0.72)';
+      ctx.fillRect(gx - 18, gy - 18, 36, 36);
+      ctx.strokeStyle = 'rgba(120, 90, 60, 0.35)';
+      ctx.lineWidth = 1.2;
+      ctx.strokeRect(gx - 18, gy - 18, 36, 36);
+      ctx.strokeStyle = 'rgba(60, 50, 72, 0.5)';
+      for (let bar = -12; bar <= 12; bar += 6) {
+        ctx.beginPath();
+        ctx.moveTo(gx + bar, gy - 17);
+        ctx.lineTo(gx + bar, gy + 17);
+        ctx.stroke();
+      }
+    }
     ctx.restore();
 
     // 2b. 墙体内侧立体环境光遮蔽阴影 (Interior Ambient Occlusion Wall Shadows)
-    const shadowDepth = 52;
+    const shadowDepth = 54;
     const topShad = ctx.createLinearGradient(0, -hh, 0, -hh + shadowDepth);
-    topShad.addColorStop(0, 'rgba(2, 1, 8, 0.78)');
+    topShad.addColorStop(0, 'rgba(2, 1, 8, 0.84)');
     topShad.addColorStop(1, 'rgba(2, 1, 8, 0)');
     ctx.fillStyle = topShad;
     ctx.fillRect(-hw, -hh, hw * 2, shadowDepth);
 
     const botShad = ctx.createLinearGradient(0, hh, 0, hh - shadowDepth);
-    botShad.addColorStop(0, 'rgba(2, 1, 8, 0.78)');
+    botShad.addColorStop(0, 'rgba(2, 1, 8, 0.84)');
     botShad.addColorStop(1, 'rgba(2, 1, 8, 0)');
     ctx.fillStyle = botShad;
     ctx.fillRect(-hw, hh - shadowDepth, hw * 2, shadowDepth);
 
     const leftShad = ctx.createLinearGradient(-hw, 0, -hw + shadowDepth, 0);
-    leftShad.addColorStop(0, 'rgba(2, 1, 8, 0.78)');
+    leftShad.addColorStop(0, 'rgba(2, 1, 8, 0.84)');
     leftShad.addColorStop(1, 'rgba(2, 1, 8, 0)');
     ctx.fillStyle = leftShad;
     ctx.fillRect(-hw, -hh, shadowDepth, hh * 2);
 
     const rightShad = ctx.createLinearGradient(hw, 0, hw - shadowDepth, 0);
-    rightShad.addColorStop(0, 'rgba(2, 1, 8, 0.78)');
+    rightShad.addColorStop(0, 'rgba(2, 1, 8, 0.84)');
     rightShad.addColorStop(1, 'rgba(2, 1, 8, 0)');
     ctx.fillStyle = rightShad;
     ctx.fillRect(hw - shadowDepth, -hh, shadowDepth, hh * 2);
 
-    // 3. 立体生态主题城墙与石砖砌缝 (3D Beveled Biome Masonry Walls)
+    // 3. Monumental Dark Gothic Cathedral Masonry & Blind-Arcade Walls
     ctx.fillStyle = theme.wallBase;
-    ctx.fillRect(-hw - wt, -hh - wt, (hw + wt) * 2, wt); // 北墙
-    ctx.fillRect(-hw - wt, hh, (hw + wt) * 2, wt);       // 南墙
-    ctx.fillRect(-hw - wt, -hh, wt, hh * 2);             // 西墙
-    ctx.fillRect(hw, -hh, wt, hh * 2);                   // 东墙
+    ctx.fillRect(-hw - wt, -hh - wt, (hw + wt) * 2, wt); // North Wall
+    ctx.fillRect(-hw - wt, hh, (hw + wt) * 2, wt);       // South Wall
+    ctx.fillRect(-hw - wt, -hh, wt, hh * 2);             // West Wall
+    ctx.fillRect(hw, -hh, wt, hh * 2);                   // East Wall
 
-    // 墙体石砖垛口浮雕细节 (Stone Battlement Crenellations)
-    ctx.fillStyle = theme.wallBrick;
-    ctx.strokeStyle = theme.wallStroke;
-    ctx.lineWidth = 1;
+    // Chiseled Stone Buttresses & Glowing Stained-Glass Lancet Slits along Perimeter
     const brickStep = 64;
+    ctx.lineWidth = 1.1;
+    let slotIdx = 0;
     for (let bx = -hw; bx < hw; bx += brickStep) {
-      if (Math.abs(bx) > 72) {
+      slotIdx++;
+      if (Math.abs(bx + brickStep * 0.5) > 76) {
+        ctx.fillStyle = theme.wallBrick;
+        ctx.strokeStyle = theme.wallStroke;
         ctx.fillRect(bx + 4, -hh - wt + 6, brickStep - 8, wt - 12);
         ctx.strokeRect(bx + 4, -hh - wt + 6, brickStep - 8, wt - 12);
+
+        // Stained-glass lancet slit on every 3rd North wall pier
+        if (slotIdx % 3 === 0) {
+          ctx.fillStyle = '#050208';
+          ctx.fillRect(bx + brickStep * 0.5 - 6, -hh - wt + 10, 12, wt - 20);
+          ctx.fillStyle = isLocked ? 'rgba(220, 38, 38, 0.45)' : theme.sconceMid;
+          ctx.fillRect(bx + brickStep * 0.5 - 4, -hh - wt + 12, 8, wt - 24);
+          ctx.strokeStyle = 'rgba(217, 119, 6, 0.55)';
+          ctx.strokeRect(bx + brickStep * 0.5 - 6, -hh - wt + 10, 12, wt - 20);
+        }
       }
-      ctx.fillRect(bx + 4, hh + 6, brickStep - 8, wt - 12);
-      ctx.strokeRect(bx + 4, hh + 6, brickStep - 8, wt - 12);
+      if (Math.abs(bx + brickStep * 0.5) > 66) {
+        ctx.fillStyle = theme.wallBrick;
+        ctx.strokeStyle = theme.wallStroke;
+        ctx.fillRect(bx + 4, hh + 6, brickStep - 8, wt - 12);
+        ctx.strokeRect(bx + 4, hh + 6, brickStep - 8, wt - 12);
+      }
     }
     for (let by = -hh; by < hh; by += brickStep) {
+      slotIdx++;
+      ctx.fillStyle = theme.wallBrick;
+      ctx.strokeStyle = theme.wallStroke;
       ctx.fillRect(-hw - wt + 6, by + 4, wt - 12, brickStep - 8);
       ctx.strokeRect(-hw - wt + 6, by + 4, wt - 12, brickStep - 8);
       ctx.fillRect(hw + 6, by + 4, wt - 12, brickStep - 8);
       ctx.strokeRect(hw + 6, by + 4, wt - 12, brickStep - 8);
+
+      if (slotIdx % 2 === 0) {
+        ctx.fillStyle = isLocked ? 'rgba(220, 38, 38, 0.4)' : theme.sconceMid;
+        ctx.fillRect(-hw - wt + 12, by + brickStep * 0.5 - 4, wt - 24, 8);
+        ctx.fillRect(hw + 12, by + brickStep * 0.5 - 4, wt - 24, 8);
+      }
     }
 
-    // 城墙双层警戒镶边
+    // Sealed South Crypt Wrought-Iron Portcullis at (0, hh)
+    ctx.save();
+    ctx.fillStyle = '#050309';
+    ctx.fillRect(-46, hh + 1, 92, wt - 2);
+    ctx.strokeStyle = '#78350f';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-46, hh + 1, 92, wt - 2);
+    ctx.strokeStyle = '#64748b';
+    ctx.lineWidth = 2;
+    for (let barX = -36; barX <= 36; barX += 12) {
+      ctx.beginPath();
+      ctx.moveTo(barX, hh + 2);
+      ctx.lineTo(barX, hh + wt - 2);
+      ctx.stroke();
+    }
+    ctx.fillStyle = '#d97706';
+    ctx.beginPath();
+    ctx.arc(0, hh + wt * 0.45, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Inner Cathedral Iron Rim & Spiked Wrought-Iron Parapet
     ctx.strokeStyle = theme.borderOuter;
-    ctx.lineWidth = 5;
+    ctx.lineWidth = 6;
     ctx.strokeRect(-hw - 2, -hh - 2, hw * 2 + 4, hh * 2 + 4);
 
     ctx.strokeStyle = isLocked ? '#ef4444' : theme.borderUnlocked;
     ctx.lineWidth = 2;
     ctx.strokeRect(-hw, -hh, hw * 2, hh * 2);
 
-    // 四角石雕柱墩与立柱火盆/符文灯塔 (4 Corner Bastion Pillars & Beacon Lanterns)
+    ctx.strokeStyle = 'rgba(217, 119, 6, 0.35)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-hw + 4, -hh + 4, hw * 2 - 8, hh * 2 - 8);
+
+    // 4 Octagonal Gothic Bastion Corner Towers & Ritual Candelabra Altars
     const corners = [
       [-hw - wt * 0.5, -hh - wt * 0.5],
       [hw + wt * 0.5, -hh - wt * 0.5],
@@ -1409,35 +1528,28 @@ export class RoomManager {
     ];
     for (let cIdx = 0; cIdx < corners.length; cIdx++) {
       const [cx, cy] = corners[cIdx];
-      ctx.fillStyle = theme.wallBase;
-      ctx.fillRect(cx - 26, cy - 26, 52, 52);
-      ctx.strokeStyle = theme.borderUnlocked;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(cx - 26, cy - 26, 52, 52);
+      ctx.fillStyle = '#09060e';
+      traceChamferedRect(ctx, cx - 30, cy - 30, 60, 60, 12);
+      ctx.fill();
+      ctx.strokeStyle = isLocked ? '#ef4444' : '#d97706';
+      ctx.lineWidth = 2.2;
+      ctx.stroke();
 
-      // 铸铁八角灯座底盘
-      ctx.fillStyle = '#090d16';
-      ctx.strokeStyle = '#94a3b8';
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.35)';
+      ctx.lineWidth = 1;
+      traceChamferedRect(ctx, cx - 23, cy - 23, 46, 46, 9);
+      ctx.stroke();
+
+      // Cast-iron brazier bowl
+      ctx.fillStyle = '#050308';
+      ctx.strokeStyle = '#a89276';
       ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.arc(cx, cy, 13, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 14, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
 
-      // 燃烧/充能灯芯与辉光
-      const cFlicker = 0.85 + Math.sin(this.elapsedSeconds * 7 + cIdx * 1.9) * 0.15;
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      const cg = ctx.createRadialGradient(cx, cy, 2, cx, cy, 34 * cFlicker);
-      cg.addColorStop(0, '#ffffff');
-      cg.addColorStop(0.35, isLocked ? 'rgba(239, 68, 68, 0.55)' : theme.sconceMid);
-      cg.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = cg;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 34 * cFlicker, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-
+      // Corner crystal & live candelabra flame cluster
       ctx.fillStyle = isLocked ? '#ef4444' : theme.pillarGem;
       ctx.beginPath();
       ctx.moveTo(cx, cy - 9);
@@ -1446,6 +1558,17 @@ export class RoomManager {
       ctx.lineTo(cx - 9, cy);
       ctx.closePath();
       ctx.fill();
+
+      drawCandelabraFlame(
+        ctx,
+        cx,
+        cy - 2,
+        1.15,
+        this.elapsedSeconds,
+        cIdx * 1.9,
+        '#fef08a',
+        isLocked ? 'rgba(239, 68, 68, 0.7)' : theme.sconceMid
+      );
     }
 
     // 城墙壁挂哥特铸铁灯具 / 壁炉火盆与真实光照投射 (3D Wall-Mounted Gothic Lantern Sconces)
@@ -3223,97 +3346,77 @@ export class RoomManager {
       ctx.fillRect(0, 0, width, height);
     }
 
-    // 极简 3D 浮雕层数铭牌与波次菱形晶石（当存在活跃首领时自动下移，礼让顶部全屏首领血条 HUD）
-    const hasActiveBoss = this.combatSystem.enemies.some(e => e.isBoss && e.active);
-    const badgeW = 96;
-    const badgeH = 22;
-    const bx = width / 2 - badgeW / 2;
-    const by = hasActiveBoss ? 142 : 56;
+    // Ornate Winged Gothic Floor Cartouche & Beveled Wave Crystals (Docked cleanly below top chronometer)
+    const badgeW = 120;
+    const badgeH = 24;
+    const by = 54;
+    const isLocked = room.state === RoomState.ACTIVE_LOCKED;
 
-    // 立体投影
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
-    ctx.beginPath();
-    ctx.roundRect(bx + 1, by + 3, badgeW, badgeH, 5);
-    ctx.fill();
-
-    // 3D 斜切黑曜金属底壳
-    const plateGrad = ctx.createLinearGradient(bx, by, bx, by + badgeH);
-    plateGrad.addColorStop(0, '#1e293b');
-    plateGrad.addColorStop(1, '#090d16');
-    ctx.fillStyle = plateGrad;
-    ctx.beginPath();
-    ctx.roundRect(bx, by, badgeW, badgeH, 5);
-    ctx.fill();
-
-    ctx.strokeStyle = room.state === RoomState.ACTIVE_LOCKED ? 'rgba(239, 68, 68, 0.6)' : 'rgba(148, 163, 184, 0.35)';
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
+    drawGothicCrestBanner(
+      ctx,
+      width / 2,
+      by + badgeH / 2,
+      badgeW,
+      badgeH,
+      isLocked ? '#ef4444' : '#d97706',
+      meta.themeColor
+    );
 
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = '600 10px -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", ui-monospace, sans-serif';
-    ctx.fillStyle = '#e2e8f0';
-    ctx.fillText(t(`第 ${room.roomNumber} 层`, `FLOOR ${room.roomNumber}`), width / 2, by + 11.5);
+    ctx.font = `700 10.5px ${GOTHIC_DISPLAY_FONT}`;
+    ctx.fillStyle = '#fef3c7';
+    ctx.fillText(t(`第 ${room.roomNumber} 层`, `FLOOR ${room.roomNumber}`), width / 2, by + badgeH / 2 + 0.5);
 
-    // 波次立体切面晶石指示点 (3D Faceted Wave Pips - 无需任何汉字即可直观感知波次进度)
+    // Gilded Gothic Wave Diamond Gems
     if (room.totalWaves > 0) {
-      const pipSpacing = 16;
+      const pipSpacing = 18;
       const startPipX = width / 2 - ((room.totalWaves - 1) * pipSpacing) / 2;
-      const pipY = by + badgeH + 10;
+      const pipY = by + badgeH + 11;
 
       for (let wIdx = 1; wIdx <= room.totalWaves; wIdx++) {
         const px = startPipX + (wIdx - 1) * pipSpacing;
-        const isCleared =
-          room.state === RoomState.CLEARED || wIdx < room.currentWave;
-        const isCurrent =
-          room.state === RoomState.ACTIVE_LOCKED && wIdx === room.currentWave;
+        const isCleared = room.state === RoomState.CLEARED || wIdx < room.currentWave;
+        const isCurrent = room.state === RoomState.ACTIVE_LOCKED && wIdx === room.currentWave;
 
         ctx.save();
         ctx.translate(px, pipY);
-        // 晶石底座暗影
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
         ctx.beginPath();
-        ctx.moveTo(0, -4);
-        ctx.lineTo(5, 1);
-        ctx.lineTo(0, 6);
-        ctx.lineTo(-5, 1);
+        ctx.moveTo(0, -5);
+        ctx.lineTo(6, 1);
+        ctx.lineTo(0, 7);
+        ctx.lineTo(-6, 1);
         ctx.closePath();
         ctx.fill();
 
-        // 晶石立体填充
-        ctx.fillStyle = isCleared
-          ? '#4ade80'
-          : isCurrent
-          ? '#ef4444'
-          : '#1e293b';
-        ctx.strokeStyle = isCleared
-          ? '#bbf7d0'
-          : isCurrent
-          ? '#fca5a5'
-          : '#475569';
+        ctx.fillStyle = isCleared ? '#34d399' : isCurrent ? '#ef4444' : '#180d1e';
+        ctx.strokeStyle = isCleared ? '#a7f3d0' : isCurrent ? '#fde047' : '#78350f';
         ctx.lineWidth = 1.2;
         ctx.beginPath();
         ctx.moveTo(0, -5);
-        ctx.lineTo(4.5, 0);
+        ctx.lineTo(5, 0);
         ctx.lineTo(0, 5);
-        ctx.lineTo(-4.5, 0);
+        ctx.lineTo(-5, 0);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
         ctx.restore();
       }
     } else {
-      // 特殊房间单颗发光星钻
       ctx.save();
-      ctx.translate(width / 2, by + badgeH + 10);
+      ctx.translate(width / 2, by + badgeH + 11);
       ctx.fillStyle = meta.themeColor;
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.moveTo(0, -5);
-      ctx.lineTo(5, 0);
-      ctx.lineTo(0, 5);
-      ctx.lineTo(-5, 0);
+      ctx.moveTo(0, -5.5);
+      ctx.lineTo(5.5, 0);
+      ctx.lineTo(0, 5.5);
+      ctx.lineTo(-5.5, 0);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
       ctx.restore();
     }
 
