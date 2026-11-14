@@ -124,13 +124,14 @@ export class SpriteRenderer {
       this.registerFrames(`${mob.id}_strike`, [0, 1, 2, 3].map((f) => mob.builder(f, 'strike')));
     }
 
-    // 3. Boss Sprites (128x128 4 Variants x 2 Phases x 3 Poses)
+    // 3. Boss Sprites (128x128 4 Variants x 2 Phases x 4 Poses: move, windup, strike, stunned)
     for (let v = 0; v < 4; v++) {
       for (const phase of [1, 2] as const) {
         const moveFrames = [0, 1, 2, 3, 4, 5].map((f) => this.createDemonBossSprite(f, v, phase, 'move'));
         this.registerFrames(`boss_v${v}_p${phase}_move`, moveFrames);
         this.registerFrames(`boss_v${v}_p${phase}_windup`, [0, 1, 2, 3].map((f) => this.createDemonBossSprite(f, v, phase, 'windup')));
         this.registerFrames(`boss_v${v}_p${phase}_strike`, [0, 1, 2, 3].map((f) => this.createDemonBossSprite(f, v, phase, 'strike')));
+        this.registerFrames(`boss_v${v}_p${phase}_stunned`, [0, 1, 2, 3].map((f) => this.createDemonBossSprite(f, v, phase, 'stunned')));
       }
     }
     this.registerFrames('demon_boss', this.spriteSheets.get('boss_v0_p1_move')!);
@@ -327,7 +328,7 @@ export class SpriteRenderer {
     return [c, c.getContext('2d')!];
   }
 
-  private getPoseParams(frame: number, pose: 'move' | 'windup' | 'strike'): {
+  private getPoseParams(frame: number, pose: 'move' | 'windup' | 'strike' | 'stunned'): {
     phase: number;
     bob: number;
     stride: number;
@@ -336,6 +337,18 @@ export class SpriteRenderer {
     lunge: number;
     glow: number;
   } {
+    if (pose === 'stunned') {
+      const ang = (frame / 4) * Math.PI * 2;
+      return {
+        phase: frame / 4,
+        bob: 6 + Math.sin(ang) * 1.4,
+        stride: 0,
+        lean: Math.sin(ang) * 0.08 + 0.1,
+        armRaise: 1.25 + Math.sin(ang) * 0.08,
+        lunge: Math.sin(ang * 2) * 1.6,
+        glow: 0.2
+      };
+    }
     if (pose === 'windup') {
       const p = frame / 3;
       return {
@@ -972,13 +985,20 @@ export class SpriteRenderer {
     frame: number,
     variant = 0,
     phase: 1 | 2 = 1,
-    pose: 'move' | 'windup' | 'strike' = 'move'
+    pose: 'move' | 'windup' | 'strike' | 'stunned' = 'move'
   ): HTMLCanvasElement {
     const [c, ctx] = this.makeCanvas(128);
     const p = this.getPoseParams(frame, pose);
     const isP2 = phase === 2;
+    const isStunned = pose === 'stunned';
     const wingBeat =
-      pose === 'windup' ? -18 : pose === 'strike' ? 16 : Math.sin((frame / 6) * Math.PI * 2) * 14;
+      isStunned
+        ? 22
+        : pose === 'windup'
+        ? -18
+        : pose === 'strike'
+        ? 16
+        : Math.sin((frame / 6) * Math.PI * 2) * 14;
 
     ctx.save();
     ctx.translate(64 + p.lunge * 1.4, 70 + p.bob * 1.4);
@@ -1356,6 +1376,40 @@ export class SpriteRenderer {
         ctx.fillRect(-1.5, -38, 3, 32);
         ctx.restore();
       }
+    }
+
+    if (isStunned) {
+      // Dazed X-eyes overlay & dimmed visor
+      ctx.fillStyle = '#090d16';
+      ctx.fillRect(-9, -35, 18, 6);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.8;
+      for (const ex of [-5, 5]) {
+        ctx.beginPath();
+        ctx.moveTo(ex - 2.5, -34);
+        ctx.lineTo(ex + 2.5, -30);
+        ctx.moveTo(ex + 2.5, -34);
+        ctx.lineTo(ex - 2.5, -30);
+        ctx.stroke();
+      }
+
+      // Cracked Arcane/Frost Binding Chains Across Torso
+      ctx.strokeStyle = '#7dd3fc';
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.moveTo(-24, -14);
+      ctx.lineTo(24, 14);
+      ctx.moveTo(24, -14);
+      ctx.lineTo(-24, 14);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#fef08a';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.ellipse(0, -52, 18, 5, Math.sin((frame / 4) * Math.PI * 2) * 0.15, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
     ctx.restore();

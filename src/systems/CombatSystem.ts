@@ -605,6 +605,12 @@ export class CombatSystem {
 
   public freezeEnemies(duration = 5.0): void {
     this.freezeTimer = duration;
+    for (const enemy of this.enemies) {
+      if (enemy.active) {
+        enemy.freezeTimer = Math.max(enemy.freezeTimer, duration);
+        enemy.hitFlashTimer = 0;
+      }
+    }
   }
 
   public update(dt: number, player: Player, onLevelUp: () => void, onBossChestOpen: () => void, onHitStop?: (duration: number) => void): void {
@@ -807,6 +813,10 @@ export class CombatSystem {
         }
 
         enemy.updateEnemy(dt, player, sepForce, (proj) => this.addEnemyProjectile(proj));
+      } else {
+        if (enemy.hitFlashTimer > 0) enemy.hitFlashTimer = Math.max(0, enemy.hitFlashTimer - dt);
+        if (enemy.freezeTimer > 0) enemy.freezeTimer = Math.max(0, enemy.freezeTimer - dt);
+        enemy.animTimer += dt * 2.2;
       }
 
       // Enemy vs Player collision (enemies still materializing in their Soul Knight summoning portal do not deal contact damage)

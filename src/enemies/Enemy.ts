@@ -1371,6 +1371,63 @@ export class Enemy extends Entity {
     this.renderProceduralGraphic(ctx);
     ctx.restore();
 
+    // Render Boss Stunned / Frozen Gothic Shackles & Orbiting Daze Sigils
+    if (this.isBoss && (this.freezeTimer > 0 || this.staggerTimer > 0)) {
+      const isIce = this.freezeTimer > 0;
+      const t = this.animTimer;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      // 1. Perspective Ground Frost/Arcane Binding Ring
+      ctx.save();
+      ctx.translate(0, this.radius * 0.55);
+      ctx.scale(1, 0.5);
+      ctx.strokeStyle = isIce ? 'rgba(56, 189, 248, 0.72)' : 'rgba(251, 191, 36, 0.72)';
+      ctx.lineWidth = 2.2;
+      ctx.setLineDash([8, 5]);
+      ctx.rotate(t * 0.4);
+      ctx.beginPath();
+      ctx.arc(0, 0, this.radius * 1.45, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+
+      // 2. Faceted Translucent Ice Shards around Boss lower body when frozen
+      if (isIce) {
+        for (let s = 0; s < 4; s++) {
+          const sx = (s - 1.5) * 18;
+          const sh = 18 + (s % 2) * 8;
+          const sy = this.radius * 0.45;
+          ctx.fillStyle = 'rgba(125, 211, 252, 0.26)';
+          ctx.strokeStyle = 'rgba(224, 242, 254, 0.65)';
+          ctx.lineWidth = 1.1;
+          ctx.beginPath();
+          ctx.moveTo(sx - 6, sy);
+          ctx.lineTo(sx, sy - sh);
+          ctx.lineTo(sx + 6, sy);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      // 3. Three Orbiting Stun Rune Stars above Boss Head
+      for (let i = 0; i < 3; i++) {
+        const ang = t * 1.35 + (i * Math.PI * 2) / 3;
+        const ox = Math.cos(ang) * (this.radius * 0.85);
+        const oy = -this.radius * 1.35 + Math.sin(ang) * 7;
+        ctx.fillStyle = isIce ? '#7dd3fc' : '#fef08a';
+        ctx.beginPath();
+        ctx.moveTo(ox, oy - 5);
+        ctx.lineTo(ox + 4, oy);
+        ctx.lineTo(ox, oy + 5);
+        ctx.lineTo(ox - 4, oy);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     // Render Elemental Status Indicators (Burn / Shock / Bleed)
     if (this.burnTimer > 0) {
       ctx.save();
@@ -1502,18 +1559,35 @@ export class Enemy extends Entity {
       }
 
       case EnemyType.BOSS_DEMON: {
-        const bossPose: 'move' | 'windup' | 'strike' =
-          this.bossState === 'DASH_TELEGRAPH' ||
-          this.bossState === 'LEAP_TELEGRAPH' ||
-          this.bossState === 'LASER_TELEGRAPH'
-            ? 'windup'
-            : this.bossState === 'STRAFE'
-            ? 'move'
-            : 'strike';
-        const bossFrame = bossPose === 'move' ? Math.floor(anim * 1.6) % 6 : Math.floor(anim * 2.8) % 4;
+        const isBossStunned = this.freezeTimer > 0 || this.staggerTimer > 0;
+        const bossPose: 'move' | 'windup' | 'strike' | 'stunned' = isBossStunned
+          ? 'stunned'
+          : this.bossState === 'DASH_TELEGRAPH' ||
+            this.bossState === 'LEAP_TELEGRAPH' ||
+            this.bossState === 'LASER_TELEGRAPH'
+          ? 'windup'
+          : this.bossState === 'STRAFE'
+          ? 'move'
+          : 'strike';
+        const bossFrame =
+          bossPose === 'move'
+            ? Math.floor(anim * 1.6) % 6
+            : bossPose === 'stunned'
+            ? Math.floor(anim * 2.2) % 4
+            : Math.floor(anim * 2.8) % 4;
         const bossSize = this.bossPhase === 2 ? 116 : 104;
         const bossKey = `boss_v${this.bossVariant % 4}_p${this.bossPhase === 2 ? 2 : 1}_${bossPose}`;
-        SpriteRenderer.getInstance().drawSprite(ctx, bossKey, bossFrame, 0, 0, bossSize, bossSize, 1, isHit);
+        SpriteRenderer.getInstance().drawSprite(
+          ctx,
+          bossKey,
+          bossFrame,
+          0,
+          0,
+          bossSize,
+          bossSize,
+          1,
+          isBossStunned ? false : isHit
+        );
         break;
       }
     }
