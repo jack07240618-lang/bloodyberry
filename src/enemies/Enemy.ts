@@ -82,7 +82,11 @@ export class Enemy extends Entity {
     | 'SPIRAL_HELL'
     | 'LASER_TELEGRAPH'
     | 'LASER_SWEEP'
-    | 'SHOTGUN_BLITZ' = 'STRAFE';
+    | 'SHOTGUN_BLITZ'
+    | 'BLOOD_NOVA'
+    | 'FROST_RING'
+    | 'VENOM_WEB'
+    | 'CATACLYSM_NOVA' = 'STRAFE';
   public bossStateTimer = 1.6;
   public bossSubTimer = 0;
   public bossDashRemaining = 0;
@@ -389,26 +393,46 @@ export class Enemy extends Entity {
           }
         }
 
-        // Transition to next Soul Knight Boss Skill!
+        // Transition to next Variant- & Phase-Specific Boss Skill!
         if (this.bossStateTimer <= 0) {
           this.bossStrafeSign *= -1;
-          const skillCycle: Array<'DASH_TELEGRAPH' | 'SPIRAL_HELL' | 'SHOTGUN_BLITZ' | 'LEAP_TELEGRAPH' | 'LASER_TELEGRAPH'> = [
-            'DASH_TELEGRAPH',
-            'SPIRAL_HELL',
-            'SHOTGUN_BLITZ',
-            'LEAP_TELEGRAPH',
-            'LASER_TELEGRAPH'
-          ];
-          const nextSkill = skillCycle[(this.bossSkillIndex + this.bossVariant) % skillCycle.length];
+          type BossSkill =
+            | 'DASH_TELEGRAPH'
+            | 'SPIRAL_HELL'
+            | 'SHOTGUN_BLITZ'
+            | 'LEAP_TELEGRAPH'
+            | 'LASER_TELEGRAPH'
+            | 'BLOOD_NOVA'
+            | 'FROST_RING'
+            | 'VENOM_WEB'
+            | 'CATACLYSM_NOVA';
+          const v = this.bossVariant % 4;
+          const p2 = this.bossPhase === 2;
+          const skillCycles: Record<number, BossSkill[]> = {
+            0: p2
+              ? ['DASH_TELEGRAPH', 'BLOOD_NOVA', 'LEAP_TELEGRAPH', 'SHOTGUN_BLITZ']
+              : ['DASH_TELEGRAPH', 'SHOTGUN_BLITZ', 'LEAP_TELEGRAPH'],
+            1: p2
+              ? ['LASER_TELEGRAPH', 'FROST_RING', 'SPIRAL_HELL', 'SHOTGUN_BLITZ']
+              : ['SPIRAL_HELL', 'FROST_RING', 'LASER_TELEGRAPH'],
+            2: p2
+              ? ['VENOM_WEB', 'DASH_TELEGRAPH', 'SPIRAL_HELL', 'LEAP_TELEGRAPH']
+              : ['VENOM_WEB', 'LEAP_TELEGRAPH', 'SHOTGUN_BLITZ'],
+            3: p2
+              ? ['CATACLYSM_NOVA', 'LEAP_TELEGRAPH', 'LASER_TELEGRAPH', 'DASH_TELEGRAPH']
+              : ['LEAP_TELEGRAPH', 'DASH_TELEGRAPH', 'LASER_TELEGRAPH']
+          };
+          const cycle = skillCycles[v];
+          const nextSkill = cycle[this.bossSkillIndex % cycle.length];
           this.bossSkillIndex++;
           this.bossState = nextSkill;
 
           if (nextSkill === 'DASH_TELEGRAPH') {
-            this.bossDashRemaining = this.bossPhase === 2 ? 3 : 2;
+            this.bossDashRemaining = p2 ? 3 : 2;
             this.bossStateTimer = 0.36;
             this.chargeDirection.copy(dirToPlayer);
           } else if (nextSkill === 'SPIRAL_HELL') {
-            this.bossStateTimer = this.bossPhase === 2 ? 3.0 : 2.5;
+            this.bossStateTimer = p2 ? 3.0 : 2.5;
             this.bossSubTimer = 0.08;
             this.bossSpiralAngle = dirToPlayer.angle();
           } else if (nextSkill === 'SHOTGUN_BLITZ') {
@@ -420,6 +444,20 @@ export class Enemy extends Entity {
           } else if (nextSkill === 'LASER_TELEGRAPH') {
             this.bossStateTimer = 0.55;
             this.bossLaserAngle = dirToPlayer.angle() - 0.55;
+          } else if (nextSkill === 'BLOOD_NOVA') {
+            this.bossStateTimer = 1.65;
+            this.bossSubTimer = 0.25;
+            this.chargeDirection.copy(dirToPlayer);
+          } else if (nextSkill === 'FROST_RING') {
+            this.bossStateTimer = 1.85;
+            this.bossSubTimer = 0.12;
+          } else if (nextSkill === 'VENOM_WEB') {
+            this.bossStateTimer = 2.2;
+            this.bossSubTimer = 0.16;
+          } else if (nextSkill === 'CATACLYSM_NOVA') {
+            this.bossStateTimer = 2.6;
+            this.bossSubTimer = 0.12;
+            this.bossSpiralAngle = dirToPlayer.angle();
           }
         }
         break;
@@ -667,6 +705,153 @@ export class Enemy extends Entity {
         }
         break;
       }
+
+      // ====================================================================
+      // 7. VARIANT 0 (PHASE 2): BLOOD SERAPH NOVA (猩红圣剑十字爆发)
+      // ====================================================================
+      case 'BLOOD_NOVA': {
+        this.position.addScaled(dirToPlayer, this.moveSpeed * 1.45 * dt);
+        if (this.bossSubTimer <= 0 && spawnProjectileCallback) {
+          this.bossSubTimer = 0.42;
+          this.bossMuzzleFlashTimer = 0.16;
+          this.bossMuzzleAngle = dirToPlayer.angle();
+          const blades = 8;
+          const rotOffset = this.bossSkillIndex * 0.25 + this.bossStateTimer;
+          for (let i = 0; i < blades; i++) {
+            const ang = rotOffset + (i * Math.PI * 2) / blades;
+            spawnProjectileCallback(
+              new EnemyProjectile(
+                this.position.x,
+                this.position.y,
+                Vector2.fromAngle(ang),
+                265,
+                16,
+                i % 2 === 0 ? '#ef4444' : '#fef08a',
+                i % 2 === 0 ? 'CRESCENT' : 'STAR'
+              )
+            );
+          }
+        }
+        if (this.bossStateTimer <= 0) {
+          this.bossState = 'STRAFE';
+          this.bossStateTimer = 1.05;
+        }
+        break;
+      }
+
+      // ====================================================================
+      // 8. VARIANT 1: GLACIAL FROST RING & ICE GEYSERS (霜骸寒冰环 + 冰暴区)
+      // ====================================================================
+      case 'FROST_RING': {
+        if (this.bossSubTimer <= 0 && spawnProjectileCallback) {
+          this.bossSubTimer = this.bossPhase === 2 ? 0.55 : 0.72;
+          this.bossMuzzleFlashTimer = 0.18;
+          this.bossMuzzleAngle = dirToPlayer.angle();
+          const shards = this.bossPhase === 2 ? 12 : 8;
+          for (let i = 0; i < shards; i++) {
+            const ang = (i * Math.PI * 2) / shards + this.bossStateTimer;
+            spawnProjectileCallback(
+              new EnemyProjectile(this.position.x, this.position.y, Vector2.fromAngle(ang), 195 * enrageMult, 14, '#38bdf8', 'STAR')
+            );
+          }
+          const geyser = new EnemyProjectile(
+            player.position.x + (Math.random() - 0.5) * 70,
+            player.position.y + (Math.random() - 0.5) * 70,
+            new Vector2(0, 0),
+            0,
+            18,
+            '#38bdf8',
+            'METEOR_ZONE'
+          );
+          geyser.radius = 40;
+          geyser.lifetime = 0.9;
+          geyser.maxLifetime = 0.9;
+          spawnProjectileCallback(geyser);
+        }
+        if (this.bossStateTimer <= 0) {
+          this.bossState = 'STRAFE';
+          this.bossStateTimer = this.bossPhase === 2 ? 1.1 : 1.45;
+        }
+        break;
+      }
+
+      // ====================================================================
+      // 9. VARIANT 2: VENOM WEB SCURRY (毒渊女皇交织毒网弹幕)
+      // ====================================================================
+      case 'VENOM_WEB': {
+        const scurryPerp = new Vector2(-dirToPlayer.y * this.bossStrafeSign, dirToPlayer.x * this.bossStrafeSign);
+        this.position.addScaled(scurryPerp, this.moveSpeed * 2.35 * enrageMult * dt);
+        if (this.bossSubTimer <= 0 && spawnProjectileCallback) {
+          this.bossSubTimer = this.bossPhase === 2 ? 0.24 : 0.32;
+          const baseAng = dirToPlayer.angle();
+          this.bossMuzzleFlashTimer = 0.12;
+          this.bossMuzzleAngle = baseAng;
+          for (const off of [-0.45, -0.15, 0.15, 0.45]) {
+            spawnProjectileCallback(
+              new EnemyProjectile(
+                this.position.x,
+                this.position.y,
+                Vector2.fromAngle(baseAng + off),
+                220 * enrageMult,
+                13,
+                Math.abs(off) > 0.3 ? '#a3e635' : '#10b981',
+                'ORB'
+              )
+            );
+          }
+        }
+        if (this.bossStateTimer <= 0) {
+          this.bossState = 'STRAFE';
+          this.bossStateTimer = this.bossPhase === 2 ? 1.05 : 1.4;
+        }
+        break;
+      }
+
+      // ====================================================================
+      // 10. VARIANT 3 (PHASE 2): HELLFIRE CATACLYSM (炼狱炎魔陨石漩涡)
+      // ====================================================================
+      case 'CATACLYSM_NOVA': {
+        this.bossSpiralAngle += 3.6 * dt;
+        if (this.bossSubTimer <= 0 && spawnProjectileCallback) {
+          this.bossSubTimer = 0.14;
+          this.bossMuzzleFlashTimer = 0.12;
+          this.bossMuzzleAngle = this.bossSpiralAngle;
+          for (let a = 0; a < 6; a++) {
+            const ang = this.bossSpiralAngle + (a * Math.PI * 2) / 6;
+            spawnProjectileCallback(
+              new EnemyProjectile(
+                this.position.x,
+                this.position.y,
+                Vector2.fromAngle(ang),
+                210,
+                15,
+                a % 2 === 0 ? '#f97316' : '#fef08a',
+                'ORB'
+              )
+            );
+          }
+          if (Math.random() < 0.28) {
+            const crater = new EnemyProjectile(
+              player.position.x + (Math.random() - 0.5) * 110,
+              player.position.y + (Math.random() - 0.5) * 110,
+              new Vector2(0, 0),
+              0,
+              22,
+              '#f97316',
+              'METEOR_ZONE'
+            );
+            crater.radius = 46;
+            crater.lifetime = 0.95;
+            crater.maxLifetime = 0.95;
+            spawnProjectileCallback(crater);
+          }
+        }
+        if (this.bossStateTimer <= 0) {
+          this.bossState = 'STRAFE';
+          this.bossStateTimer = 1.15;
+        }
+        break;
+      }
     }
   }
 
@@ -750,6 +935,7 @@ export class Enemy extends Entity {
       }
 
       // Phantom Afterimages along Dash / Leap trajectory
+      const ghostKey = `boss_v${this.bossVariant % 4}_p${this.bossPhase === 2 ? 2 : 1}_strike`;
       for (const ghost of this.bossAfterimages) {
         ctx.save();
         ctx.translate(ghost.x, ghost.y);
@@ -757,7 +943,7 @@ export class Enemy extends Entity {
         ctx.globalAlpha = ghost.alpha * 0.55;
         ctx.globalCompositeOperation = 'lighter';
         const frame = Math.floor(this.animTimer) % 4;
-        SpriteRenderer.getInstance().drawSprite(ctx, 'demon_boss', frame, 0, 0, 72, 72, ghost.alpha * 0.55, true);
+        SpriteRenderer.getInstance().drawSprite(ctx, ghostKey, frame, 0, 0, 104, 104, 1, true);
         ctx.restore();
       }
     }
@@ -1262,63 +1448,72 @@ export class Enemy extends Entity {
   private renderProceduralGraphic(ctx: CanvasRenderingContext2D): void {
     const isHit = this.hitFlashTimer > 0;
     const anim = this.animTimer;
+    const mobPose: 'move' | 'windup' | 'strike' =
+      this.attackState === 'WINDUP' || (this.type === EnemyType.MINOTAUR && this.chargeState === 'TELEGRAPH')
+        ? 'windup'
+        : this.attackState === 'STRIKE' || (this.type === EnemyType.MINOTAUR && this.chargeState === 'CHARGING')
+        ? 'strike'
+        : 'move';
+    const mobFrame = mobPose === 'move' ? Math.floor(anim * 2.0) % 6 : Math.floor(anim * 3.0) % 4;
 
     switch (this.type) {
       case EnemyType.WALKER: {
-        const frame = Math.floor(anim * 1.5) % 4;
-        SpriteRenderer.getInstance().drawSprite(ctx, 'ghoul_walk', frame, 0, 0, 32, 32, 1, isHit);
+        SpriteRenderer.getInstance().drawSprite(ctx, `ghoul_${mobPose}`, mobFrame, 0, 0, 42, 42, 1, isHit);
         break;
       }
 
       case EnemyType.DASHER: {
-        const frame = Math.floor(anim * 2.5) % 4;
-        SpriteRenderer.getInstance().drawSprite(ctx, 'bat_fly', frame, 0, 0, 32, 32, 1, isHit);
+        SpriteRenderer.getInstance().drawSprite(ctx, `bat_${mobPose}`, mobFrame, 0, 0, 42, 42, 1, isHit);
         break;
       }
 
       case EnemyType.SWARMER: {
-        const frame = Math.floor(anim * 2.0) % 4;
-        SpriteRenderer.getInstance().drawSprite(ctx, 'spider_walk', frame, 0, 0, 26, 26, 1, isHit);
+        SpriteRenderer.getInstance().drawSprite(ctx, `spider_${mobPose}`, mobFrame, 0, 0, 34, 34, 1, isHit);
         break;
       }
 
       case EnemyType.TANK: {
-        const frame = Math.floor(anim * 1.2) % 4;
-        SpriteRenderer.getInstance().drawSprite(ctx, 'golem_walk', frame, 0, 0, 48, 48, 1, isHit);
+        SpriteRenderer.getInstance().drawSprite(ctx, `golem_${mobPose}`, mobFrame, 0, 0, 58, 58, 1, isHit);
         break;
       }
 
       case EnemyType.MINOTAUR: {
-        const frame = Math.floor(anim * 1.8) % 4;
-        SpriteRenderer.getInstance().drawSprite(ctx, 'minotaur_walk', frame, 0, 0, 48, 48, 1, isHit);
+        SpriteRenderer.getInstance().drawSprite(ctx, `minotaur_${mobPose}`, mobFrame, 0, 0, 58, 58, 1, isHit);
         break;
       }
 
       case EnemyType.RANGED_SPITTER: {
-        const frame = Math.floor(anim * 1.6) % 4;
-        SpriteRenderer.getInstance().drawSprite(ctx, 'gargoyle_fly', frame, 0, 0, 34, 34, 1, isHit);
+        SpriteRenderer.getInstance().drawSprite(ctx, `gargoyle_${mobPose}`, mobFrame, 0, 0, 44, 44, 1, isHit);
         break;
       }
 
       case EnemyType.SLIME_LARGE:
       case EnemyType.SLIME_MEDIUM:
       case EnemyType.SLIME_SMALL: {
-        const frame = Math.floor(anim * 1.4) % 4;
-        const size = this.radius * 2.2;
-        SpriteRenderer.getInstance().drawSprite(ctx, 'slime_squish', frame, 0, 0, size, size, 1, isHit);
+        const size = this.radius * 2.5;
+        SpriteRenderer.getInstance().drawSprite(ctx, `slime_${mobPose}`, mobFrame, 0, 0, size, size, 1, isHit);
         break;
       }
 
       case EnemyType.GHOST: {
-        const frame = Math.floor(anim * 1.5) % 4;
-        ctx.globalAlpha = 0.72;
-        SpriteRenderer.getInstance().drawSprite(ctx, 'ghost_float', frame, 0, 0, 32, 32, 1, isHit);
+        ctx.globalAlpha = 0.78;
+        SpriteRenderer.getInstance().drawSprite(ctx, `ghost_${mobPose}`, mobFrame, 0, 0, 42, 42, 1, isHit);
         break;
       }
 
       case EnemyType.BOSS_DEMON: {
-        const frame = Math.floor(anim) % 4;
-        SpriteRenderer.getInstance().drawSprite(ctx, 'demon_boss', frame, 0, 0, 72, 72, 1, isHit);
+        const bossPose: 'move' | 'windup' | 'strike' =
+          this.bossState === 'DASH_TELEGRAPH' ||
+          this.bossState === 'LEAP_TELEGRAPH' ||
+          this.bossState === 'LASER_TELEGRAPH'
+            ? 'windup'
+            : this.bossState === 'STRAFE'
+            ? 'move'
+            : 'strike';
+        const bossFrame = bossPose === 'move' ? Math.floor(anim * 1.6) % 6 : Math.floor(anim * 2.8) % 4;
+        const bossSize = this.bossPhase === 2 ? 116 : 104;
+        const bossKey = `boss_v${this.bossVariant % 4}_p${this.bossPhase === 2 ? 2 : 1}_${bossPose}`;
+        SpriteRenderer.getInstance().drawSprite(ctx, bossKey, bossFrame, 0, 0, bossSize, bossSize, 1, isHit);
         break;
       }
     }
