@@ -1,7 +1,3 @@
-import '@fontsource/cinzel/400.css';
-import '@fontsource/cinzel/600.css';
-import '@fontsource/cinzel/700.css';
-import '@fontsource/cinzel/900.css';
 import { GameLoop } from './core/GameLoop';
 import { InputController } from './core/Input';
 import { Camera } from './core/Camera';
@@ -398,10 +394,14 @@ class GameEngine {
   }
 
   private updateBranchSelectHover(mx: number, my: number): void {
-    const { cardW, cardH, gap, startX, startY } = this.uiManager.getBranchSelectLayout(
-      this.camera.viewportWidth,
-      this.camera.viewportHeight
-    );
+    const w = this.camera.viewportWidth;
+    const h = this.camera.viewportHeight;
+    const cardW = Math.min(280, (w - 64) / 2);
+    const cardH = 290;
+    const gap = 24;
+    const totalW = cardW * 2 + gap;
+    const startX = w / 2 - totalW / 2;
+    const startY = h * 0.25;
 
     this.uiManager.hoveredBranchIndex = -1;
     for (let i = 0; i < 2; i++) {
@@ -677,44 +677,70 @@ class GameEngine {
 
   // --- Mouse / Touch Interactivity ---
   private updateSettingsHover(mx: number, my: number): void {
+    const w = this.camera.viewportWidth;
+    const h = this.camera.viewportHeight;
     const isInGame = this.state !== GameState.CHARACTER_SELECT;
-    const l = this.uiManager.getSettingsLayout(
-      this.camera.viewportWidth,
-      this.camera.viewportHeight,
-      isInGame
-    );
+    const panelW = 396;
+    const panelH = isInGame ? 358 : 302;
+    const panelX = w / 2 - panelW / 2;
+    const panelY = h / 2 - panelH / 2;
 
     this.uiManager.hoveredButton = null;
 
-    if (my >= l.langBtnY && my <= l.langBtnY + l.langBtnH) {
-      if (mx >= l.zhBtnX && mx <= l.zhBtnX + l.langBtnW) {
+    // Language Buttons
+    const row1Y = panelY + 84;
+    const langBtnW = 92;
+    const langBtnH = 32;
+    const zhBtnX = panelX + panelW - 28 - langBtnW * 2 - 10;
+    const enBtnX = panelX + panelW - 28 - langBtnW;
+    const langBtnY = row1Y - langBtnH / 2;
+
+    if (my >= langBtnY && my <= langBtnY + langBtnH) {
+      if (mx >= zhBtnX && mx <= zhBtnX + langBtnW) {
         this.uiManager.hoveredButton = 'lang_zh';
         return;
       }
-      if (mx >= l.enBtnX && mx <= l.enBtnX + l.langBtnW) {
+      if (mx >= enBtnX && mx <= enBtnX + langBtnW) {
         this.uiManager.hoveredButton = 'lang_en';
         return;
       }
     }
 
-    if (mx >= l.audioBtnX && mx <= l.audioBtnX + l.audioBtnW && my >= l.audioBtnY && my <= l.audioBtnY + l.audioBtnH) {
+    // Audio Toggle Button
+    const row2Y = panelY + 132;
+    const audioBtnW = 194;
+    const audioBtnH = 32;
+    const audioBtnX = panelX + panelW - 28 - audioBtnW;
+    const audioBtnY = row2Y - audioBtnH / 2;
+    if (mx >= audioBtnX && mx <= audioBtnX + audioBtnW && my >= audioBtnY && my <= audioBtnY + audioBtnH) {
       this.uiManager.hoveredButton = 'toggle_audio';
       return;
     }
 
-    if (mx >= l.audioBtnX && mx <= l.audioBtnX + l.audioBtnW && my >= l.bgmBtnY && my <= l.bgmBtnY + l.audioBtnH) {
+    // BGM Style Cycle Button
+    const row3Y = panelY + 180;
+    const bgmBtnY = row3Y - audioBtnH / 2;
+    if (mx >= audioBtnX && mx <= audioBtnX + audioBtnW && my >= bgmBtnY && my <= bgmBtnY + audioBtnH) {
       this.uiManager.hoveredButton = 'cycle_bgm_style';
       return;
     }
 
-    if (mx >= l.actionBtnX && mx <= l.actionBtnX + l.actionBtnW && my >= l.resumeBtnY && my <= l.resumeBtnY + l.actionBtnH) {
+    // Bottom Action Buttons
+    const actionBtnW = panelW - 56;
+    const actionBtnH = 40;
+    const actionBtnX = panelX + 28;
+    const resumeBtnY = panelY + 232;
+    if (mx >= actionBtnX && mx <= actionBtnX + actionBtnW && my >= resumeBtnY && my <= resumeBtnY + actionBtnH) {
       this.uiManager.hoveredButton = 'close_settings';
       return;
     }
 
-    if (isInGame && mx >= l.actionBtnX && mx <= l.actionBtnX + l.actionBtnW && my >= l.quitBtnY && my <= l.quitBtnY + l.actionBtnH) {
-      this.uiManager.hoveredButton = 'quit_to_title';
-      return;
+    if (isInGame) {
+      const quitBtnY = panelY + 286;
+      if (mx >= actionBtnX && mx <= actionBtnX + actionBtnW && my >= quitBtnY && my <= quitBtnY + actionBtnH) {
+        this.uiManager.hoveredButton = 'quit_to_title';
+        return;
+      }
     }
   }
 
@@ -748,31 +774,38 @@ class GameEngine {
   }
 
   private updateLevelUpHover(mx: number, my: number): void {
-    const l = this.uiManager.getLevelUpLayout(
-      this.camera.viewportWidth,
-      this.camera.viewportHeight,
-      this.levelUpOptions.length,
-      !!this.player
-    );
+    const cardWidth = Math.min(540, this.camera.viewportWidth - 40);
+    const cardHeight = 84;
+    const cardGap = 14;
+    const startY = this.camera.viewportHeight * 0.21;
+    const cx = this.camera.viewportWidth / 2 - cardWidth / 2;
 
     this.uiManager.hoveredUpgradeIndex = -1;
     this.uiManager.hoveredButton = null;
 
     for (let i = 0; i < this.levelUpOptions.length; i++) {
-      const cy = l.startY + i * (l.cardHeight + l.cardGap);
-      if (mx >= l.cardX && mx <= l.cardX + l.cardWidth && my >= cy && my <= cy + l.cardHeight) {
+      const cy = startY + i * (cardHeight + cardGap);
+      if (mx >= cx && mx <= cx + cardWidth && my >= cy && my <= cy + cardHeight) {
         this.uiManager.hoveredUpgradeIndex = i;
         this.selectedUpgradeIdx = i;
         return;
       }
     }
 
-    if (my >= l.bottomY && my <= l.bottomY + l.btnH) {
-      if (mx >= l.btnStartX && mx <= l.btnStartX + l.btnW) {
+    // Check bottom action buttons (Reroll, Skip, Banish)
+    const bottomY = startY + this.levelUpOptions.length * (cardHeight + cardGap) + 18;
+    const btnW = 148;
+    const btnH = 38;
+    const btnGap = 18;
+    const totalBtnW = btnW * 3 + btnGap * 2;
+    const btnStartX = this.camera.viewportWidth / 2 - totalBtnW / 2;
+
+    if (my >= bottomY && my <= bottomY + btnH) {
+      if (mx >= btnStartX && mx <= btnStartX + btnW) {
         this.uiManager.hoveredButton = 'reroll';
-      } else if (mx >= l.btnStartX + l.btnW + l.btnGap && mx <= l.btnStartX + l.btnW * 2 + l.btnGap) {
+      } else if (mx >= btnStartX + btnW + btnGap && mx <= btnStartX + btnW * 2 + btnGap) {
         this.uiManager.hoveredButton = 'skip';
-      } else if (mx >= l.btnStartX + (l.btnW + l.btnGap) * 2 && mx <= l.btnStartX + (l.btnW + l.btnGap) * 2 + l.btnW) {
+      } else if (mx >= btnStartX + (btnW + btnGap) * 2 && mx <= btnStartX + (btnW + btnGap) * 2 + btnW) {
         this.uiManager.hoveredButton = 'banish';
       }
     }
@@ -808,35 +841,51 @@ class GameEngine {
   }
 
   private updateCharSelectHover(mx: number, my: number): void {
-    const l = this.uiManager.getCharSelectLayout(
-      this.camera.viewportWidth,
-      this.camera.viewportHeight
-    );
+    const w = this.camera.viewportWidth;
+    const h = this.camera.viewportHeight;
+
+    // Top-right Settings & Audio buttons
+    const topBtnY = 22;
+    const btnSize = 30;
+    const settingsBtnX = w - 88;
+    const soundBtnX = w - 50;
 
     this.uiManager.hoveredCharacterIndex = -1;
     this.uiManager.hoveredButton = null;
 
-    if (my >= l.topBtnY && my <= l.topBtnY + l.btnSize) {
-      if (mx >= l.settingsBtnX && mx <= l.settingsBtnX + l.btnSize) {
+    if (my >= topBtnY && my <= topBtnY + btnSize) {
+      if (mx >= settingsBtnX && mx <= settingsBtnX + btnSize) {
         this.uiManager.hoveredButton = 'open_settings';
         return;
       }
-      if (mx >= l.soundBtnX && mx <= l.soundBtnX + l.btnSize) {
+      if (mx >= soundBtnX && mx <= soundBtnX + btnSize) {
         this.uiManager.hoveredButton = 'sound';
         return;
       }
     }
 
+    const cardW = 200;
+    const cardH = 252;
+    const gap = 20;
+    const totalW = CHARACTERS.length * cardW + (CHARACTERS.length - 1) * gap;
+    const startX = Math.max(20, w / 2 - totalW / 2);
+    const startY = h * 0.215;
+
     for (let i = 0; i < CHARACTERS.length; i++) {
-      const cx = l.startX + i * (l.cardW + l.gap);
-      const cy = l.startY;
-      if (mx >= cx && mx <= cx + l.cardW && my >= cy && my <= cy + l.cardH) {
+      const cx = startX + i * (cardW + gap);
+      const cy = startY;
+      if (mx >= cx && mx <= cx + cardW && my >= cy && my <= cy + cardH) {
         this.uiManager.hoveredCharacterIndex = i;
         break;
       }
     }
 
-    if (mx >= l.btnX && mx <= l.btnX + l.btnW && my >= l.btnY && my <= l.btnY + l.btnH) {
+    // Start button hover
+    const btnW = 240;
+    const btnH = 50;
+    const btnX = w / 2 - btnW / 2;
+    const btnY = startY + cardH + 38;
+    if (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH) {
       this.uiManager.hoveredButton = 'start';
     }
   }
@@ -866,10 +915,10 @@ class GameEngine {
   }
 
   private updateGameOverHover(mx: number, my: number): void {
-    const { btnW, btnH, btnX, btnY } = this.uiManager.getGameOverLayout(
-      this.camera.viewportWidth,
-      this.camera.viewportHeight
-    );
+    const btnW = 200;
+    const btnH = 46;
+    const btnX = this.camera.viewportWidth / 2 - btnW / 2;
+    const btnY = this.camera.viewportHeight * 0.19 + 340 + 24;
 
     if (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH) {
       this.uiManager.hoveredButton = 'restart';
@@ -886,10 +935,10 @@ class GameEngine {
   }
 
   private updateChestHover(mx: number, my: number): void {
-    const { btnW, btnH, btnX, btnY } = this.uiManager.getChestModalLayout(
-      this.camera.viewportWidth,
-      this.camera.viewportHeight
-    );
+    const btnW = 180;
+    const btnH = 44;
+    const btnX = this.camera.viewportWidth / 2 - btnW / 2;
+    const btnY = this.camera.viewportHeight * 0.22 + 280 + 22;
 
     if (mx >= btnX && mx <= btnX + btnW && my >= btnY && my <= btnY + btnH) {
       this.uiManager.hoveredButton = 'claim';
@@ -918,9 +967,10 @@ class GameEngine {
   }
 
   private updateHUDHover(mx: number, my: number): void {
-    const { topBtnY, btnSize, settingsBtnX, soundBtnX } = this.uiManager.getTopUtilityButtonsLayout(
-      this.camera.viewportWidth
-    );
+    const topBtnY = 22;
+    const btnSize = 30;
+    const settingsBtnX = this.camera.viewportWidth - 88;
+    const soundBtnX = this.camera.viewportWidth - 50;
 
     this.uiManager.hoveredButton = null;
 
@@ -980,7 +1030,7 @@ class GameEngine {
     this.ctx.scale(dpr, dpr);
 
     // Clear background
-    this.ctx.fillStyle = '#05030a';
+    this.ctx.fillStyle = '#0a0812';
     this.ctx.fillRect(0, 0, w, h);
 
     if (this.state === GameState.CHARACTER_SELECT) {
@@ -1044,8 +1094,7 @@ class GameEngine {
         h,
         this.levelUpOptions,
         this.selectedUpgradeIdx,
-        this.player,
-        this.companionSystem
+        this.player
       );
     } else if (this.state === GameState.BRANCH_SELECT) {
       this.uiManager.renderBranchSelectModal(

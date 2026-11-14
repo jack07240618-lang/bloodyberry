@@ -3,8 +3,6 @@ import { Vector2 } from '../core/Vector2';
 import { Player } from '../entities/Player';
 import { DropType } from '../entities/DropItem';
 import { SpriteRenderer } from '../renderer/SpriteRenderer';
-import { GOTHIC_DISPLAY_FONT, drawGothicGaugeBar } from '../ui/GothicOrnament';
-import { getBossText } from '../core/I18n';
 
 export enum EnemyType {
   WALKER = 'WALKER',         // Zombie / Ghoul
@@ -1638,10 +1636,10 @@ export class Enemy extends Entity {
    * 极简克制的首领微缩血条（无浮夸大边框、王冠或文字，适配同屏多 Boss 战斗，保留受击白金残影反馈）
    */
   private renderBossHealthBar(ctx: CanvasRenderingContext2D): void {
-    const barWidth = 76;
-    const barHeight = 6;
+    const barWidth = 64;
+    const barHeight = 4.5;
     const barX = this.position.x - barWidth / 2;
-    const barY = this.position.y - this.radius - 20;
+    const barY = this.position.y - this.radius - 18;
     const isEnraged = this.bossPhase === 2;
 
     const shakeX = this.hitFlashTimer > 0 ? (Math.random() - 0.5) * 2.5 : 0;
@@ -1650,47 +1648,49 @@ export class Enemy extends Entity {
     ctx.save();
     ctx.translate(shakeX, shakeY);
 
-    const pct = Math.max(0, Math.min(1, this.hp / Math.max(1, this.maxHp)));
-    const lagRatio = Math.max(pct, Math.min(1, this.displayLagHp / Math.max(1, this.maxHp)));
-    const pulse = isEnraged ? 0.5 + 0.5 * Math.sin(Date.now() * 0.01) : 0;
+    // 1. 柔和悬浮底影
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+    ctx.fillRect(barX - 1.5, barY + 1.5, barWidth + 3, barHeight + 2);
 
-    // 1. Boss Variant Gothic Reliquary Title Micro-Tag
-    const bossTitle = getBossText(this.bossVariant).name;
-    ctx.font = `700 8.5px ${GOTHIC_DISPLAY_FONT}`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillStyle = 'rgba(3, 2, 6, 0.9)';
-    ctx.fillText(bossTitle, this.position.x, barY - 4.2);
-    ctx.fillStyle = isEnraged ? '#fde047' : '#e2d2b5';
-    ctx.fillText(bossTitle, this.position.x, barY - 5);
+    // 2. 极简黑曜暗槽与细线外框
+    ctx.fillStyle = '#05070e';
+    ctx.fillRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
+    ctx.strokeStyle = isEnraged ? 'rgba(251, 191, 36, 0.75)' : 'rgba(148, 163, 184, 0.45)';
+    ctx.lineWidth = 0.9;
+    ctx.strokeRect(barX - 1, barY - 1, barWidth + 2, barHeight + 2);
 
-    // 2. Sculpted Gothic Reliquary Gauge Bar (25% / 50% / 75% Iron Ribs & Spiked End-Caps)
-    drawGothicGaugeBar(ctx, {
-      x: barX,
-      y: barY,
-      w: barWidth,
-      h: barHeight,
-      ratio: pct,
-      lagRatio,
-      fillTop: isEnraged ? '#fef08a' : '#fda4af',
-      fillMid: isEnraged ? '#f97316' : '#dc2626',
-      fillBot: isEnraged ? '#9a3412' : '#580a16',
-      frameGold: isEnraged ? '#fbbf24' : '#b45309',
-      segments: 4,
-      endCaps: true,
-      pulse
-    });
+    // 3. 延迟受击白金残影条
+    const lagPct = Math.max(0, Math.min(1, this.displayLagHp / this.maxHp));
+    const pct = Math.max(0, Math.min(1, this.hp / this.maxHp));
+    if (lagPct > pct + 0.004) {
+      ctx.fillStyle = 'rgba(254, 240, 138, 0.88)';
+      ctx.fillRect(barX, barY, barWidth * lagPct, barHeight);
+    }
 
-    // Subtle center diamond Notch marking 50% Phase II threshold
-    const midX = this.position.x;
-    ctx.fillStyle = isEnraged ? '#fde047' : '#d97706';
-    ctx.beginPath();
-    ctx.moveTo(midX, barY - 3.5);
-    ctx.lineTo(midX + 2.5, barY - 1);
-    ctx.lineTo(midX, barY + 1.5);
-    ctx.lineTo(midX - 2.5, barY - 1);
-    ctx.closePath();
-    ctx.fill();
+    // 4. 主血量填充
+    const fillW = barWidth * pct;
+    if (fillW > 0.5) {
+      const bossGrad = ctx.createLinearGradient(0, barY, 0, barY + barHeight);
+      if (isEnraged) {
+        bossGrad.addColorStop(0, '#fef08a');
+        bossGrad.addColorStop(0.45, '#f97316');
+        bossGrad.addColorStop(1, '#9a3412');
+      } else {
+        bossGrad.addColorStop(0, '#fca5a5');
+        bossGrad.addColorStop(0.4, '#ef4444');
+        bossGrad.addColorStop(1, '#7f1d1d');
+      }
+      ctx.fillStyle = bossGrad;
+      ctx.fillRect(barX, barY, fillW, barHeight);
+
+      // 1px 顶部微高光
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.32)';
+      ctx.fillRect(barX, barY, fillW, 1.2);
+    }
+
+    // 5. 50% 阶段极细分割线
+    ctx.fillStyle = 'rgba(5, 7, 14, 0.85)';
+    ctx.fillRect(barX + barWidth * 0.5 - 0.5, barY, 1, barHeight);
 
     ctx.restore();
   }

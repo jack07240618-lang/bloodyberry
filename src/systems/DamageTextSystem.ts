@@ -1,5 +1,4 @@
 import { Vector2 } from '../core/Vector2';
-import { GOTHIC_DISPLAY_FONT, GOTHIC_MONO_FONT } from '../ui/GothicOrnament';
 
 export interface DamageNumber {
   position: Vector2;
@@ -96,61 +95,26 @@ export class DamageTextSystem {
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.lineJoin = 'round';
 
     for (const item of this.items) {
       const progress = 1 - item.lifetime / item.maxLifetime;
-      const popScale = item.isCrit && progress < 0.2 ? 1 + (0.2 - progress) * 1.15 : 1;
-      const isTextCallout = /[^\d+\-.,%! ]/.test(item.text);
+      const popScale = item.isCrit && progress < 0.2 ? 1 + (0.2 - progress) * 0.9 : 1;
 
       ctx.save();
       ctx.translate(item.position.x, item.position.y);
       ctx.scale(popScale, popScale);
       ctx.globalAlpha = item.alpha;
 
-      const size = item.isCrit ? Math.min(17, item.fontSize + 1.5) : item.fontSize;
-      if (item.isCrit || isTextCallout) {
-        ctx.font = `700 ${size}px ${GOTHIC_DISPLAY_FONT}`;
-      } else {
-        ctx.font = `600 ${size}px ${GOTHIC_MONO_FONT}`;
-      }
+      const weight = item.isCrit ? '600' : '500';
+      const size = item.isCrit ? Math.min(15, item.fontSize) : item.fontSize;
+      ctx.font = `${weight} ${size}px ui-monospace, "SF Mono", "JetBrains Mono", -apple-system, sans-serif`;
 
-      // Carved obsidian ink contour + vertical drop shadow for crisp gothic legibility
-      ctx.strokeStyle = 'rgba(5, 2, 10, 0.92)';
-      ctx.lineWidth = item.isCrit ? 3.2 : 2.3;
-      ctx.strokeText(item.text, 0, 0);
+      // Subtle 1px dark drop shadow (Clean modern look, no thick cartoon outline)
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.78)';
+      ctx.fillText(item.text, 0, 1.2);
 
-      ctx.fillStyle = 'rgba(4, 2, 8, 0.85)';
-      ctx.fillText(item.text, 0, 1.4);
-
-      if (item.isCrit && item.color === '#fbbf24') {
-        const g = ctx.createLinearGradient(0, -size * 0.5, 0, size * 0.5);
-        g.addColorStop(0, '#fef9c3');
-        g.addColorStop(0.5, '#fbbf24');
-        g.addColorStop(1, '#d97706');
-        ctx.fillStyle = g;
-      } else {
-        ctx.fillStyle = item.color;
-      }
+      ctx.fillStyle = item.isCrit && item.color === '#fbbf24' ? '#fde047' : item.color;
       ctx.fillText(item.text, 0, 0);
-
-      // Tiny gilded gothic glint alongside major critical hits
-      if (item.isCrit && progress < 0.55) {
-        ctx.fillStyle = 'rgba(253, 224, 71, 0.85)';
-        const sparkX = -Math.max(12, item.text.length * size * 0.34);
-        ctx.beginPath();
-        ctx.moveTo(sparkX, -3.5);
-        ctx.lineTo(sparkX + 1.4, -1);
-        ctx.lineTo(sparkX + 3.5, 0);
-        ctx.lineTo(sparkX + 1.4, 1);
-        ctx.lineTo(sparkX, 3.5);
-        ctx.lineTo(sparkX - 1.4, 1);
-        ctx.lineTo(sparkX - 3.5, 0);
-        ctx.lineTo(sparkX - 1.4, -1);
-        ctx.closePath();
-        ctx.fill();
-      }
-
       ctx.restore();
     }
 

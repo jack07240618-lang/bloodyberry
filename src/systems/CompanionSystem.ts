@@ -408,33 +408,15 @@ export class CompanionSystem {
     }
     ctx.stroke();
 
-    // 连线上的 5 枚菱形鎏金铸铁香炉链环 (沿着波纹弦线轨迹移动)
-    const linkAngle = Math.atan2(dy, dx);
-    for (let k = 1; k <= 5; k++) {
-      const kt = ((k / 6) + (this.pulseTime * 0.14)) % 1;
-      const kWave = Math.sin(kt * Math.PI * 3 + this.pulseTime * 2.5) * Math.sin(kt * Math.PI) * 6;
-      const kx = p1.x + dx * kt + nx * kWave;
-      const ky = p1.y + dy * kt + ny * kWave;
-      ctx.save();
-      ctx.translate(kx, ky);
-      ctx.rotate(linkAngle);
-      ctx.fillStyle = '#1c1018';
-      ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 1.2;
+    // 连线上的哥特鎏金符文节点
+    ctx.fillStyle = '#fbbf24';
+    for (let k = 1; k < 4; k++) {
+      const kt = ((k / 4) + (this.pulseTime * 0.15)) % 1;
+      const kx = p1.x + dx * kt;
+      const ky = p1.y + dy * kt;
       ctx.beginPath();
-      ctx.moveTo(4.5, 0);
-      ctx.lineTo(0, -3);
-      ctx.lineTo(-4.5, 0);
-      ctx.lineTo(0, 3);
-      ctx.closePath();
+      ctx.arc(kx, ky, 2.5, 0, Math.PI * 2);
       ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = '#fef08a';
-      ctx.beginPath();
-      ctx.arc(0, 0, 1.3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
     }
 
     // 2. 若激活 [近战] 共鸣，绘制伙伴周围的旋转哥特剑刃法阵
@@ -452,99 +434,56 @@ export class CompanionSystem {
       ctx.restore();
     }
 
-    // 3. 绘制六翼哥特圣物提灯伙伴本体 (Seraphic Astral Reliquary Thurible)
+    // 3. 绘制六翼哥特圣物提灯伙伴本体 (Seraphic Astral Reliquary Lantern)
     ctx.translate(p2.x, p2.y);
     const bob = Math.sin(this.pulseTime * 1.5) * 3;
-    const wingFlap = Math.sin(this.pulseTime * 3.2) * 0.24;
+    const wingFlap = Math.sin(this.pulseTime * 3.2) * 0.25;
 
     if (this.mode === 'ANCHOR') {
-      // 定点锚定旋转哥特八芒星圣环
-      ctx.save();
-      ctx.rotate(this.pulseTime * 0.55);
-      const sealR = 25 + Math.sin(this.pulseTime * 2) * 2;
-      ctx.strokeStyle = 'rgba(251, 191, 36, 0.85)';
-      ctx.lineWidth = 1.4;
+      // 定点锚定哥特八芒星法阵
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.8;
       ctx.beginPath();
-      ctx.arc(0, 0, sealR, 0, Math.PI * 2);
+      ctx.arc(0, 0, 24 + Math.sin(this.pulseTime * 2) * 2.5, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.strokeStyle = 'rgba(217, 119, 6, 0.5)';
-      ctx.lineWidth = 1;
-      for (const rot of [0, Math.PI / 4]) {
-        ctx.save();
-        ctx.rotate(rot);
-        ctx.strokeRect(-sealR * 0.68, -sealR * 0.68, sealR * 1.36, sealR * 1.36);
-        ctx.restore();
-      }
-      ctx.restore();
     }
 
     // 灵魂核心光晕
-    const aura = ctx.createRadialGradient(0, bob, 2, 0, bob, 28);
+    const aura = ctx.createRadialGradient(0, bob, 2, 0, bob, 26);
     aura.addColorStop(0, '#ffffff');
     aura.addColorStop(0.4, tetherColor);
     aura.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = aura;
     ctx.beginPath();
-    ctx.arc(0, bob, 28, 0, Math.PI * 2);
+    ctx.arc(0, bob, 26, 0, Math.PI * 2);
     ctx.fill();
 
-    // 双层锯齿鎏金圣翼 (Twin Layered Serrated Seraph Wings)
+    // 左右拍动的鎏金圣翼 (Golden Seraph Wings)
+    ctx.fillStyle = '#fde047';
     for (const side of [-1, 1]) {
       ctx.save();
       ctx.scale(side, 1);
       ctx.rotate(wingFlap);
-
-      // 主上羽翼（三段飞羽轮廓）
-      ctx.fillStyle = '#fde047';
-      ctx.strokeStyle = '#92400e';
-      ctx.lineWidth = 0.9;
       ctx.beginPath();
-      ctx.moveTo(5, bob - 3);
-      ctx.quadraticCurveTo(16, bob - 15, 22, bob - 8);
-      ctx.lineTo(17, bob - 4);
-      ctx.lineTo(20, bob - 1);
-      ctx.quadraticCurveTo(14, bob + 3, 5, bob + 2);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // 次下羽翼（暖琥珀次级飞羽）
-      ctx.rotate(-0.22);
-      ctx.fillStyle = 'rgba(251, 191, 36, 0.8)';
-      ctx.beginPath();
-      ctx.moveTo(5, bob + 1);
-      ctx.quadraticCurveTo(13, bob + 3, 15, bob + 8);
-      ctx.quadraticCurveTo(10, bob + 9, 4, bob + 4);
+      ctx.moveTo(4, bob - 2);
+      ctx.quadraticCurveTo(15, bob - 12, 18, bob - 4);
+      ctx.quadraticCurveTo(13, bob + 2, 4, bob + 2);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
     }
 
-    // 哥特尖顶香炉冠饰与底部垂坠
-    ctx.fillStyle = '#b45309';
-    ctx.beginPath();
-    ctx.moveTo(0, -17 + bob);
-    ctx.lineTo(3, -12 + bob);
-    ctx.lineTo(-3, -12 + bob);
-    ctx.closePath();
-    ctx.moveTo(0, 16 + bob);
-    ctx.lineTo(2.4, 12 + bob);
-    ctx.lineTo(-2.4, 12 + bob);
-    ctx.closePath();
-    ctx.fill();
-
-    // 哥特黄铜提灯外框 + 镂空十字花格栅
+    // 哥特黄铜提灯外框与炽白圣火核心
     ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 1.9;
+    ctx.lineWidth = 1.8;
     ctx.beginPath();
     ctx.moveTo(0, -12 + bob);
-    ctx.lineTo(9.5, bob);
+    ctx.lineTo(9, bob);
     ctx.lineTo(0, 12 + bob);
-    ctx.lineTo(-9.5, bob);
+    ctx.lineTo(-9, bob);
     ctx.closePath();
     ctx.stroke();
 
-    // 内核炽白圣火
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.moveTo(0, -8 + bob);
@@ -553,27 +492,6 @@ export class CompanionSystem {
     ctx.lineTo(-6, bob);
     ctx.closePath();
     ctx.fill();
-
-    // 提灯镂空雕花十字肋条
-    ctx.strokeStyle = 'rgba(120, 53, 15, 0.72)';
-    ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    ctx.moveTo(0, -11 + bob);
-    ctx.lineTo(0, 11 + bob);
-    ctx.moveTo(-8.5, bob);
-    ctx.lineTo(8.5, bob);
-    ctx.stroke();
-
-    // 环绕香炉飘散的 3 颗琥珀香火火星
-    for (let s = 0; s < 3; s++) {
-      const ang = this.pulseTime * 2.1 + (s * Math.PI * 2) / 3;
-      const sx = Math.cos(ang) * 14;
-      const sy = bob + Math.sin(ang * 1.3) * 9 - ((this.pulseTime * 8 + s * 4) % 10) * 0.4;
-      ctx.fillStyle = s % 2 === 0 ? '#fde68a' : '#fb923c';
-      ctx.beginPath();
-      ctx.arc(sx, sy, 1.3, 0, Math.PI * 2);
-      ctx.fill();
-    }
 
     ctx.restore();
   }

@@ -26,17 +26,15 @@ export class AmbientParticleSystem {
   }
 
   private seedEmbers(): void {
-    const gothicPalette = ['#f97316', '#fbbf24', '#ef4444', '#c084fc', '#fde68a'];
-    for (let i = 0; i < 36; i++) {
-      const color = gothicPalette[i % gothicPalette.length];
+    for (let i = 0; i < 25; i++) {
       this.embers.push({
-        position: new Vector2((Math.random() - 0.5) * 900, (Math.random() - 0.5) * 900),
-        velocity: new Vector2((Math.random() - 0.5) * 24, -22 - Math.random() * 38),
-        radius: 1.4 + Math.random() * 2.4,
-        alpha: 0.45 + Math.random() * 0.45,
-        color,
-        wobbleSpeed: 2 + Math.random() * 4.2,
-        wobbleTimer: Math.random() * 12
+        position: new Vector2((Math.random() - 0.5) * 800, (Math.random() - 0.5) * 800),
+        velocity: new Vector2((Math.random() - 0.5) * 20, -25 - Math.random() * 35),
+        radius: 1.5 + Math.random() * 2,
+        alpha: 0.5 + Math.random() * 0.4,
+        color: Math.random() < 0.6 ? '#f97316' : '#fbbf24',
+        wobbleSpeed: 2 + Math.random() * 4,
+        wobbleTimer: Math.random() * 10
       });
     }
   }
@@ -101,27 +99,17 @@ export class AmbientParticleSystem {
   }
 
   public renderFogAndTrails(ctx: CanvasRenderingContext2D, camera: Camera): void {
-    // 1. Render weapon / dash ribbons with outer gothic aura + molten-gold core filament
+    // 1. Render weapon trails
     for (const points of this.trails.values()) {
       if (points.length < 2) continue;
       for (let i = 0; i < points.length - 1; i++) {
         const p1 = points[i];
         const p2 = points[i + 1];
         ctx.save();
+        ctx.globalAlpha = p1.alpha;
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = p1.width;
         ctx.lineCap = 'round';
-        // Outer crimson-violet shroud halo
-        ctx.globalAlpha = p1.alpha * 0.42;
-        ctx.strokeStyle = '#c084fc';
-        ctx.lineWidth = p1.width * 1.65;
-        ctx.beginPath();
-        ctx.moveTo(p1.position.x, p1.position.y);
-        ctx.lineTo(p2.position.x, p2.position.y);
-        ctx.stroke();
-
-        // Inner consecrated gold filament
-        ctx.globalAlpha = p1.alpha * 0.9;
-        ctx.strokeStyle = '#fde68a';
-        ctx.lineWidth = Math.max(1.2, p1.width * 0.55);
         ctx.beginPath();
         ctx.moveTo(p1.position.x, p1.position.y);
         ctx.lineTo(p2.position.x, p2.position.y);
@@ -130,21 +118,16 @@ export class AmbientParticleSystem {
       }
     }
 
-    // 2. Render Gothic Catacomb Embers & Censer Sparks
+    // 2. Render Embers
     for (const e of this.embers) {
-      if (camera.isVisible(e.position, e.radius + 14)) {
+      if (camera.isVisible(e.position, e.radius + 10)) {
         ctx.save();
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.globalAlpha = e.alpha * 0.42;
+        ctx.globalAlpha = e.alpha;
+        ctx.shadowColor = e.color;
+        ctx.shadowBlur = 6;
         ctx.fillStyle = e.color;
         ctx.beginPath();
-        ctx.arc(e.position.x, e.position.y, e.radius * 2.8, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.globalAlpha = Math.min(1, e.alpha + 0.15);
-        ctx.fillStyle = '#fffbeb';
-        ctx.beginPath();
-        ctx.arc(e.position.x, e.position.y, e.radius * 0.72, 0, Math.PI * 2);
+        ctx.arc(e.position.x, e.position.y, e.radius, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }

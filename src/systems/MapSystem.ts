@@ -175,12 +175,10 @@ export class MapSystem {
           ctx.fillRect(blk.x, blk.y + blk.h - 2, blk.w, 2);
           ctx.fillRect(blk.x + blk.w - 2, blk.y, 2, blk.h);
 
-          // Gothic chamfer micro-rivets on chiseled slabs
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.035)';
+          // Subtle surface grain speckles
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.03)';
           ctx.fillRect(blk.x + 6, blk.y + 7, 3, 2);
           ctx.fillRect(blk.x + blk.w - 10, blk.y + blk.h - 9, 4, 3);
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
-          ctx.fillRect(blk.x + 2, blk.y + 2, 2, 2);
         }
 
         // Biome-specific environmental surface details
@@ -202,19 +200,16 @@ export class MapSystem {
           ctx.fillStyle = pal.patchColor2;
           ctx.fillRect(29, 27, 5, 4);
         } else if (variant === 4) {
-          // Engraved Gothic Trefoil & Mystic Circle Rune Slab
+          // Engraved biome rune slab
           ctx.strokeStyle = pal.runeColor;
-          ctx.lineWidth = 1.4;
+          ctx.lineWidth = 1.5;
           ctx.beginPath();
-          ctx.arc(32, 32, 18, 0, Math.PI * 2);
+          ctx.arc(32, 32, 16, 0, Math.PI * 2);
           ctx.stroke();
           ctx.beginPath();
-          ctx.arc(32, 32, 10, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.moveTo(32, 14);
-          ctx.lineTo(46, 40);
-          ctx.lineTo(18, 40);
+          ctx.moveTo(32, 16);
+          ctx.lineTo(45, 40);
+          ctx.lineTo(19, 40);
           ctx.closePath();
           ctx.stroke();
         } else if (variant === 7) {
@@ -1060,28 +1055,6 @@ export class MapSystem {
       ctx.fillStyle = portalLight;
       ctx.beginPath();
       ctx.arc(psx, psy + 18, pRad, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // 2a-iii. Four Sanctuary Corner Bastion Candelabra Volumetric Glow Pools
-    const bastionCoords: Array<[number, number]> = [
-      [-515, -365],
-      [515, -365],
-      [-515, 365],
-      [515, 365]
-    ];
-    for (let i = 0; i < bastionCoords.length; i++) {
-      const bWorld = new Vector2(bastionCoords[i][0], bastionCoords[i][1]);
-      if (!camera.isVisible(bWorld, 200)) continue;
-      const bsx = bWorld.x - camera.position.x + halfW;
-      const bsy = bWorld.y - camera.position.y + halfH;
-      const bGlow = ctx.createRadialGradient(bsx, bsy, 4, bsx, bsy, 170);
-      bGlow.addColorStop(0, 'rgba(254, 240, 138, 0.22)');
-      bGlow.addColorStop(0.42, 'rgba(234, 88, 12, 0.12)');
-      bGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      ctx.fillStyle = bGlow;
-      ctx.beginPath();
-      ctx.arc(bsx, bsy, 170, 0, Math.PI * 2);
       ctx.fill();
     }
 

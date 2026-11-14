@@ -4,7 +4,6 @@ import { Weapon } from '../weapons/Weapon';
 import { PASSIVE_DEFINITIONS } from '../passives/PassiveRegistry';
 import { SpriteRenderer } from '../renderer/SpriteRenderer';
 import { SkillTag } from '../systems/BuildSystem';
-import { drawGothicGaugeBar } from '../ui/GothicOrnament';
 
 export class Player extends Entity {
   public characterId = 'antonio';
@@ -422,35 +421,22 @@ export class Player extends Entity {
     ctx.ellipse(0, 6, this.radius * (ultReady ? 2.8 : 2.2), this.radius * (ultReady ? 1.4 : 1.1), 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Gothic Hunter's 8-Pointed Astrolabe Compass Sigil beneath feet
+    // Gothic Hunter's Sacred Compass Ring beneath feet (unified reliquary filigree)
     ctx.save();
     ctx.scale(1, 0.52);
     ctx.translate(0, 14);
-    const sigilR = this.radius * 1.75;
-    ctx.strokeStyle = ultReady ? 'rgba(251, 191, 36, 0.62)' : 'rgba(125, 211, 252, 0.34)';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = ultReady ? 'rgba(251, 191, 36, 0.55)' : 'rgba(125, 211, 252, 0.32)';
+    ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.arc(0, 0, sigilR, 0, Math.PI * 2);
+    ctx.arc(0, 0, this.radius * 1.65, 0, Math.PI * 2);
     ctx.stroke();
-
-    ctx.strokeStyle = ultReady ? 'rgba(220, 38, 38, 0.45)' : 'rgba(217, 119, 6, 0.25)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.arc(0, 0, sigilR * 0.72, 0, Math.PI * 2);
-    ctx.stroke();
-
-    for (let c = 0; c < 8; c++) {
-      const cAng = (c * Math.PI) / 4 + this.walkAnimTimer * 0.08;
-      const cx = Math.cos(cAng) * sigilR;
-      const cy = Math.sin(cAng) * sigilR;
-      const d = c % 2 === 0 ? 3.2 : 1.8;
-      ctx.fillStyle = c % 2 === 0 ? (ultReady ? '#fde047' : '#bae6fd') : '#d97706';
+    for (let c = 0; c < 4; c++) {
+      const cAng = (c * Math.PI) / 2 + (this.walkAnimTimer * 0.08);
+      const cx = Math.cos(cAng) * this.radius * 1.65;
+      const cy = Math.sin(cAng) * this.radius * 1.65;
+      ctx.fillStyle = ultReady ? '#fde047' : '#bae6fd';
       ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(cAng) * d, cy + Math.sin(cAng) * d);
-      ctx.lineTo(cx - Math.sin(cAng) * d * 0.6, cy + Math.cos(cAng) * d * 0.6);
-      ctx.lineTo(cx - Math.cos(cAng) * d, cy - Math.sin(cAng) * d);
-      ctx.lineTo(cx + Math.sin(cAng) * d * 0.6, cy - Math.cos(cAng) * d * 0.6);
-      ctx.closePath();
+      ctx.arc(cx, cy, 2.2, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
@@ -482,18 +468,18 @@ export class Player extends Entity {
       ctx.globalAlpha = 0.4;
     }
 
-    const animFrame = this.isMoving ? Math.floor(this.walkAnimTimer) % 6 : 0;
+    const animFrame = this.isMoving ? Math.floor(this.walkAnimTimer) % 4 : 0;
     const isHit = this.hurtFlashTimer > 0;
 
-    // Draw 64x64 2.5D Gothic Hero Sprite
+    // Draw High-Res Gothic Hero Sprite
     SpriteRenderer.getInstance().drawSprite(
       ctx,
       spriteKey,
       animFrame,
       0,
-      -4,
-      44,
-      44,
+      -2,
+      40,
+      40,
       this.facingDirection,
       isHit
     );
@@ -505,42 +491,94 @@ export class Player extends Entity {
   }
 
   private renderHealthBar(ctx: CanvasRenderingContext2D): void {
-    const barWidth = 44;
+    const barWidth = 42;
     const barHeight = 6;
     const barX = this.position.x - barWidth / 2;
-    const barY = this.position.y - this.radius - 20;
+    const barY = this.position.y - this.radius - 18;
+
+    ctx.save();
+
+    // 1. 3D Floating Drop Shadow beneath the gauge
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.72)';
+    ctx.beginPath();
+    ctx.roundRect(barX - 2, barY + 1.5, barWidth + 4, barHeight + 4, 3);
+    ctx.fill();
+
+    // 2. Sculpted Metallic Outer Casing (Top Light Bevel + Bottom Bronze Shadow)
+    const caseGrad = ctx.createLinearGradient(0, barY - 2, 0, barY + barHeight + 2);
+    caseGrad.addColorStop(0, '#334155');
+    caseGrad.addColorStop(0.5, '#0f172a');
+    caseGrad.addColorStop(1, '#020617');
+    ctx.fillStyle = caseGrad;
+    ctx.beginPath();
+    ctx.roundRect(barX - 2, barY - 2, barWidth + 4, barHeight + 4, 3);
+    ctx.fill();
+
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+
+    // Left & Right 3D Gold Diamond Studs
+    ctx.fillStyle = '#fde047';
+    for (const sx of [barX - 3, barX + barWidth + 3]) {
+      ctx.beginPath();
+      ctx.moveTo(sx, barY + barHeight / 2 - 2.5);
+      ctx.lineTo(sx + 2.5, barY + barHeight / 2);
+      ctx.lineTo(sx, barY + barHeight / 2 + 2.5);
+      ctx.lineTo(sx - 2.5, barY + barHeight / 2);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // 3. Recessed Dark Inner Well
+    ctx.fillStyle = '#04060d';
+    ctx.fillRect(barX, barY, barWidth, barHeight);
+
     const hpPercent = Math.max(0, Math.min(1, this.hp / this.maxHp));
+    const fillWidth = barWidth * hpPercent;
 
-    const colors =
-      hpPercent > 0.5
-        ? { top: '#bbf7d0', mid: '#16a34a', bot: '#052e16', frame: '#d97706' }
-        : hpPercent > 0.25
-          ? { top: '#fef08a', mid: '#d97706', bot: '#451a03', frame: '#f59e0b' }
-          : { top: '#fecaca', mid: '#dc2626', bot: '#450a0a', frame: '#ef4444' };
+    // 4. Cylindrical 3D Liquid Glass Fill (4-stop vertical curvature gradient)
+    if (fillWidth > 0.5) {
+      const cylGrad = ctx.createLinearGradient(0, barY, 0, barY + barHeight);
+      if (hpPercent > 0.5) {
+        cylGrad.addColorStop(0, '#bbf7d0');
+        cylGrad.addColorStop(0.35, '#22c55e');
+        cylGrad.addColorStop(0.8, '#15803d');
+        cylGrad.addColorStop(1, '#052e16');
+      } else if (hpPercent > 0.25) {
+        cylGrad.addColorStop(0, '#fef08a');
+        cylGrad.addColorStop(0.35, '#f59e0b');
+        cylGrad.addColorStop(0.8, '#b45309');
+        cylGrad.addColorStop(1, '#451a03');
+      } else {
+        cylGrad.addColorStop(0, '#fecaca');
+        cylGrad.addColorStop(0.35, '#ef4444');
+        cylGrad.addColorStop(0.8, '#991b1b');
+        cylGrad.addColorStop(1, '#450a0a');
+      }
+      ctx.fillStyle = cylGrad;
+      ctx.fillRect(barX, barY, fillWidth, barHeight);
 
-    drawGothicGaugeBar(ctx, {
-      x: barX,
-      y: barY,
-      w: barWidth,
-      h: barHeight,
-      ratio: hpPercent,
-      fillTop: colors.top,
-      fillMid: colors.mid,
-      fillBot: colors.bot,
-      frameGold: colors.frame,
-      segments: 4,
-      endCaps: true
-    });
+      // Top Specular Glass Tube Highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
+      ctx.fillRect(barX, barY, fillWidth, 1.8);
 
-    // Stamina / Dash Micro-Conduit under HP gauge
+      // Glowing Liquid Meniscus Tip
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(barX + Math.max(0, fillWidth - 1.5), barY, 1.5, barHeight);
+    }
+
+    // 5. Subtle 3D Dash Stamina Micro-Bar directly under HP gauge
     const dashReady = this.dashCooldown <= 0;
     const dashPct = dashReady
       ? 1
       : 1 - Math.min(1, this.dashCooldown / Math.max(0.1, this.maxDashCooldown * this.cooldownMult));
-    const dashY = barY + barHeight + 3.5;
-    ctx.fillStyle = 'rgba(4, 2, 10, 0.88)';
-    ctx.fillRect(barX + 2, dashY, barWidth - 4, 2.2);
+    const dashY = barY + barHeight + 3;
+    ctx.fillStyle = 'rgba(4, 6, 13, 0.85)';
+    ctx.fillRect(barX + 2, dashY, barWidth - 4, 2);
     ctx.fillStyle = dashReady ? '#38bdf8' : '#0284c7';
-    ctx.fillRect(barX + 2, dashY, (barWidth - 4) * dashPct, 2.2);
+    ctx.fillRect(barX + 2, dashY, (barWidth - 4) * dashPct, 2);
+
+    ctx.restore();
   }
 }

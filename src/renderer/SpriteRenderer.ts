@@ -35,10 +35,7 @@ export class SpriteRenderer {
     if (flipX < 0) {
       ctx.scale(-1, 1);
     }
-    ctx.imageSmoothingEnabled = canvas.width >= 64;
-    if (ctx.imageSmoothingEnabled) {
-      ctx.imageSmoothingQuality = 'high';
-    }
+    ctx.imageSmoothingEnabled = false;
     ctx.drawImage(canvas, -width / 2, -height / 2, width, height);
     ctx.restore();
   }
@@ -94,15 +91,14 @@ export class SpriteRenderer {
   }
 
   private generateAllSprites(): void {
-    // 1. Playable Hero Archetypes (64x64 2.5D Dark Gothic, 6 gait frames)
-    const heroFrames = [0, 1, 2, 3, 4, 5];
-    this.registerFrames('hunter_walk', heroFrames.map((f) => this.createHeroSprite('antonio', f)));
-    this.registerFrames('hero_antonio', heroFrames.map((f) => this.createHeroSprite('antonio', f)));
-    this.registerFrames('hero_imelda', heroFrames.map((f) => this.createHeroSprite('imelda', f)));
-    this.registerFrames('hero_gennaro', heroFrames.map((f) => this.createHeroSprite('gennaro', f)));
-    this.registerFrames('hero_arca', heroFrames.map((f) => this.createHeroSprite('arca', f)));
-    this.registerFrames('hero_pasqualina', heroFrames.map((f) => this.createHeroSprite('pasqualina', f)));
-    this.registerFrames('hero_mortaccio', heroFrames.map((f) => this.createHeroSprite('mortaccio', f)));
+    // 1. Playable Hero Archetypes (and default hunter_walk)
+    this.registerFrames('hunter_walk', [0, 1, 2, 3].map((f) => this.createHeroSprite('antonio', f)));
+    this.registerFrames('hero_antonio', [0, 1, 2, 3].map((f) => this.createHeroSprite('antonio', f)));
+    this.registerFrames('hero_imelda', [0, 1, 2, 3].map((f) => this.createHeroSprite('imelda', f)));
+    this.registerFrames('hero_gennaro', [0, 1, 2, 3].map((f) => this.createHeroSprite('gennaro', f)));
+    this.registerFrames('hero_arca', [0, 1, 2, 3].map((f) => this.createHeroSprite('arca', f)));
+    this.registerFrames('hero_pasqualina', [0, 1, 2, 3].map((f) => this.createHeroSprite('pasqualina', f)));
+    this.registerFrames('hero_mortaccio', [0, 1, 2, 3].map((f) => this.createHeroSprite('mortaccio', f)));
 
     // 2. Monster Sprites (64x64 2.5D Dark Gothic Multi-Pose: move x6, windup x4, strike x4)
     const mobDefs: Array<{
@@ -142,344 +138,187 @@ export class SpriteRenderer {
   }
 
   // ============================================================================
-  // HERO SPRITES (64x64 2.5D Dark Gothic Multi-Layer Shaded Silhouettes + Ink Rim)
+  // HERO SPRITES (32x32 Crisp Pixel-Art Canvas + Automatic Dark Outlines)
   // ============================================================================
   private createHeroSprite(heroId: string, frame: number): HTMLCanvasElement {
-    const [c, ctx] = this.makeCanvas(64);
-    const p = this.getPoseParams(frame % 6, 'move');
-    const ang = (frame / 6) * Math.PI * 2;
-    const capeSway = Math.sin(ang) * 3.2;
+    const c = document.createElement('canvas');
+    c.width = 32;
+    c.height = 32;
+    const ctx = c.getContext('2d')!;
+    const bob = frame % 2 === 1 ? -1 : 0;
+    const stride = frame === 1 ? 2 : frame === 3 ? -2 : 0;
+    const capeWave = Math.sin(frame * Math.PI * 0.5) * 2;
 
-    let capeDark = '#450a0a';
-    let capeMid = '#991b1b';
+    // Palette configuration per character
+    let capeDark = '#7f1d1d';
+    let capeMid = '#b91c1c';
     let capeLight = '#ef4444';
-    let armorDark = '#181326';
-    let armorMid = '#332945';
+    let armorDark = '#1e293b';
+    let armorMid = '#475569';
     let armorLight = '#94a3b8';
     let trimGold = '#f59e0b';
     let eyeGlow = '#38bdf8';
 
     if (heroId === 'imelda') {
-      capeDark = '#2e1065'; capeMid = '#6b21a8'; capeLight = '#c084fc';
-      armorDark = '#171236'; armorMid = '#312e81'; armorLight = '#a5b4fc';
+      capeDark = '#4c1d95'; capeMid = '#7e22ce'; capeLight = '#c084fc';
+      armorDark = '#1e1b4b'; armorMid = '#312e81'; armorLight = '#818cf8';
       eyeGlow = '#f0abfc';
     } else if (heroId === 'gennaro') {
-      capeDark = '#022c22'; capeMid = '#065f46'; capeLight = '#34d399';
-      armorDark = '#0c131d'; armorMid = '#1e293b'; armorLight = '#64748b';
+      capeDark = '#064e3b'; capeMid = '#047857'; capeLight = '#34d399';
+      armorDark = '#0f172a'; armorMid = '#334155'; armorLight = '#64748b';
       eyeGlow = '#6ee7b7';
     } else if (heroId === 'arca') {
-      capeDark = '#3f070a'; capeMid = '#9a3412'; capeLight = '#fb923c';
-      armorDark = '#1c1417'; armorMid = '#442b2a'; armorLight = '#fbbf24';
+      capeDark = '#450a0a'; capeMid = '#991b1b'; capeLight = '#f97316';
+      armorDark = '#27272a'; armorMid = '#52525b'; armorLight = '#fbbf24';
       eyeGlow = '#fde047';
     } else if (heroId === 'pasqualina') {
-      capeDark = '#78350f'; capeMid = '#b45309'; capeLight = '#fcd34d';
-      armorDark = '#172554'; armorMid = '#1d4ed8'; armorLight = '#93c5fd';
+      capeDark = '#78350f'; capeMid = '#d97706'; capeLight = '#fde047';
+      armorDark = '#1e3a8a'; armorMid = '#2563eb'; armorLight = '#93c5fd';
       eyeGlow = '#38bdf8';
     } else if (heroId === 'mortaccio') {
       capeDark = '#1e1b4b'; capeMid = '#4338ca'; capeLight = '#818cf8';
-      armorDark = '#94a3b8'; armorMid = '#cbd5e1'; armorLight = '#f8fafc';
+      armorDark = '#cbd5e1'; armorMid = '#e2e8f0'; armorLight = '#ffffff';
       eyeGlow = '#ef4444';
     }
 
-    ctx.save();
-    ctx.translate(32, 35 + p.bob * 0.85);
-    ctx.rotate(p.lean * 0.7);
-
-    // 1. Billowing Tattered Gothic Mantle (Behind torso, multi-fold gradient & gilded hem)
-    const cloakGrad = ctx.createLinearGradient(-16, -14, 14, 24);
-    cloakGrad.addColorStop(0, capeMid);
-    cloakGrad.addColorStop(0.55, capeDark);
-    cloakGrad.addColorStop(1, '#050208');
-    ctx.fillStyle = cloakGrad;
+    // 1. Billowing Back Cloak (3-tone shaded folds)
+    ctx.fillStyle = capeDark;
     ctx.beginPath();
-    ctx.moveTo(-10, -14);
-    ctx.quadraticCurveTo(-20 + capeSway * 0.5, 4, -19 + capeSway, 23);
-    ctx.lineTo(-11 + capeSway * 0.7, 19);
-    ctx.lineTo(-3 + capeSway * 0.5, 24);
-    ctx.lineTo(5 + capeSway * 0.35, 19);
-    ctx.lineTo(13 + capeSway * 0.25, 22);
-    ctx.quadraticCurveTo(15, 2, 10, -13);
+    ctx.moveTo(11, 10 + bob);
+    ctx.lineTo(5 + capeWave, 26);
+    ctx.lineTo(19 + capeWave * 0.5, 27);
+    ctx.lineTo(18, 11 + bob);
     ctx.closePath();
     ctx.fill();
 
-    // Inner cloak crimson/astral fold highlight
-    ctx.strokeStyle = capeLight;
-    ctx.lineWidth = 1.6;
-    ctx.globalAlpha = 0.65;
+    ctx.fillStyle = capeMid;
     ctx.beginPath();
-    ctx.moveTo(-8, -11);
-    ctx.quadraticCurveTo(-15 + capeSway * 0.6, 5, -14 + capeSway * 0.85, 20);
-    ctx.stroke();
-    ctx.globalAlpha = 1;
-
-    // 2. Articulated Greaves & Pointed Gothic Sabaton Boots
-    for (const side of [-1, 1] as const) {
-      const legY = 12;
-      const dx = side * 4.5 + (side < 0 ? -p.stride * 0.5 : p.stride * 0.5);
-      ctx.fillStyle = '#09060d';
-      ctx.beginPath();
-      ctx.roundRect(dx - 3.2, legY, 6.4, 12, 2);
-      ctx.fill();
-      // Knee cop & gold buckle
-      ctx.fillStyle = armorLight;
-      ctx.fillRect(dx - 2.6, legY + 1, 5.2, 3);
-      ctx.fillStyle = trimGold;
-      ctx.fillRect(dx - 1.5, legY + 6, 3, 1.4);
-    }
-
-    // 3. Sculpted Gothic Cuirass / Corseted Coat with Bandolier & Belt Reliquary
-    const torsoGrad = ctx.createLinearGradient(-10, -12, 10, 14);
-    torsoGrad.addColorStop(0, armorMid);
-    torsoGrad.addColorStop(0.6, armorDark);
-    torsoGrad.addColorStop(1, '#07040c');
-    ctx.fillStyle = torsoGrad;
-    ctx.beginPath();
-    ctx.moveTo(-9, -11);
-    ctx.lineTo(9, -11);
-    ctx.lineTo(8, 12);
-    ctx.quadraticCurveTo(0, 15, -8, 12);
+    ctx.moveTo(12, 11 + bob);
+    ctx.lineTo(7 + capeWave, 25);
+    ctx.lineTo(15 + capeWave * 0.5, 26);
+    ctx.lineTo(16, 11 + bob);
     ctx.closePath();
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)';
-    ctx.lineWidth = 1;
-    ctx.stroke();
 
-    // Specular pectoral highlight & ornate diagonal sash / rib filigree
-    ctx.strokeStyle = trimGold;
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(-7, -9);
-    ctx.lineTo(6, 5);
-    ctx.stroke();
+    // Cloak rim highlight
+    ctx.fillStyle = capeLight;
+    ctx.fillRect(7 + Math.round(capeWave), 18 + bob, 2, 6);
 
-    // Ornate Gold Belt & Crimson Relic Buckle
-    ctx.fillStyle = '#291512';
-    ctx.fillRect(-8.5, 5.5, 17, 3.6);
+    // 2. Animated Armored Boots & Greaves
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(11 - stride, 24, 4, 6);
+    ctx.fillRect(17 + stride, 24, 4, 6);
+    // Steel knee guards
+    ctx.fillStyle = armorLight;
+    ctx.fillRect(11 - stride, 24, 3, 2);
+    ctx.fillRect(17 + stride, 24, 3, 2);
+
+    // 3. Torso / Cuirass / Tunic
+    ctx.fillStyle = armorDark;
+    ctx.fillRect(11, 12 + bob, 10, 12);
+    ctx.fillStyle = armorMid;
+    ctx.fillRect(12, 13 + bob, 8, 10);
+    // Specular chest plate & belt
+    ctx.fillStyle = armorLight;
+    ctx.fillRect(13, 13 + bob, 6, 4);
+    ctx.fillStyle = '#451a03';
+    ctx.fillRect(11, 20 + bob, 10, 2);
+    // Golden Belt Buckle
     ctx.fillStyle = trimGold;
-    ctx.beginPath();
-    ctx.moveTo(0, 4.5);
-    ctx.lineTo(3.5, 7.3);
-    ctx.lineTo(0, 10.1);
-    ctx.lineTo(-3.5, 7.3);
-    ctx.closePath();
-    ctx.fill();
-    ctx.fillStyle = eyeGlow;
-    ctx.fillRect(-1, 6.3, 2, 2);
+    ctx.fillRect(15, 20 + bob, 3, 2);
 
-    // 4. Fluted Gothic Pauldrons (Layered Shoulder Armor)
-    for (const side of [-1, 1] as const) {
-      ctx.fillStyle = capeMid;
-      ctx.beginPath();
-      ctx.moveTo(side * 6, -12);
-      ctx.quadraticCurveTo(side * 15, -14, side * 14, -5);
-      ctx.lineTo(side * 6, -6);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = trimGold;
-      ctx.lineWidth = 1.3;
-      ctx.stroke();
-    }
+    // 4. Pauldrons (Shoulder Armor with Gold Trim)
+    ctx.fillStyle = capeLight;
+    ctx.fillRect(9, 11 + bob, 4, 4);
+    ctx.fillRect(19, 11 + bob, 4, 4);
+    ctx.fillStyle = trimGold;
+    ctx.fillRect(9, 14 + bob, 4, 1);
+    ctx.fillRect(19, 14 + bob, 4, 1);
 
-    // 5. Detailed Gothic Head, Facial Visage & Class Crown / Hat / Hood
+    // 5. Head & Distinct Class Headgear
     if (heroId === 'mortaccio') {
-      // Ornate Sovereign Skull with Jaw & Crowned Horns
+      // Detailed Undead Skull Head with Jaw
       ctx.fillStyle = '#e2e8f0';
-      ctx.beginPath();
-      ctx.arc(0, -19, 7.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillRect(-5, -15, 10, 4.5);
-      ctx.fillStyle = '#07040b';
-      ctx.fillRect(-4.5, -20, 3.2, 3.2);
-      ctx.fillRect(1.5, -20, 3.2, 3.2);
-      ctx.fillStyle = eyeGlow;
-      ctx.fillRect(-3.6, -19, 1.8, 1.8);
-      ctx.fillRect(2.4, -19, 1.8, 1.8);
-    } else if (heroId === 'imelda') {
-      // Pale Visage + Cathedral Witch Pointed Hat + Crescent Buckle
-      ctx.fillStyle = '#fde68a';
-      ctx.beginPath();
-      ctx.arc(0.5, -16.5, 5.8, 0, Math.PI * 2);
-      ctx.fill();
-      // Hair framing
-      ctx.fillStyle = '#3b0764';
-      ctx.fillRect(-6, -19, 3, 8);
-      ctx.fillRect(4, -19, 2.5, 7);
-      // Wide tilted Witch Brim
-      ctx.fillStyle = capeDark;
-      ctx.beginPath();
-      ctx.ellipse(0, -21, 14, 3.2, -0.06, 0, Math.PI * 2);
-      ctx.fill();
-      // Tall crooked Gothic Spire Cone
-      ctx.fillStyle = capeMid;
-      ctx.beginPath();
-      ctx.moveTo(-7.5, -21);
-      ctx.quadraticCurveTo(-2, -31, 4, -33.5);
-      ctx.quadraticCurveTo(2, -26, 7.5, -21);
-      ctx.closePath();
-      ctx.fill();
-      ctx.fillStyle = trimGold;
-      ctx.fillRect(-6.5, -22.2, 13, 2);
-      // Luminous Witch Eyes
-      ctx.fillStyle = eyeGlow;
-      ctx.fillRect(-2.5, -17, 2.2, 2);
-      ctx.fillRect(2, -17, 2.2, 2);
-    } else if (heroId === 'arca') {
-      // High-Collared Crimson Warlock Mitre & Blazing Crown
-      ctx.fillStyle = '#fed7aa';
-      ctx.beginPath();
-      ctx.arc(0.5, -16.5, 5.8, 0, Math.PI * 2);
-      ctx.fill();
-      // Twin Gothic Collar Fins behind head
-      ctx.fillStyle = capeMid;
-      ctx.beginPath();
-      ctx.moveTo(-9, -11);
-      ctx.lineTo(-12, -24);
-      ctx.lineTo(-4, -16);
-      ctx.moveTo(9, -11);
-      ctx.lineTo(12, -24);
-      ctx.lineTo(4, -16);
-      ctx.fill();
-      // Crown & Flame Crest
-      ctx.fillStyle = capeDark;
-      ctx.beginPath();
-      ctx.moveTo(-7, -19);
-      ctx.lineTo(-3, -29);
-      ctx.lineTo(0, -24);
-      ctx.lineTo(4, -30);
-      ctx.lineTo(7, -19);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = trimGold;
-      ctx.lineWidth = 1.4;
-      ctx.stroke();
-      ctx.fillStyle = eyeGlow;
-      ctx.fillRect(-2.5, -17, 2.2, 2);
-      ctx.fillRect(2, -17, 2.2, 2);
-    } else if (heroId === 'gennaro') {
-      // Gothic Plumed Cowl & Half-Face Assassin Veil
-      ctx.fillStyle = '#e7d5b8';
-      ctx.beginPath();
-      ctx.arc(0.5, -17, 5.8, 0, Math.PI * 2);
-      ctx.fill();
-      // Face Veil
-      ctx.fillStyle = '#090f14';
-      ctx.fillRect(-5, -15.5, 11, 5);
-      // Cowl Hood
-      ctx.fillStyle = capeDark;
-      ctx.beginPath();
-      ctx.moveTo(-8, -14);
-      ctx.quadraticCurveTo(-8, -26, 1, -27);
-      ctx.quadraticCurveTo(9, -24, 7.5, -15);
-      ctx.lineTo(4, -18);
-      ctx.lineTo(-5, -18);
-      ctx.closePath();
-      ctx.fill();
-      ctx.strokeStyle = capeLight;
-      ctx.lineWidth = 1;
-      ctx.stroke();
-      // Piercing Emerald Eyes
-      ctx.fillStyle = eyeGlow;
-      ctx.fillRect(-2.2, -17.8, 2.4, 2);
-      ctx.fillRect(2.2, -17.8, 2.4, 2);
-    } else {
-      // Antonio (Vampire Hunter): Sharp Face + Wide Gothic Hunter Hat & Flowing Feather
-      ctx.fillStyle = '#fcd34d';
-      ctx.beginPath();
-      ctx.arc(0.5, -16.5, 5.8, 0, Math.PI * 2);
-      ctx.fill();
-      // Shadow under brim
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-      ctx.fillRect(-5, -20, 11, 2.5);
-      // Wide-brimmed Vampire Hunter Hat
-      ctx.fillStyle = '#0d0914';
-      ctx.beginPath();
-      ctx.ellipse(0, -20.5, 14.5, 3, -0.04, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#1d1629';
-      ctx.beginPath();
-      ctx.moveTo(-7.5, -20.5);
-      ctx.lineTo(-5.5, -28.5);
-      ctx.lineTo(5.5, -28.5);
-      ctx.lineTo(7.5, -20.5);
-      ctx.closePath();
-      ctx.fill();
-      // Crimson Hatband & Silver Feather
-      ctx.fillStyle = capeMid;
-      ctx.fillRect(-6.8, -22.5, 13.6, 2);
-      ctx.strokeStyle = '#fda4af';
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.moveTo(-6, -22);
-      ctx.quadraticCurveTo(-12, -29, -15, -31);
-      ctx.stroke();
-      // Luminous Eyes
-      ctx.fillStyle = eyeGlow;
-      ctx.fillRect(-2.4, -17, 2.2, 2);
-      ctx.fillRect(2.1, -17, 2.2, 2);
-    }
-
-    // 6. Signature Gothic Hand Relics
-    const armY = 1 + p.armRaise * 6;
-    if (heroId === 'imelda' || heroId === 'arca') {
-      // Ornate Jewel Staff with Glowing Lantern Ring
-      ctx.strokeStyle = '#78350f';
-      ctx.lineWidth = 2.6;
-      ctx.beginPath();
-      ctx.moveTo(13, 14);
-      ctx.lineTo(17, -14 + armY * 0.4);
-      ctx.stroke();
-
-      ctx.strokeStyle = trimGold;
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.arc(17.5, -18 + armY * 0.4, 4.5, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.fillStyle = eyeGlow;
-      ctx.beginPath();
-      ctx.arc(17.5, -18 + armY * 0.4, 2.5, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.fillRect(12, 5 + bob, 8, 6);
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(16.7, -19 + armY * 0.4, 1.4, 1.4);
-    } else if (heroId === 'gennaro') {
-      // Twin Gothic Stillettos
-      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(13, 5 + bob, 6, 3);
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(13, 10 + bob, 6, 2); // Teeth
+      ctx.fillStyle = '#090d16';
+      ctx.fillRect(14, 7 + bob, 2, 2);
+      ctx.fillRect(18, 7 + bob, 2, 2);
+      ctx.fillStyle = eyeGlow;
+      ctx.fillRect(15, 7 + bob, 1, 1);
+      ctx.fillRect(19, 7 + bob, 1, 1);
+    } else if (heroId === 'imelda' || heroId === 'arca') {
+      // Pointed Battlemage / Warlock Hat + Glowing Eyes under Brim
+      ctx.fillStyle = '#fde68a'; // Face
+      ctx.fillRect(13, 7 + bob, 6, 5);
+      // Hat Brim
+      ctx.fillStyle = capeDark;
+      ctx.fillRect(8, 6 + bob, 16, 2);
+      // Hat Cone
+      ctx.fillStyle = capeMid;
       ctx.beginPath();
-      ctx.moveTo(11, armY);
-      ctx.lineTo(25, armY - 4);
-      ctx.lineTo(13, armY + 3);
+      ctx.moveTo(10, 6 + bob);
+      ctx.lineTo(15, 1 + bob);
+      ctx.lineTo(21, 6 + bob);
       ctx.closePath();
       ctx.fill();
+      // Gold hat band
       ctx.fillStyle = trimGold;
-      ctx.fillRect(10, armY - 2.5, 2.5, 6);
+      ctx.fillRect(11, 5 + bob, 10, 1);
+      // Glowing eyes
+      ctx.fillStyle = eyeGlow;
+      ctx.fillRect(15, 8 + bob, 2, 2);
+      ctx.fillRect(18, 8 + bob, 2, 2);
     } else {
-      // Vampire Killer Crimson-Gilded Runeblade / Whip-Sword
-      ctx.save();
-      ctx.translate(11, armY);
-      ctx.rotate(-0.35);
-      // Crossguard
-      ctx.fillStyle = trimGold;
-      ctx.fillRect(-1.5, -5, 3, 10);
-      // Fluted Blade
-      const bladeGrad = ctx.createLinearGradient(0, -2, 16, 2);
-      bladeGrad.addColorStop(0, '#f8fafc');
-      bladeGrad.addColorStop(0.5, '#cbd5e1');
-      bladeGrad.addColorStop(1, '#64748b');
-      ctx.fillStyle = bladeGrad;
-      ctx.beginPath();
-      ctx.moveTo(1.5, -2.5);
-      ctx.lineTo(17, 0);
-      ctx.lineTo(1.5, 2.5);
-      ctx.closePath();
-      ctx.fill();
-      // Blood-ruby pommel
-      ctx.fillStyle = '#dc2626';
-      ctx.fillRect(-4, -1.2, 2.5, 2.4);
-      ctx.restore();
+      // Gothic Vampire Hunter Hood / Wide-Brimmed Hat + Flowing Hair
+      ctx.fillStyle = '#fcd34d'; // Skin shadow
+      ctx.fillRect(13, 6 + bob, 6, 5);
+      // Dark Hood / Hunter Hat
+      ctx.fillStyle = armorDark;
+      ctx.fillRect(9, 5 + bob, 14, 2); // Wide brim
+      ctx.fillRect(11, 2 + bob, 10, 4); // Crown
+      ctx.fillStyle = capeMid;
+      ctx.fillRect(11, 4 + bob, 10, 1); // Crimson hat ribbon
+      // Glowing Hunter Eyes
+      ctx.fillStyle = eyeGlow;
+      ctx.fillRect(15, 7 + bob, 2, 2);
+      ctx.fillRect(18, 7 + bob, 2, 2);
     }
 
-    ctx.restore();
-    return this.applyPixelOutline(c, '#040208');
+    // 6. Signature Hand Weapon in Right Hand
+    const wepY = 14 + bob + (frame % 2);
+    if (heroId === 'imelda' || heroId === 'arca') {
+      // Ornate Gem Staff
+      ctx.fillStyle = '#78350f';
+      ctx.fillRect(23, 8 + bob, 2, 18);
+      ctx.fillStyle = trimGold;
+      ctx.fillRect(22, 7 + bob, 4, 2);
+      ctx.fillStyle = eyeGlow;
+      ctx.fillRect(23, 4 + bob, 3, 3);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(24, 5 + bob, 1, 1);
+    } else if (heroId === 'gennaro') {
+      // Twin Silver Daggers
+      ctx.fillStyle = '#e2e8f0';
+      ctx.fillRect(22, wepY, 7, 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(23, wepY, 5, 1);
+      ctx.fillStyle = trimGold;
+      ctx.fillRect(21, wepY - 1, 2, 4);
+    } else {
+      // Vampire Killer Whip / Broadsword with Silver Blade Glint
+      ctx.fillStyle = trimGold;
+      ctx.fillRect(21, wepY - 2, 2, 6); // Crossguard
+      ctx.fillStyle = '#94a3b8';
+      ctx.fillRect(23, wepY - 1, 8, 3); // Blade body
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(23, wepY - 1, 7, 1); // Razor top highlight
+    }
+
+    return this.applyPixelOutline(c, '#05050a');
   }
 
   private makeCanvas(size: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
