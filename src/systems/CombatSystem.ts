@@ -12,6 +12,13 @@ import { SoundSynthesizer } from '../core/SoundSynthesizer';
 import { Camera } from '../core/Camera';
 import { BuildEventBus, DelayedTraitBomb, SkillTag, TAG_METADATA } from './BuildSystem';
 import type { Weapon } from '../weapons/Weapon';
+import {
+  drawCathedralRoseWeb,
+  drawConcentricRuneHalo,
+  drawFiligreeSpikeRing,
+  drawFourPointStar,
+  drawGothicCrossEmblem
+} from '../vfx/GothicVFX';
 
 export interface VisualLightningEffect {
   position: Vector2;
@@ -37,6 +44,7 @@ export class CombatSystem {
   private visualLightnings: VisualLightningEffect[] = [];
   private screenNukeFlashTimer = 0;
   private activeUltimateHeroId = 'antonio';
+  private activeUltimateBranchKey = 'antonio';
   private currentPlayerRef: Player | null = null;
   private globalAttackCounter = 0;
   private activeHitStopCallback?: (duration: number) => void;
@@ -245,6 +253,12 @@ export class CombatSystem {
     this.currentPlayerRef = player;
     const origin = player.position;
     const dashDmg = Math.round(28 * player.damageMult);
+    this.particleSystem.emitDashBurst(
+      player.lastDashStartPosition.x,
+      player.lastDashStartPosition.y,
+      player.dashDirection.angle(),
+      player.branchColor || '#38bdf8'
+    );
     this.particleSystem.emitHit(origin.x, origin.y, '#38bdf8', 10);
 
     // 触发 OnDodge 事件监听节点（示例B：冲刺原地留下继承主武器属性标签的延迟炸弹）
@@ -296,6 +310,7 @@ export class CombatSystem {
   public triggerCharacterUltimate(player: Player): void {
     this.screenNukeFlashTimer = 0.65;
     this.activeUltimateHeroId = player.characterId;
+    this.activeUltimateBranchKey = player.selectedBranch || player.characterId;
     this.camera.triggerShake(16);
     this.sound.playExplosion(0.75, 1100);
 
@@ -701,7 +716,7 @@ export class CombatSystem {
             const reflectedDamage = Math.max(Math.round(ep.damage * 3.2), Math.round(proj.damage * 1.15));
             ep.reflect(reflectDir, reflectedDamage);
             this.sound.playParry();
-            this.particleSystem.emitSlashImpact(ep.position.x, ep.position.y, reflectDir.angle(), '#34d399', true);
+            this.particleSystem.emitParryBurst(ep.position.x, ep.position.y, reflectDir.angle());
             this.camera.triggerShake(2.5);
 
             // Antonio [圣光裁决者] 分化：弹反成功回血 + 向最近敌人发射追踪圣剑
@@ -1558,33 +1573,41 @@ export class CombatSystem {
       }
     }
 
-    // 1b. Render Delayed Trait Bombs (示例B：冲刺原地留下的延迟引爆炸弹)
+    // 1b. Render Delayed Trait Bombs (冲刺原地留下的延迟引爆炸弹：哥特炼金咒印炸弹)
     for (const bomb of this.delayedBombs) {
       ctx.save();
       ctx.translate(bomb.position.x, bomb.position.y);
-      const progress = 1 - bomb.timer / bomb.maxTimer;
-      const pulse = 1 + Math.sin(progress * Math.PI * 6) * 0.18;
-
-      // 预警爆炸半径圈
-      ctx.strokeStyle = bomb.inheritedTags.has(SkillTag.FIRE) ? 'rgba(249, 115, 22, 0.55)' : 'rgba(56, 189, 248, 0.55)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath();
-      ctx.arc(0, 0, bomb.radius * (0.4 + 0.6 * progress), 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // 炸弹核心球体
       ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = bomb.inheritedTags.has(SkillTag.FIRE) ? '#f97316' : '#38bdf8';
+      const progress = 1 - bomb.timer / bomb.maxTimer;
+      const pulse = 1 + Math.sin(progress * Math.PI * 8) * 0.2;
+      const isFire = bomb.inheritedTags.has(SkillTag.FIRE);
+      const bColor = isFire ? '#f97316' : '#38bdf8';
+
+      // Spinning Gothic Octagram Charge Seal
+      drawConcentricRuneHalo(ctx, {
+        x: 0,
+        y: 0,
+        r: bomb.radius * (0.42 + 0.58 * progress),
+        primaryColor: isFire ? 'rgba(249, 115, 22, 0.72)' : 'rgba(56, 189, 248, 0.72)',
+        accentColor: '#fde047',
+        rotation: progress * 5.2,
+        spokes: 8,
+        polygonSides: 6,
+        polygonStep: 2,
+        ringWidth: 1.7
+      });
+
+      // Crystal Core Halo & 4-Point Reliquary Star
+      const cGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 22 * pulse);
+      cGrad.addColorStop(0, '#ffffff');
+      cGrad.addColorStop(0.45, bColor);
+      cGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = cGrad;
       ctx.beginPath();
-      ctx.arc(0, 0, 11 * pulse, 0, Math.PI * 2);
+      ctx.arc(0, 0, 22 * pulse, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(0, 0, 5 * pulse, 0, Math.PI * 2);
-      ctx.fill();
+      drawFourPointStar(ctx, 0, 0, 14 * pulse, 3.6, bColor, '#ffffff', progress * 6);
       ctx.restore();
     }
 
@@ -1614,7 +1637,7 @@ export class CombatSystem {
       this.renderLightningEffect(ctx, l);
     }
 
-    // 5b. Boss Slain Radial Shockwave & Sacred Golden Runes (Boss 终结径向冲击波)
+    // 5b. Boss Slain Radial Shockwave & Colossal Cathedral Rose Mandala (Boss 终结径向冲击波)
     if (this.bossSlainWaveTimer > 0) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -1622,38 +1645,41 @@ export class CombatSystem {
       const alpha = Math.max(0, 1 - prog);
       const bx = this.bossSlainPosition.x;
       const by = this.bossSlainPosition.y;
-      const maxR = 460;
+      const maxR = 490;
       const curR = maxR * Math.pow(prog, 0.55);
 
-      ctx.globalAlpha = alpha * 0.9;
-      ctx.strokeStyle = '#fef08a';
-      ctx.lineWidth = Math.max(2, 16 * (1 - prog));
-      ctx.beginPath();
-      ctx.arc(bx, by, curR, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.globalAlpha = alpha * 0.92;
+      drawFiligreeSpikeRing(
+        ctx,
+        bx,
+        by,
+        curR,
+        16,
+        24 * (1 - prog * 0.4),
+        '#fef08a',
+        prog * 0.7,
+        Math.max(2, 12 * (1 - prog))
+      );
 
-      ctx.strokeStyle = '#f59e0b';
-      ctx.lineWidth = Math.max(1.5, 8 * (1 - prog));
-      ctx.beginPath();
-      ctx.arc(bx, by, curR * 0.76, 0, Math.PI * 2);
-      ctx.stroke();
+      drawCathedralRoseWeb(ctx, bx, by, curR * 0.88, 12, -prog * 1.1, '#f59e0b', '#fef08a', Math.max(1.5, 4 * alpha));
+      drawConcentricRuneHalo(ctx, {
+        x: bx,
+        y: by,
+        r: curR * 0.72,
+        primaryColor: '#fde047',
+        accentColor: '#ef4444',
+        rotation: prog * 1.9,
+        spokes: 12,
+        polygonSides: 8,
+        polygonStep: 3,
+        ringWidth: Math.max(1.5, 5 * alpha)
+      });
 
-      // Rotating 8-Pointed Sacred Runic Seal at Boss Death Epicenter
-      ctx.save();
-      ctx.translate(bx, by);
-      ctx.rotate(prog * 1.8);
-      ctx.strokeStyle = `rgba(254, 240, 138, ${alpha * 0.75})`;
-      ctx.lineWidth = 2.5;
-      for (let s = 0; s < 2; s++) {
-        ctx.rotate(Math.PI / 4);
-        const boxS = curR * 0.48;
-        ctx.strokeRect(-boxS, -boxS, boxS * 2, boxS * 2);
-      }
-      ctx.restore();
+      drawGothicCrossEmblem(ctx, bx, by, curR * 0.55, 10 * alpha, '#fef08a', '#ffffff', prog * 0.45);
       ctx.restore();
     }
 
-    // 6. Character-Specific Ultimate Screen Sigil + Flash
+    // 6. Character & Branch Specific Gothic Maximalist Ultimate Ritual Mandalas
     if (this.screenNukeFlashTimer > 0) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -1662,88 +1688,137 @@ export class CombatSystem {
 
       const cx = this.camera.position.x;
       const cy = this.camera.position.y;
-      const maxR = Math.max(this.camera.viewportWidth, this.camera.viewportHeight) * 0.62;
+      const maxR = Math.max(this.camera.viewportWidth, this.camera.viewportHeight) * 0.65;
       const r = maxR * (0.28 + 0.72 * progress);
 
       ctx.globalAlpha = alpha;
+      const ultKey = this.activeUltimateBranchKey || this.activeUltimateHeroId;
 
-      if (this.activeUltimateHeroId === 'antonio') {
-        // CRIMSON CROSS: Colossal Golden-Crimson Crusader Cross Slash across the arena
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 18 * (1 - progress * 0.5);
-        ctx.beginPath();
-        ctx.moveTo(cx - r, cy);
-        ctx.lineTo(cx + r, cy);
-        ctx.moveTo(cx, cy - r);
-        ctx.lineTo(cx, cy + r);
-        ctx.stroke();
-
-        ctx.strokeStyle = '#fef08a';
-        ctx.lineWidth = 6;
-        ctx.stroke();
-      } else if (this.activeUltimateHeroId === 'gennaro') {
-        // PHANTOM BLADESTORM: Emerald Vortex Blades Ring
-        ctx.strokeStyle = '#10b981';
-        ctx.lineWidth = 5;
-        for (let b = 0; b < 8; b++) {
-          const ang = (b * Math.PI) / 4 + progress * 4;
+      if (ultKey.startsWith('antonio')) {
+        // CRIMSON CROSS / SANCTUARY AEGIS: Monumental Crusader Greatsword Cross + Rose Window Mandala
+        const primary = ultKey === 'antonio_arbiter' ? '#fde047' : '#ef4444';
+        const secondary = ultKey === 'antonio_arbiter' ? '#ffffff' : '#fbbf24';
+        drawCathedralRoseWeb(ctx, cx, cy, r * 0.95, 12, progress * 0.45, primary, secondary, 3.0);
+        drawConcentricRuneHalo(ctx, {
+          x: cx,
+          y: cy,
+          r: r * 0.82,
+          primaryColor: secondary,
+          accentColor: '#ffffff',
+          rotation: -progress * 0.9,
+          spokes: 8,
+          polygonSides: 8,
+          polygonStep: 2,
+          ringWidth: 3.2
+        });
+        drawGothicCrossEmblem(ctx, cx, cy, r * 0.96, 16 * (1 - progress * 0.3), primary, '#fef08a', 0);
+      } else if (ultKey.startsWith('gennaro')) {
+        // PHANTOM BLADESTORM / EXECUTE: Emerald-Gold Orbital Blade Vortex + Serrated Storm Crown
+        const bladeColor = ultKey === 'gennaro_executioner' ? '#a3e635' : '#10b981';
+        drawConcentricRuneHalo(ctx, {
+          x: cx,
+          y: cy,
+          r: r * 0.92,
+          primaryColor: bladeColor,
+          accentColor: '#fef08a',
+          rotation: progress * 3.6,
+          spokes: 16,
+          polygonSides: 8,
+          polygonStep: 3,
+          ringWidth: 3.0
+        });
+        drawFiligreeSpikeRing(ctx, cx, cy, r * 0.76, 16, 26, '#34d399', -progress * 2.8, 3.2);
+        for (let b = 0; b < 12; b++) {
+          const ang = (b * Math.PI * 2) / 12 + progress * 4.2;
+          ctx.strokeStyle = b % 2 === 0 ? '#ffffff' : bladeColor;
+          ctx.lineWidth = 4.2;
           ctx.beginPath();
-          ctx.arc(cx, cy, r * 0.85, ang, ang + 0.45);
+          ctx.arc(cx, cy, r * (0.55 + (b % 3) * 0.16), ang, ang + 0.55);
           ctx.stroke();
         }
-      } else if (this.activeUltimateHeroId === 'arca') {
-        // HELLFIRE CATACLYSM: Concentric Solar Magma Rings
-        ctx.strokeStyle = '#f97316';
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.arc(cx, cy, r * 0.65, 0, Math.PI * 2);
-        ctx.stroke();
-      } else if (this.activeUltimateHeroId === 'pasqualina') {
-        // PRISMATIC THUNDER: Octagonal Storm Array
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        for (let i = 0; i <= 8; i++) {
-          const ang = (i * Math.PI * 2) / 8 + progress;
-          const px = cx + Math.cos(ang) * r;
-          const py = cy + Math.sin(ang) * r;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
+      } else if (ultKey === 'arca_necro' || ultKey === 'mortaccio') {
+        // DEATH HARVEST: Necrotic Amethyst Reaper Mandala + Scythe Crescent Sweeps
+        drawCathedralRoseWeb(ctx, cx, cy, r * 0.94, 10, -progress * 1.4, '#a855f7', '#f3e8ff', 2.6);
+        drawConcentricRuneHalo(ctx, {
+          x: cx,
+          y: cy,
+          r: r * 0.85,
+          primaryColor: '#c084fc',
+          accentColor: '#fde047',
+          rotation: progress * 1.5,
+          spokes: 10,
+          polygonSides: 5,
+          polygonStep: 2,
+          ringWidth: 3.2
+        });
+        for (let s = 0; s < 8; s++) {
+          const ang = (s * Math.PI) / 4 + progress * 2.5;
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(ang);
+          ctx.fillStyle = s % 2 === 0 ? '#e9d5ff' : '#c084fc';
+          ctx.beginPath();
+          ctx.arc(0, 0, r * 0.7, -0.28, 0.28, false);
+          ctx.arc(-18, 0, r * 0.64, 0.22, -0.22, true);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
         }
-        ctx.stroke();
-      } else if (this.activeUltimateHeroId === 'mortaccio') {
-        // DEATH SPIRAL HARVEST: Necrotic Purple Reaper Halo
-        ctx.strokeStyle = '#a855f7';
-        ctx.lineWidth = 6;
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.stroke();
+      } else if (ultKey.startsWith('arca')) {
+        // HELLFIRE / SOLAR CATACLYSM: Triple Concentric Infernal Pentagram + Erupting Flame Crown
+        drawFiligreeSpikeRing(ctx, cx, cy, r * 0.96, 15, 28, '#f97316', progress * 1.4, 3.6);
+        drawConcentricRuneHalo(ctx, {
+          x: cx,
+          y: cy,
+          r: r * 0.86,
+          primaryColor: '#ef4444',
+          accentColor: '#fef08a',
+          rotation: -progress * 1.2,
+          spokes: 10,
+          polygonSides: 5,
+          polygonStep: 2,
+          ringWidth: 3.4
+        });
+        drawCathedralRoseWeb(ctx, cx, cy, r * 0.62, 8, progress * 1.6, '#fb923c', '#ffffff', 2.4);
+      } else if (ultKey === 'imelda_storm' || ultKey === 'pasqualina') {
+        // PRISMATIC THUNDER: Counter-Rotating Octagonal Storm Astrolabe + Radial Arc Bolts
+        drawConcentricRuneHalo(ctx, {
+          x: cx,
+          y: cy,
+          r: r * 0.95,
+          primaryColor: '#38bdf8',
+          accentColor: '#f0abfc',
+          rotation: progress * 1.8,
+          spokes: 16,
+          polygonSides: 8,
+          polygonStep: 3,
+          ringWidth: 3.2
+        });
+        drawCathedralRoseWeb(ctx, cx, cy, r * 0.72, 12, -progress * 1.5, '#7dd3fc', '#ffffff', 2.2);
+        drawFiligreeSpikeRing(ctx, cx, cy, r * 0.56, 8, 22, '#e879f9', progress * 2.4, 2.6);
       } else {
-        // IMELDA: STARFALL PENTAGRAM (5-Pointed Celestial Pentagram)
-        ctx.strokeStyle = '#fbbf24';
-        ctx.lineWidth = 5;
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.strokeStyle = '#38bdf8';
-        ctx.lineWidth = 3.5;
-        ctx.beginPath();
-        for (let i = 0; i <= 5; i++) {
-          const starIdx = (i * 2) % 5;
-          const ang = (starIdx * Math.PI * 2) / 5 - Math.PI / 2 + progress * 0.8;
-          const px = cx + Math.cos(ang) * r;
-          const py = cy + Math.sin(ang) * r;
-          if (i === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
-        }
-        ctx.stroke();
+        // IMELDA / ABSOLUTE ZERO: Grand Celestial Starfall Pentagram + Cathedral Rose Tracery
+        const pColor = ultKey === 'imelda_frost' ? '#7dd3fc' : '#fbbf24';
+        const sColor = ultKey === 'imelda_frost' ? '#e0f2fe' : '#38bdf8';
+        drawCathedralRoseWeb(ctx, cx, cy, r * 0.98, 12, -progress * 0.7, pColor, '#ffffff', 2.4);
+        drawConcentricRuneHalo(ctx, {
+          x: cx,
+          y: cy,
+          r: r * 0.9,
+          primaryColor: pColor,
+          accentColor: sColor,
+          rotation: progress * 0.9,
+          spokes: 10,
+          polygonSides: 5,
+          polygonStep: 2,
+          ringWidth: 3.6
+        });
+        drawFourPointStar(ctx, cx, cy, r * 0.34, 18, pColor, '#ffffff', progress * 1.5);
       }
 
       // Soft Tinted Flash Wash
-      ctx.globalAlpha = Math.min(0.45, this.screenNukeFlashTimer * 0.9);
-      ctx.fillStyle = '#fef08a';
+      ctx.globalAlpha = Math.min(0.42, this.screenNukeFlashTimer * 0.85);
+      ctx.fillStyle = ultKey.startsWith('arca_necro') ? '#d8b4fe' : '#fef08a';
       ctx.fillRect(
         cx - this.camera.viewportWidth,
         cy - this.camera.viewportHeight,
@@ -1758,27 +1833,49 @@ export class CombatSystem {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     const alpha = l.lifetime / l.maxLifetime;
+    const progress = 1 - alpha;
     ctx.globalAlpha = alpha;
 
-    // 1. Ground Impact Scorched Shockwave Halo
+    const priColor = l.isEvolved ? '#38bdf8' : '#a855f7';
+    const secColor = l.isEvolved ? '#bae6fd' : '#e9d5ff';
+
+    // 1. Ground Impact Scorched Shockwave Halo & Gothic Ritual Thunder Seal
     const haloGrad = ctx.createRadialGradient(
       l.position.x, l.position.y, 2,
-      l.position.x, l.position.y, l.radius * 1.35
+      l.position.x, l.position.y, l.radius * 1.45
     );
     haloGrad.addColorStop(0, '#ffffff');
-    haloGrad.addColorStop(0.35, l.isEvolved ? '#38bdf8' : '#a855f7');
+    haloGrad.addColorStop(0.35, priColor);
     haloGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = haloGrad;
     ctx.beginPath();
-    ctx.arc(l.position.x, l.position.y, l.radius * 1.35, 0, Math.PI * 2);
+    ctx.arc(l.position.x, l.position.y, l.radius * 1.45, 0, Math.PI * 2);
     ctx.fill();
 
-    // Crisp Electric Ring
-    ctx.strokeStyle = l.isEvolved ? '#bae6fd' : '#e9d5ff';
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(l.position.x, l.position.y, l.radius, 0, Math.PI * 2);
-    ctx.stroke();
+    drawConcentricRuneHalo(ctx, {
+      x: l.position.x,
+      y: l.position.y,
+      r: l.radius * (0.85 + progress * 0.25),
+      primaryColor: secColor,
+      accentColor: '#fde047',
+      rotation: progress * 3.5,
+      spokes: 6,
+      polygonSides: 6,
+      polygonStep: 2,
+      ringWidth: 1.8
+    });
+    drawFiligreeSpikeRing(
+      ctx,
+      l.position.x,
+      l.position.y,
+      l.radius * 1.02,
+      8,
+      7,
+      secColor,
+      -progress * 4,
+      1.6
+    );
+    drawFourPointStar(ctx, l.position.x, l.position.y, l.radius * 0.6, 3.2, secColor, '#ffffff', progress * 5);
 
     // 2. Generate Jagged Bolt Points from Sky to Target
     const pts: { x: number; y: number }[] = [];
@@ -1787,19 +1884,19 @@ export class CombatSystem {
     pts.push({ x: curX, y: curY });
 
     while (curY < l.position.y) {
-      curY += 32 + Math.random() * 28;
+      curY += 30 + Math.random() * 28;
       if (curY >= l.position.y) {
         curX = l.position.x;
         curY = l.position.y;
       } else {
-        curX += (Math.random() - 0.5) * 42;
+        curX += (Math.random() - 0.5) * 44;
       }
       pts.push({ x: curX, y: curY });
     }
 
     // Outer Thick Glow Pass
     ctx.strokeStyle = l.isEvolved ? '#0284c7' : '#9333ea';
-    ctx.lineWidth = l.isEvolved ? 14 : 10;
+    ctx.lineWidth = l.isEvolved ? 15 : 11;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.beginPath();
@@ -1808,24 +1905,29 @@ export class CombatSystem {
 
     // Midtone Plasma Pass
     ctx.strokeStyle = l.isEvolved ? '#7dd3fc' : '#d8b4fe';
-    ctx.lineWidth = l.isEvolved ? 6 : 4.5;
+    ctx.lineWidth = l.isEvolved ? 6.5 : 4.8;
     ctx.stroke();
 
     // Inner Blinding White Core Pass
     ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.2;
     ctx.stroke();
 
-    // Side Fork Branches
-    ctx.strokeStyle = l.isEvolved ? '#bae6fd' : '#f3e8ff';
-    ctx.lineWidth = 1.5;
+    // Side Fork Branches + Star Sparks along Bolt
+    ctx.strokeStyle = secColor;
+    ctx.lineWidth = 1.6;
     for (let i = 1; i < pts.length - 1; i += 2) {
       const p = pts[i];
       const forkDir = i % 4 === 1 ? 1 : -1;
+      const fx = p.x + forkDir * (20 + Math.random() * 20);
+      const fy = p.y + 22 + Math.random() * 16;
       ctx.beginPath();
       ctx.moveTo(p.x, p.y);
-      ctx.lineTo(p.x + forkDir * (18 + Math.random() * 18), p.y + 20 + Math.random() * 15);
+      ctx.lineTo(fx, fy);
       ctx.stroke();
+      if (i % 4 === 1) {
+        drawFourPointStar(ctx, fx, fy, 4.5, 1.1, secColor, '#ffffff');
+      }
     }
 
     ctx.restore();

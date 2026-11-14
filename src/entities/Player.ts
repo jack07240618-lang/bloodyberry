@@ -4,6 +4,7 @@ import { Weapon } from '../weapons/Weapon';
 import { PASSIVE_DEFINITIONS } from '../passives/PassiveRegistry';
 import { SpriteRenderer } from '../renderer/SpriteRenderer';
 import { SkillTag } from '../systems/BuildSystem';
+import { drawConcentricRuneHalo, drawFiligreeSpikeRing, drawFourPointStar } from '../vfx/GothicVFX';
 
 export class Player extends Entity {
   public characterId = 'antonio';
@@ -366,18 +367,37 @@ export class Player extends Entity {
       ctx.restore();
     }
 
-    // Render Gennaro Phantom Shadow Clones in World Space
+    // Render Gennaro Phantom Shadow Clones in World Space with Gothic Assassination Seals
     for (const clone of this.shadowClones) {
       ctx.save();
       ctx.translate(clone.x, clone.y);
-      ctx.globalAlpha = Math.min(0.75, clone.timer * 0.8);
-      const cloneAura = ctx.createRadialGradient(0, 6, 2, 0, 6, 22);
-      cloneAura.addColorStop(0, 'rgba(52, 211, 153, 0.45)');
+      ctx.globalAlpha = Math.min(0.82, clone.timer * 0.85);
+      const cloneAura = ctx.createRadialGradient(0, 6, 2, 0, 6, 28);
+      cloneAura.addColorStop(0, 'rgba(52, 211, 153, 0.5)');
       cloneAura.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = cloneAura;
       ctx.beginPath();
-      ctx.ellipse(0, 6, 22, 11, 0, 0, Math.PI * 2);
+      ctx.ellipse(0, 6, 28, 14, 0, 0, Math.PI * 2);
       ctx.fill();
+
+      ctx.save();
+      ctx.translate(0, 8);
+      ctx.scale(1, 0.52);
+      ctx.globalCompositeOperation = 'lighter';
+      drawConcentricRuneHalo(ctx, {
+        x: 0,
+        y: 0,
+        r: 24,
+        primaryColor: 'rgba(52, 211, 153, 0.8)',
+        accentColor: '#fde047',
+        rotation: clone.timer * 2.4,
+        spokes: 6,
+        polygonSides: 6,
+        polygonStep: 2,
+        ringWidth: 1.5
+      });
+      ctx.restore();
+
       SpriteRenderer.getInstance().drawSprite(ctx, spriteKey, 1, 0, -2, 38, 38, clone.facing, false);
       ctx.restore();
     }
@@ -385,59 +405,97 @@ export class Player extends Entity {
     ctx.save();
     ctx.translate(this.position.x, this.position.y);
 
-    // Ascendancy Transformation Pillar Burst (pure optical feedback upon choosing late-game branch)
+    // Ascendancy Transformation Pillar Burst + Cathedral Floor Mandala upon choosing Lv.5 branch
     if (this.branchAscendFlashTimer > 0 && this.branchColor) {
       const p = this.branchAscendFlashTimer / 1.1;
+      const expand = 1 - p;
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.globalAlpha = p * 0.72;
-      const colGrad = ctx.createLinearGradient(0, -180, 0, 20);
+      ctx.globalAlpha = p * 0.85;
+
+      // Ground Expanding Cathedral Ascension Halo
+      ctx.save();
+      ctx.translate(0, 8);
+      ctx.scale(1, 0.55);
+      drawConcentricRuneHalo(ctx, {
+        x: 0,
+        y: 0,
+        r: 36 + expand * 75,
+        primaryColor: this.branchColor,
+        accentColor: '#ffffff',
+        rotation: expand * 2.5,
+        spokes: 8,
+        polygonSides: 8,
+        polygonStep: 3,
+        ringWidth: 2.2
+      });
+      ctx.restore();
+
+      const colGrad = ctx.createLinearGradient(0, -220, 0, 24);
       colGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
       colGrad.addColorStop(0.5, this.branchColor);
       colGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = colGrad;
-      ctx.fillRect(-26 * p, -180, 52 * p, 200);
+      ctx.fillRect(-32 * p, -220, 64 * p, 244);
+
+      drawFourPointStar(ctx, 0, -24, 30 * p, 5, this.branchColor, '#ffffff', expand * 3);
       ctx.restore();
     }
 
     // Soft radial aura glow beneath player feet (Branch color when ascended, Golden/Purple when Ultimate is Ready!)
     const ultReady = this.isUltimateReady();
-    const auraGrad = ctx.createRadialGradient(0, 6, 2, 0, 6, this.radius * (ultReady ? 2.8 : 2.2));
+    const auraGrad = ctx.createRadialGradient(0, 6, 2, 0, 6, this.radius * (ultReady ? 2.9 : 2.3));
     if (this.branchColor) {
-      auraGrad.addColorStop(0, ultReady ? 'rgba(250, 204, 21, 0.42)' : `${this.branchColor}55`);
+      auraGrad.addColorStop(0, ultReady ? 'rgba(250, 204, 21, 0.45)' : `${this.branchColor}58`);
       auraGrad.addColorStop(0.55, `${this.branchColor}28`);
       auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     } else if (ultReady) {
-      auraGrad.addColorStop(0, 'rgba(250, 204, 21, 0.42)');
-      auraGrad.addColorStop(0.5, 'rgba(168, 85, 247, 0.22)');
+      auraGrad.addColorStop(0, 'rgba(250, 204, 21, 0.45)');
+      auraGrad.addColorStop(0.5, 'rgba(168, 85, 247, 0.25)');
       auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     } else {
       auraGrad.addColorStop(0, 'rgba(56, 189, 248, 0.28)');
-      auraGrad.addColorStop(0.5, 'rgba(59, 130, 246, 0.10)');
+      auraGrad.addColorStop(0.5, 'rgba(59, 130, 246, 0.12)');
       auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     }
     ctx.fillStyle = auraGrad;
     ctx.beginPath();
-    ctx.ellipse(0, 6, this.radius * (ultReady ? 2.8 : 2.2), this.radius * (ultReady ? 1.4 : 1.1), 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 6, this.radius * (ultReady ? 2.9 : 2.3), this.radius * (ultReady ? 1.45 : 1.15), 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Gothic Hunter's Sacred Compass Ring beneath feet (unified reliquary filigree)
+    // Intricate Under-Foot Gothic Astrolabe Ritual Seal VFX
     ctx.save();
     ctx.scale(1, 0.52);
     ctx.translate(0, 14);
-    ctx.strokeStyle = ultReady ? 'rgba(251, 191, 36, 0.55)' : 'rgba(125, 211, 252, 0.32)';
-    ctx.lineWidth = 1.6;
-    ctx.beginPath();
-    ctx.arc(0, 0, this.radius * 1.65, 0, Math.PI * 2);
-    ctx.stroke();
-    for (let c = 0; c < 4; c++) {
-      const cAng = (c * Math.PI) / 2 + (this.walkAnimTimer * 0.08);
-      const cx = Math.cos(cAng) * this.radius * 1.65;
-      const cy = Math.sin(cAng) * this.radius * 1.65;
-      ctx.fillStyle = ultReady ? '#fde047' : '#bae6fd';
-      ctx.beginPath();
-      ctx.arc(cx, cy, 2.2, 0, Math.PI * 2);
-      ctx.fill();
+    ctx.globalCompositeOperation = 'lighter';
+    const sigilPrimary = ultReady ? 'rgba(251, 191, 36, 0.72)' : this.branchColor || 'rgba(125, 211, 252, 0.36)';
+    const sigilAccent = ultReady ? '#fef08a' : '#bae6fd';
+    drawConcentricRuneHalo(ctx, {
+      x: 0,
+      y: 0,
+      r: this.radius * (ultReady ? 2.05 : 1.8),
+      primaryColor: sigilPrimary,
+      accentColor: sigilAccent,
+      rotation: this.timeSurvived * (ultReady ? 0.9 : 0.4),
+      spokes: 8,
+      polygonSides: ultReady ? 8 : 4,
+      polygonStep: ultReady ? 3 : 1,
+      ringWidth: ultReady ? 1.8 : 1.3,
+      showNodes: true,
+      dashedInner: true
+    });
+    if (ultReady) {
+      drawFiligreeSpikeRing(
+        ctx,
+        0,
+        0,
+        this.radius * 2.08,
+        8,
+        6.5,
+        'rgba(254, 240, 138, 0.75)',
+        -this.timeSurvived * 0.65,
+        1.4
+      );
     }
     ctx.restore();
 
@@ -447,17 +505,25 @@ export class Player extends Entity {
     ctx.ellipse(3, this.radius + 1, this.radius * 1.15, this.radius * 0.48, 0.12, 0, Math.PI * 2);
     ctx.fill();
 
-    // Render Continuous Sacred Golden Orbit Ring when King Bible / Holy Shield is equipped!
+    // Render Dual-Track Gothic Sacred Orbit Ring when King Bible / Holy Shield is equipped!
     const shieldWeapon = this.getWeapon('spinning_orbs');
     if (shieldWeapon) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       const orbitR = shieldWeapon.area * this.areaMult;
-      ctx.strokeStyle = shieldWeapon.isEvolved ? 'rgba(244, 63, 94, 0.35)' : 'rgba(251, 191, 36, 0.28)';
+      ctx.strokeStyle = shieldWeapon.isEvolved ? 'rgba(244, 63, 94, 0.38)' : 'rgba(251, 191, 36, 0.32)';
       ctx.lineWidth = 2;
       ctx.setLineDash([10, 6]);
       ctx.beginPath();
       ctx.arc(0, 0, orbitR, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.rotate(this.timeSurvived * 0.6);
+      ctx.strokeStyle = shieldWeapon.isEvolved ? 'rgba(253, 164, 175, 0.25)' : 'rgba(254, 240, 138, 0.22)';
+      ctx.lineWidth = 1.2;
+      ctx.setLineDash([4, 10]);
+      ctx.beginPath();
+      ctx.arc(0, 0, orbitR * 0.88, 0, Math.PI * 2);
       ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();

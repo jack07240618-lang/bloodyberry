@@ -1,6 +1,13 @@
 import { Vector2 } from '../core/Vector2';
 import { Entity } from '../entities/Entity';
 import { SkillTag, WEAPON_DEFAULT_TAGS } from '../systems/BuildSystem';
+import {
+  drawCathedralRoseWeb,
+  drawConcentricRuneHalo,
+  drawFiligreeSpikeRing,
+  drawFourPointStar,
+  drawGothicCrossEmblem
+} from '../vfx/GothicVFX';
 
 export enum ProjectileType {
   DIRECT_BOLT = 'DIRECT_BOLT',
@@ -157,25 +164,45 @@ export class Projectile extends Entity {
     for (let i = 0; i < this.trailPoints.length - 1; i++) {
       const p1 = this.trailPoints[i];
       const p2 = this.trailPoints[i + 1];
-      const ratio = Math.pow(1 - i / this.trailPoints.length, 1.35);
-      // Outer soft Qi glow
-      ctx.globalAlpha = ratio * 0.38 * lifeAlpha;
-      ctx.strokeStyle = ribbonColor;
-      ctx.lineWidth = Math.max(1.2, maxW * 1.45 * ratio);
+      const ratio = Math.pow(1 - i / this.trailPoints.length, 1.3);
+      const x1 = p1.x - this.position.x;
+      const y1 = p1.y - this.position.y;
+      const x2 = p2.x - this.position.x;
+      const y2 = p2.y - this.position.y;
+
+      // 1. Deep Violet-Crimson Outer Shroud
+      ctx.globalAlpha = ratio * 0.24 * lifeAlpha;
+      ctx.strokeStyle = this.isSingularityStrike ? '#c084fc' : '#991b1b';
+      ctx.lineWidth = Math.max(1.5, maxW * 1.95 * ratio);
       ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(p1.x - this.position.x, p1.y - this.position.y);
-      ctx.lineTo(p2.x - this.position.x, p2.y - this.position.y);
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
       ctx.stroke();
 
-      // Inner white-hot core filament
-      ctx.globalAlpha = ratio * 0.62 * lifeAlpha;
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = Math.max(0.6, maxW * 0.45 * ratio);
+      // 2. Main Weapon Glow Filament
+      ctx.globalAlpha = ratio * 0.48 * lifeAlpha;
+      ctx.strokeStyle = ribbonColor;
+      ctx.lineWidth = Math.max(1.1, maxW * 1.3 * ratio);
       ctx.beginPath();
-      ctx.moveTo(p1.x - this.position.x, p1.y - this.position.y);
-      ctx.lineTo(p2.x - this.position.x, p2.y - this.position.y);
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
       ctx.stroke();
+
+      // 3. Inner White-Gold Core Silk
+      ctx.globalAlpha = ratio * 0.72 * lifeAlpha;
+      ctx.strokeStyle = '#fef3c7';
+      ctx.lineWidth = Math.max(0.6, maxW * 0.42 * ratio);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+
+      // Trailing gothic diamond dust beads along trail vertices
+      if ((this.isEvolved || this.isSingularityStrike || maxW >= 9) && i % 3 === 1) {
+        ctx.globalAlpha = ratio * 0.65 * lifeAlpha;
+        drawFourPointStar(ctx, x2, y2, Math.max(2.2, maxW * 0.45 * ratio), 0.8, ribbonColor, '#ffffff', this.elapsed * 4 + i);
+      }
     }
     ctx.restore();
   }
@@ -193,7 +220,7 @@ export class Projectile extends Entity {
 
     switch (this.type) {
       // ======================================================================
-      // 1. GARLIC / SOUL EATER: Intricate Rotating Sacred Seal & Energy Ripples
+      // 1. GARLIC / SOUL EATER: Cathedral Rose Window Tracery & Thorn Aura
       // ======================================================================
       case ProjectileType.GARLIC_AURA: {
         ctx.globalCompositeOperation = 'lighter';
@@ -202,46 +229,60 @@ export class Projectile extends Entity {
         const isCrimson = this.color === '#f43f5e' || this.isEvolved;
 
         // Soft Radial Energy Field
-        const grad = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r);
+        const grad = ctx.createRadialGradient(0, 0, r * 0.15, 0, 0, r * 1.04);
         grad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        grad.addColorStop(0.7, isCrimson ? 'rgba(244, 63, 94, 0.08)' : 'rgba(253, 224, 71, 0.07)');
-        grad.addColorStop(0.95, isCrimson ? 'rgba(225, 29, 72, 0.28)' : 'rgba(250, 204, 21, 0.24)');
+        grad.addColorStop(0.55, isCrimson ? 'rgba(136, 19, 55, 0.14)' : 'rgba(161, 98, 7, 0.10)');
+        grad.addColorStop(0.86, isCrimson ? 'rgba(244, 63, 94, 0.28)' : 'rgba(253, 224, 71, 0.22)');
         grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.arc(0, 0, r * 1.04, 0, Math.PI * 2);
         ctx.fill();
 
-        // Outer & Inner Sacred Rune Rings
-        ctx.rotate(this.elapsed * 0.8);
-        ctx.strokeStyle = isCrimson ? 'rgba(251, 113, 133, 0.55)' : 'rgba(254, 240, 138, 0.45)';
-        ctx.lineWidth = 1.8;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.94, 0, Math.PI * 2);
-        ctx.stroke();
+        const rimPrimary = isCrimson ? 'rgba(251, 113, 133, 0.56)' : 'rgba(254, 240, 138, 0.48)';
+        const rimAccent = isCrimson ? 'rgba(253, 224, 71, 0.42)' : 'rgba(251, 191, 36, 0.42)';
 
-        ctx.setLineDash([8, 6]);
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.82, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
+        // Intricate 12-Petal Cathedral Rose Web (subtly breathing)
+        drawCathedralRoseWeb(ctx, 0, 0, r * 0.92, 12, this.elapsed * 0.35, rimPrimary, rimAccent, 1.25);
 
-        // 8-Pointed Geometric Star Sigil Nodes on Perimeter
-        const nodes = 8;
-        for (let i = 0; i < nodes; i++) {
-          const ang = (i * Math.PI * 2) / nodes;
+        // Counter-Rotating Concentric Gothic Seal + Barbed Thorn Perimeter
+        drawConcentricRuneHalo(ctx, {
+          x: 0,
+          y: 0,
+          r: r * 0.94,
+          primaryColor: rimPrimary,
+          accentColor: rimAccent,
+          rotation: this.elapsed * 0.65,
+          spokes: 12,
+          polygonSides: isCrimson ? 8 : 6,
+          polygonStep: 2,
+          ringWidth: 1.5,
+          showNodes: true,
+          dashedInner: true
+        });
+        drawFiligreeSpikeRing(ctx, 0, 0, r * 0.96, 16, 6.5, rimPrimary, -this.elapsed * 0.4, 1.3);
+
+        // 8 Orbiting Consecrated Soul Sparks
+        for (let i = 0; i < 8; i++) {
+          const ang = (i * Math.PI * 2) / 8 + this.elapsed * 1.1;
           const nx = Math.cos(ang) * r * 0.88;
           const ny = Math.sin(ang) * r * 0.88;
-          ctx.fillStyle = isCrimson ? '#fda4af' : '#fef08a';
-          ctx.beginPath();
-          ctx.arc(nx, ny, 2.5, 0, Math.PI * 2);
-          ctx.fill();
+          drawFourPointStar(
+            ctx,
+            nx,
+            ny,
+            isCrimson ? 4.8 : 4.0,
+            1.1,
+            isCrimson ? '#fb7185' : '#fef08a',
+            '#ffffff',
+            ang
+          );
         }
         break;
       }
 
       // ======================================================================
-      // 2. SANTA WATER / LA BORRA: Swirling Holy/Abyssal Vortex & Rising Flames
+      // 2. SANTA WATER / LA BORRA: Twin-Seal Gothic Sanctum & Cathedral Flames
       // ======================================================================
       case ProjectileType.GROUND_FIRE: {
         ctx.globalCompositeOperation = 'lighter';
@@ -249,52 +290,48 @@ export class Projectile extends Entity {
         ctx.globalAlpha = fade;
 
         // Multi-stop Glowing Ground Pool
-        const poolGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, this.radius);
+        const poolGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, this.radius * 1.05);
         poolGrad.addColorStop(0, '#ffffff');
-        poolGrad.addColorStop(0.35, this.color || '#38bdf8');
-        poolGrad.addColorStop(0.75, 'rgba(2, 132, 199, 0.50)');
+        poolGrad.addColorStop(0.32, this.color || '#38bdf8');
+        poolGrad.addColorStop(0.74, this.isEvolved ? 'rgba(220, 38, 38, 0.45)' : 'rgba(2, 132, 199, 0.48)');
         poolGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = poolGrad;
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
+        ctx.arc(0, 0, this.radius * 1.05, 0, Math.PI * 2);
         ctx.fill();
 
-        // Rotating Inscribed Hexagram / Magic Circle inside the pool
-        ctx.save();
-        ctx.rotate(this.elapsed * 2.2);
-        ctx.strokeStyle = '#bae6fd';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.72, 0, Math.PI * 2);
-        ctx.stroke();
+        const sealColor = this.isEvolved && this.color === '#f97316' ? '#fed7aa' : '#bae6fd';
+        // Nested Gothic Rose + Octagram Magic Sanctum inside Pool
+        drawCathedralRoseWeb(ctx, 0, 0, this.radius * 0.86, 8, -this.elapsed * 1.1, sealColor, '#ffffff', 1.25);
+        drawConcentricRuneHalo(ctx, {
+          x: 0,
+          y: 0,
+          r: this.radius * 0.82,
+          primaryColor: sealColor,
+          accentColor: '#ffffff',
+          rotation: this.elapsed * 2.1,
+          spokes: 6,
+          polygonSides: 6,
+          polygonStep: 2,
+          ringWidth: 1.45,
+          showNodes: true,
+          dashedInner: true
+        });
+        drawFiligreeSpikeRing(ctx, 0, 0, this.radius * 0.92, 12, 5.5, sealColor, -this.elapsed * 1.5, 1.3);
 
-        for (let t = 0; t < 2; t++) {
-          ctx.rotate(Math.PI / 3);
+        // 7 Rising Gothic Sacred Flame Spires
+        for (let i = 0; i < 7; i++) {
+          const seed = i * 1.45 + this.elapsed * 5.2;
+          const fx = Math.sin(seed) * (this.radius * 0.58);
+          const fy = Math.cos(seed * 0.8) * (this.radius * 0.46) - ((this.elapsed * 34 + i * 11) % 20);
+          const flameH = 12 + Math.sin(seed * 2.1) * 4.5;
+
+          ctx.fillStyle = i % 2 === 0 ? '#ffffff' : this.color || '#7dd3fc';
           ctx.beginPath();
-          for (let v = 0; v < 3; v++) {
-            const a = (v * Math.PI * 2) / 3;
-            const vx = Math.cos(a) * this.radius * 0.72;
-            const vy = Math.sin(a) * this.radius * 0.72;
-            if (v === 0) ctx.moveTo(vx, vy);
-            else ctx.lineTo(vx, vy);
-          }
-          ctx.closePath();
-          ctx.stroke();
-        }
-        ctx.restore();
-
-        // Rising Sacred Flame Tongues
-        for (let i = 0; i < 5; i++) {
-          const seed = i * 1.7 + this.elapsed * 5;
-          const fx = Math.sin(seed) * (this.radius * 0.55);
-          const fy = Math.cos(seed * 0.8) * (this.radius * 0.45) - ((this.elapsed * 30 + i * 12) % 18);
-          const flameH = 10 + Math.sin(seed * 2) * 4;
-
-          ctx.fillStyle = i % 2 === 0 ? '#ffffff' : '#7dd3fc';
-          ctx.beginPath();
-          ctx.moveTo(fx - 3, fy);
-          ctx.quadraticCurveTo(fx, fy - flameH, fx, fy - flameH - 3);
-          ctx.quadraticCurveTo(fx + 3, fy - flameH * 0.5, fx + 3, fy);
+          ctx.moveTo(fx - 3.4, fy);
+          ctx.quadraticCurveTo(fx - 1, fy - flameH * 0.7, fx, fy - flameH - 4);
+          ctx.quadraticCurveTo(fx + 1, fy - flameH * 0.7, fx + 3.4, fy);
+          ctx.quadraticCurveTo(fx, fy + 2.2, fx - 3.4, fy);
           ctx.closePath();
           ctx.fill();
         }
@@ -557,91 +594,121 @@ export class Projectile extends Entity {
           ctx.restore();
         }
 
-        // 5. Dispersing Sword Qi Wind-Shear Filaments & Dissolving Star Motes (剑气破空流光与消散微粒)
+        // 5. Dispersing Sword Qi Wind-Shear Filaments, Gothic Barbed Thorn Spires & Star Motes
         ctx.strokeStyle = isSingularity ? '#f5d0fe' : isCrimson ? '#fef08a' : '#e0f2fe';
         ctx.lineWidth = Math.max(0.7, 1.6 * (1 - progress * 0.5));
         ctx.lineCap = 'round';
-        for (let s = -3; s <= 3; s++) {
-          const sAng = s * 0.28 + Math.sin(progress * 5 + s) * 0.05;
+        for (let s = -4; s <= 4; s++) {
+          const sAng = s * 0.24 + Math.sin(progress * 5 + s) * 0.05;
           if (sAng < curStartAng || sAng > curEndAng) continue;
-          const driftR = r * (0.92 + progress * 0.22 + (Math.abs(s) % 2) * 0.05);
+          const driftR = r * (0.94 + progress * 0.22 + (Math.abs(s) % 2) * 0.06);
 
           // Curved wind-shear arc filament
           ctx.beginPath();
           ctx.arc(0, 0, driftR, sAng - 0.11 * (1 - progress * 0.4), sAng + 0.11 * (1 - progress * 0.4));
           ctx.stroke();
 
-          // Drifting Sword Qi Mote
-          const moteX = Math.cos(sAng) * (driftR + progress * 14);
-          const moteY = Math.sin(sAng) * (driftR + progress * 14);
-          const moteR = Math.max(0.6, 2.2 * (1 - progress * 0.65));
-          ctx.fillStyle = '#ffffff';
-          ctx.beginPath();
-          ctx.arc(moteX, moteY, moteR, 0, Math.PI * 2);
-          ctx.fill();
+          // Gothic Rose-Thorn Rune Diamond along Sword Qi Perimeter
+          const moteX = Math.cos(sAng) * (driftR + progress * 15);
+          const moteY = Math.sin(sAng) * (driftR + progress * 15);
+          const starR = Math.max(1.8, 5.5 * (1 - progress * 0.65));
+          if (Math.abs(s) % 2 === 0) {
+            drawFourPointStar(
+              ctx,
+              moteX,
+              moteY,
+              starR,
+              starR * 0.28,
+              isSingularity ? '#e879f9' : isCrimson ? '#fbbf24' : '#7dd3fc',
+              '#ffffff',
+              sAng
+            );
+          } else {
+            ctx.fillStyle = '#ffffff';
+            ctx.beginPath();
+            ctx.arc(moteX, moteY, starR * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+          }
         }
         break;
       }
 
       // ======================================================================
-      // 4. KNIFE / THOUSAND EDGE: Metallic Throwing Blade + Curved Arrow Qi Wake
+      // 4. KNIFE / THOUSAND EDGE: Gothic Stiletto Blade + Barbed Guard & Sonic Wake
       // ======================================================================
       case ProjectileType.PIERCING_DAGGER: {
-        this.renderMotionRibbon(ctx, this.glowColor || '#38bdf8', 7.5, lifeAlpha);
+        this.renderMotionRibbon(ctx, this.glowColor || '#38bdf8', 8.5, lifeAlpha);
         ctx.globalAlpha = lifeAlpha;
         ctx.rotate(this.rotation);
-        ctx.scale(0.7 + 0.3 * spawnEase, 0.7 + 0.3 * spawnEase);
+        ctx.scale(0.75 + 0.3 * spawnEase, 0.75 + 0.3 * spawnEase);
 
-        // Additive Speed Aura + Curved Sonic Arrow-Qi Wake (破空箭气弧光)
+        // Additive Speed Aura + Dual Curved Sonic Arrow-Qi Wake (双层破空箭气弧光)
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const wakeGrad = ctx.createLinearGradient(-22, 0, 18, 0);
+        const wakeGrad = ctx.createLinearGradient(-26, 0, 19, 0);
         wakeGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        wakeGrad.addColorStop(0.55, 'rgba(56, 189, 248, 0.28)');
-        wakeGrad.addColorStop(1, 'rgba(224, 242, 254, 0.75)');
+        wakeGrad.addColorStop(0.5, this.glowColor || 'rgba(56, 189, 248, 0.32)');
+        wakeGrad.addColorStop(1, 'rgba(224, 242, 254, 0.85)');
         ctx.fillStyle = wakeGrad;
         ctx.beginPath();
-        ctx.moveTo(17, 0);
-        ctx.quadraticCurveTo(2, -9, -20, -12);
-        ctx.quadraticCurveTo(-4, -3, -14, 0);
-        ctx.quadraticCurveTo(-4, 3, -20, 12);
-        ctx.quadraticCurveTo(2, 9, 17, 0);
+        ctx.moveTo(18, 0);
+        ctx.quadraticCurveTo(2, -10, -24, -14);
+        ctx.quadraticCurveTo(-5, -3, -15, 0);
+        ctx.quadraticCurveTo(-5, 3, -24, 14);
+        ctx.quadraticCurveTo(2, 10, 18, 0);
         ctx.fill();
 
         // Twin Sonic Bow-Wave Arcs at Tip
-        ctx.strokeStyle = 'rgba(186, 230, 253, 0.72)';
+        ctx.strokeStyle = 'rgba(224, 242, 254, 0.8)';
         ctx.lineWidth = 1.4;
         ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.arc(4, 0, 12, -0.58, 0.58);
+        ctx.arc(5, 0, 13, -0.62, 0.62);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.5)';
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.arc(0, 0, 15, -0.45, 0.45);
         ctx.stroke();
         ctx.restore();
 
-        // Pommel & Wrapped Grip
+        // Ruby-Set Pommel & Wrapped Grip
         ctx.fillStyle = '#fbbf24';
         ctx.beginPath();
-        ctx.arc(-13, 0, 2.5, 0, Math.PI * 2);
+        ctx.arc(-13.5, 0, 2.8, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#dc2626';
+        ctx.beginPath();
+        ctx.arc(-13.5, 0, 1.3, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#78350f';
         ctx.fillRect(-11, -2, 6, 4);
 
-        // Ornate Golden Crossguard
+        // Barbed Winged Gothic Crossguard
         ctx.fillStyle = '#f59e0b';
-        ctx.fillRect(-5, -5, 2.5, 10);
+        ctx.beginPath();
+        ctx.moveTo(-4.5, -7);
+        ctx.lineTo(-2.2, -3);
+        ctx.lineTo(-2.2, 3);
+        ctx.lineTo(-4.5, 7);
+        ctx.lineTo(-6.2, 4);
+        ctx.lineTo(-6.2, -4);
+        ctx.closePath();
+        ctx.fill();
 
-        // Two-Tone Steel Dagger Blade (Light Top Edge, Dark Bottom Bevel)
+        // Two-Tone Fluted Gothic Stiletto Blade
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.moveTo(-2.5, -3.5);
-        ctx.lineTo(14, 0);
+        ctx.moveTo(-2.5, -3.8);
+        ctx.lineTo(15.5, 0);
         ctx.lineTo(-2.5, 0);
         ctx.closePath();
         ctx.fill();
 
         ctx.fillStyle = '#94a3b8';
         ctx.beginPath();
-        ctx.moveTo(-2.5, 3.5);
-        ctx.lineTo(14, 0);
+        ctx.moveTo(-2.5, 3.8);
+        ctx.lineTo(15.5, 0);
         ctx.lineTo(-2.5, 0);
         ctx.closePath();
         ctx.fill();
@@ -649,214 +716,249 @@ export class Projectile extends Entity {
       }
 
       // ======================================================================
-      // 5. CROSS / HEAVEN SWORD: Spinning Celestial Cruciform Blade + Halo
+      // 5. CROSS / HEAVEN SWORD: Patonce Gothic Cross + Rose-Crown Mandala
       // ======================================================================
       case ProjectileType.BOOMERANG: {
-        this.renderMotionRibbon(ctx, this.glowColor || '#fbbf24', 12, lifeAlpha);
+        this.renderMotionRibbon(ctx, this.glowColor || '#fbbf24', 13, lifeAlpha);
         ctx.globalAlpha = lifeAlpha;
         ctx.globalCompositeOperation = 'lighter';
 
-        // Circular Spinning Halo Ring
-        ctx.strokeStyle = 'rgba(253, 224, 71, 0.5)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 1.15, 0, Math.PI * 2);
-        ctx.stroke();
+        const crossColor = this.color || '#f59e0b';
+        // Counter-rotating Gothic Spike Crown Halo around Cross
+        drawConcentricRuneHalo(ctx, {
+          x: 0,
+          y: 0,
+          r: this.radius * 1.25,
+          primaryColor: 'rgba(253, 224, 71, 0.58)',
+          accentColor: '#ffffff',
+          rotation: -this.rotation * 0.7,
+          spokes: 8,
+          polygonSides: 4,
+          polygonStep: 1,
+          ringWidth: 1.5,
+          showNodes: true,
+          dashedInner: false
+        });
+        drawFiligreeSpikeRing(ctx, 0, 0, this.radius * 1.15, 8, 4.5, crossColor, this.rotation * 0.5, 1.5);
 
-        ctx.rotate(this.rotation);
-        const s = this.radius * 1.25;
-
-        // 4 Bladed Cross Arms
-        ctx.fillStyle = this.color || '#f59e0b';
-        for (let arm = 0; arm < 4; arm++) {
-          ctx.rotate(Math.PI / 2);
-          ctx.beginPath();
-          ctx.moveTo(0, -3);
-          ctx.lineTo(s, -5);
-          ctx.lineTo(s + 5, 0);
-          ctx.lineTo(s, 5);
-          ctx.lineTo(0, 3);
-          ctx.closePath();
-          ctx.fill();
-
-          // White core inlay
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(2, -1.5, s - 2, 3);
-          ctx.fillStyle = this.color || '#f59e0b';
-        }
-
-        // Center Sapphire / Ruby Gem
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(0, 0, 4, 0, Math.PI * 2);
-        ctx.fill();
+        const s = this.radius * 1.35;
+        drawGothicCrossEmblem(ctx, 0, 0, s, 3.2, crossColor, '#ffffff', this.rotation);
+        drawFourPointStar(ctx, 0, 0, s * 0.5, 1.8, '#fef08a', '#ffffff', this.rotation + Math.PI * 0.25);
         break;
       }
 
       // ======================================================================
-      // 6. AXE / DEATH SPIRAL: Executioner Battleaxe & Grim Reaper Scythe
+      // 6. AXE / DEATH SPIRAL: Ornamental Executioner Axe & Necrotic Reaper Scythe
       // ======================================================================
       case ProjectileType.ARCBALLISTIC_AXE: {
         const isScythe = this.radius >= 22 || this.color === '#a855f7';
-        this.renderMotionRibbon(ctx, isScythe ? '#c084fc' : '#94a3b8', 10, lifeAlpha);
+        this.renderMotionRibbon(ctx, isScythe ? '#c084fc' : '#94a3b8', 11.5, lifeAlpha);
         ctx.globalAlpha = lifeAlpha;
-        ctx.rotate(this.rotation);
 
         if (isScythe) {
-          // DEATH SPIRAL: Giant Glowing Grim Reaper Scythe
+          // DEATH SPIRAL: Swirling Necrotic Pentacle + Giant Crescent Reaper Scythe
           ctx.globalCompositeOperation = 'lighter';
-          ctx.strokeStyle = '#a855f7';
-          ctx.lineWidth = 3;
-          ctx.beginPath();
-          ctx.arc(0, 0, this.radius * 1.1, 0, Math.PI * 1.4);
-          ctx.stroke();
+          drawConcentricRuneHalo(ctx, {
+            x: 0,
+            y: 0,
+            r: this.radius * 1.18,
+            primaryColor: 'rgba(192, 132, 252, 0.6)',
+            accentColor: '#f3e8ff',
+            rotation: -this.rotation * 0.65,
+            spokes: 5,
+            polygonSides: 5,
+            polygonStep: 2,
+            ringWidth: 1.5
+          });
+          ctx.rotate(this.rotation);
+          drawFiligreeSpikeRing(ctx, 0, 0, this.radius * 1.06, 10, 5, '#a855f7', 0, 1.8);
 
-          // Scythe Shaft
+          // Ornate Scythe Shaft
           ctx.fillStyle = '#d8b4fe';
-          ctx.fillRect(-2, -18, 4, 36);
+          ctx.fillRect(-2.2, -19, 4.4, 38);
+          drawFourPointStar(ctx, 0, -19, 5, 1.4, '#e9d5ff', '#ffffff');
 
-          // Sweeping Crescent Reaper Blade
-          ctx.fillStyle = '#f3e8ff';
+          // Dual-Layered Crescent Reaper Blade
+          ctx.fillStyle = '#c084fc';
           ctx.beginPath();
-          ctx.moveTo(0, -16);
-          ctx.quadraticCurveTo(24, -18, 22, 8);
-          ctx.quadraticCurveTo(12, -8, 0, -8);
+          ctx.moveTo(0, -18);
+          ctx.quadraticCurveTo(28, -21, 25, 11);
+          ctx.quadraticCurveTo(13, -8, 0, -7);
+          ctx.closePath();
+          ctx.fill();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.moveTo(2, -16);
+          ctx.quadraticCurveTo(25, -18, 24, 9);
+          ctx.quadraticCurveTo(16, -9, 2, -11);
           ctx.closePath();
           ctx.fill();
         } else {
-          // Double-Bitted Steel Executioner Axe
-          ctx.fillStyle = '#78350f';
-          ctx.fillRect(-2.5, -14, 5, 28);
-          // Gold haft rings
-          ctx.fillStyle = '#fbbf24';
-          ctx.fillRect(-3, -12, 6, 2);
-          ctx.fillRect(-3, 8, 6, 2);
+          // Spinning Crimson Wind-Shear Ring + Double-Bitted Executioner Axe
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          drawFiligreeSpikeRing(ctx, 0, 0, 17, 6, 3.5, 'rgba(248, 113, 113, 0.55)', -this.rotation * 0.5, 1.4);
+          ctx.restore();
 
-          // Left & Right Curved Blades
+          ctx.rotate(this.rotation);
+          ctx.fillStyle = '#78350f';
+          ctx.fillRect(-2.5, -15, 5, 30);
+          ctx.fillStyle = '#fbbf24';
+          ctx.fillRect(-3.5, -13, 7, 2.5);
+          ctx.fillRect(-3.5, 9, 7, 2.5);
+          drawFourPointStar(ctx, 0, -15, 4.5, 1.2, '#fbbf24', '#fef08a');
+
+          // Left & Right Blood-Grooved Curved Blades
           ctx.fillStyle = '#94a3b8';
           ctx.beginPath();
-          ctx.moveTo(-2, -9);
-          ctx.quadraticCurveTo(-16, -14, -15, 0);
-          ctx.quadraticCurveTo(-16, 14, -2, 6);
-          ctx.moveTo(2, -9);
-          ctx.quadraticCurveTo(16, -14, 15, 0);
-          ctx.quadraticCurveTo(16, 14, 2, 6);
+          ctx.moveTo(-2, -10);
+          ctx.quadraticCurveTo(-18, -16, -16, 0);
+          ctx.quadraticCurveTo(-18, 16, -2, 7);
+          ctx.moveTo(2, -10);
+          ctx.quadraticCurveTo(18, -16, 16, 0);
+          ctx.quadraticCurveTo(18, 16, 2, 7);
           ctx.fill();
 
-          // Bright Razor Edges
           ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2;
+          ctx.lineWidth = 2.2;
           ctx.beginPath();
-          ctx.arc(-6, -1.5, 9, Math.PI * 0.65, Math.PI * 1.35);
+          ctx.arc(-6.5, -1.5, 10, Math.PI * 0.65, Math.PI * 1.35);
           ctx.stroke();
           ctx.beginPath();
-          ctx.arc(6, -1.5, 9, -Math.PI * 0.35, Math.PI * 0.35);
+          ctx.arc(6.5, -1.5, 10, -Math.PI * 0.35, Math.PI * 0.35);
           ctx.stroke();
         }
         break;
       }
 
       // ======================================================================
-      // 7. KING BIBLE / UNHOLY VESPERS: Ornate Golden Cross Crusader Shield
+      // 7. KING BIBLE / UNHOLY VESPERS: Haloed Gothic Crusader Reliquary Shield
       // ======================================================================
       case ProjectileType.ORBITING_ORB: {
         const isUnholy = this.color === '#ef4444' || this.color === '#f43f5e' || this.isEvolved;
-        this.renderMotionRibbon(ctx, isUnholy ? '#ef4444' : '#fbbf24', 10, lifeAlpha);
+        this.renderMotionRibbon(ctx, isUnholy ? '#ef4444' : '#fbbf24', 11, lifeAlpha);
         ctx.globalAlpha = lifeAlpha;
 
-        // 1. Continuous Connecting Sacred Orbit Ring (Drawn relative to orb)
+        // 1. Rotating Cathedral Sanctity Halo + Radial Glow
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const halo = ctx.createRadialGradient(0, 0, 2, 0, 0, this.radius * 2.1);
+        const halo = ctx.createRadialGradient(0, 0, 2, 0, 0, this.radius * 2.4);
         halo.addColorStop(0, '#ffffff');
-        halo.addColorStop(0.35, isUnholy ? 'rgba(244, 63, 94, 0.72)' : 'rgba(251, 191, 36, 0.68)');
+        halo.addColorStop(0.35, isUnholy ? 'rgba(244, 63, 94, 0.78)' : 'rgba(251, 191, 36, 0.72)');
         halo.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = halo;
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 2.1, 0, Math.PI * 2);
+        ctx.arc(0, 0, this.radius * 2.4, 0, Math.PI * 2);
         ctx.fill();
+
+        drawConcentricRuneHalo(ctx, {
+          x: 0,
+          y: 0,
+          r: this.radius * 1.5,
+          primaryColor: isUnholy ? 'rgba(251, 113, 133, 0.65)' : 'rgba(253, 224, 71, 0.6)',
+          accentColor: '#ffffff',
+          rotation: this.elapsed * 3.5,
+          spokes: 4,
+          polygonSides: 4,
+          polygonStep: 1,
+          ringWidth: 1.2,
+          showNodes: true,
+          dashedInner: false
+        });
         ctx.restore();
 
-        // 2. Heraldic Gothic Heater Shield Body (3-Tone Metallic Gold / Crimson)
+        // 2. Heraldic Gothic Heater Shield Body (Deep Iron/Gold + Crimson/Gold Enamel)
         ctx.fillStyle = isUnholy ? '#450a0a' : '#78350f';
         ctx.beginPath();
-        ctx.moveTo(-10, -11);
-        ctx.lineTo(10, -11);
-        ctx.lineTo(10, 0);
-        ctx.quadraticCurveTo(10, 10, 0, 14);
-        ctx.quadraticCurveTo(-10, 10, -10, 0);
+        ctx.moveTo(-10.5, -11.5);
+        ctx.lineTo(10.5, -11.5);
+        ctx.lineTo(10.5, 0);
+        ctx.quadraticCurveTo(10.5, 11, 0, 15);
+        ctx.quadraticCurveTo(-10.5, 11, -10.5, 0);
         ctx.closePath();
         ctx.fill();
 
-        // Inner Shield Plate
         ctx.fillStyle = isUnholy ? '#dc2626' : '#f59e0b';
         ctx.beginPath();
         ctx.moveTo(-8, -9);
         ctx.lineTo(8, -9);
         ctx.lineTo(8, 0);
-        ctx.quadraticCurveTo(8, 8, 0, 11.5);
-        ctx.quadraticCurveTo(-8, 8, -8, 0);
+        ctx.quadraticCurveTo(8, 8.5, 0, 12);
+        ctx.quadraticCurveTo(-8, 8.5, -8, 0);
         ctx.closePath();
         ctx.fill();
 
-        // Specular Metallic Bevel Rim
         ctx.strokeStyle = isUnholy ? '#fda4af' : '#fef08a';
         ctx.lineWidth = 1.8;
         ctx.stroke();
 
-        // 3. Radiant White-Gold Crusader Cross Emblem on Shield Center
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-2, -7, 4, 15);
-        ctx.fillRect(-6, -3, 12, 4);
+        // 3. Sculpted Patonce Crusader Cross Emblem + Ruby Heart
+        drawGothicCrossEmblem(ctx, 0, -0.5, 8.2, 1.9, '#ffffff', isUnholy ? '#fecdd3' : '#fef08a');
+        ctx.fillStyle = isUnholy ? '#fbbf24' : '#dc2626';
+        ctx.beginPath();
+        ctx.arc(0, -0.5, 1.8, 0, Math.PI * 2);
+        ctx.fill();
         break;
       }
 
       // ======================================================================
-      // 8. FIRE WAND / HELLFIRE: Blazing Solar Meteor & Corona
+      // 8. FIRE WAND / HELLFIRE: Crowned Infernal Meteor & Swirling Cinder Corona
       // ======================================================================
       case ProjectileType.FIREBALL: {
-        this.renderMotionRibbon(ctx, this.glowColor || '#f97316', this.radius * 1.5, lifeAlpha);
+        this.renderMotionRibbon(ctx, this.glowColor || '#f97316', this.radius * 1.65, lifeAlpha);
         ctx.globalAlpha = lifeAlpha;
         ctx.globalCompositeOperation = 'lighter';
-        ctx.rotate(this.rotation);
 
-        // Swept Comet Tail
-        const tailGrad = ctx.createLinearGradient(-this.radius * 3.2, 0, this.radius, 0);
+        // Orbiting Jagged Hellfire Crown
+        drawFiligreeSpikeRing(ctx, 0, 0, this.radius * 1.05, 8, this.radius * 0.55, '#fb923c', this.elapsed * 9, 1.6);
+
+        ctx.rotate(this.rotation);
+        // Swept Dual-Flame Comet Tail
+        const tailGrad = ctx.createLinearGradient(-this.radius * 3.8, 0, this.radius * 1.2, 0);
         tailGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        tailGrad.addColorStop(0.5, '#dc2626');
-        tailGrad.addColorStop(0.85, '#f97316');
+        tailGrad.addColorStop(0.45, '#dc2626');
+        tailGrad.addColorStop(0.82, '#f97316');
         tailGrad.addColorStop(1, '#ffffff');
 
         ctx.fillStyle = tailGrad;
         ctx.beginPath();
-        ctx.moveTo(-this.radius * 3.2, 0);
-        ctx.quadraticCurveTo(-this.radius * 0.5, -this.radius * 1.3, this.radius, 0);
-        ctx.quadraticCurveTo(-this.radius * 0.5, this.radius * 1.3, -this.radius * 3.2, 0);
+        ctx.moveTo(-this.radius * 3.8, 0);
+        ctx.quadraticCurveTo(-this.radius * 0.4, -this.radius * 1.45, this.radius * 1.15, 0);
+        ctx.quadraticCurveTo(-this.radius * 0.4, this.radius * 1.45, -this.radius * 3.8, 0);
         ctx.fill();
 
-        // White-Hot Core
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.65, 0, Math.PI * 2);
-        ctx.fill();
+        // Blazing Star-Flared White-Gold Heart
+        drawFourPointStar(ctx, 0, 0, this.radius * 1.35, this.radius * 0.36, '#fde047', '#ffffff', this.elapsed * 6);
         break;
       }
 
       // ======================================================================
-      // 9. RUNETRACER / NO FUTURE: Prismatic Diamond Crystal Laser
+      // 9. RUNETRACER / NO FUTURE: Prismatic Octagram Crystal Laser
       // ======================================================================
       case ProjectileType.RUNETRACER_LASER: {
         const hue = (Date.now() * 0.4 + this.id * 50) % 360;
         const prismColor = `hsl(${hue}, 95%, 65%)`;
-        this.renderMotionRibbon(ctx, prismColor, 11, lifeAlpha);
+        this.renderMotionRibbon(ctx, prismColor, 12.5, lifeAlpha);
         ctx.globalAlpha = lifeAlpha;
-
         ctx.globalCompositeOperation = 'lighter';
-        ctx.rotate(this.rotation);
 
-        // Outer Prismatic Diamond
+        drawConcentricRuneHalo(ctx, {
+          x: 0,
+          y: 0,
+          r: this.radius * 1.75,
+          primaryColor: prismColor,
+          accentColor: '#ffffff',
+          rotation: -this.rotation * 0.85,
+          spokes: 4,
+          polygonSides: 4,
+          polygonStep: 1,
+          ringWidth: 1.4
+        });
+
+        ctx.rotate(this.rotation);
+        const r = this.radius * 1.5;
         ctx.fillStyle = prismColor;
-        const r = this.radius * 1.4;
         ctx.beginPath();
         ctx.moveTo(0, -r);
         ctx.lineTo(r, 0);
@@ -865,59 +967,62 @@ export class Projectile extends Entity {
         ctx.closePath();
         ctx.fill();
 
-        // Inner White Star Core
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 0.55, 0, Math.PI * 2);
-        ctx.fill();
+        drawFourPointStar(ctx, 0, 0, r * 0.95, r * 0.24, '#ffffff', '#ffffff', Math.PI * 0.25);
         break;
       }
 
       // ======================================================================
-      // 10. MAGIC WAND / HOLY WAND: Arcane Star Comet with Sonic Arrow-Qi Wake
+      // 10. MAGIC WAND / HOLY WAND: Astral Seal Comet with Sonic Arrow-Qi Wake
       // ======================================================================
       default: {
-        this.renderMotionRibbon(ctx, this.glowColor || '#38bdf8', this.radius * 1.4, lifeAlpha);
+        this.renderMotionRibbon(ctx, this.glowColor || '#38bdf8', this.radius * 1.5, lifeAlpha);
         ctx.globalAlpha = lifeAlpha;
         ctx.globalCompositeOperation = 'lighter';
+
+        // Miniature Counter-Rotating Astral Rune Seal around Bolt
+        drawConcentricRuneHalo(ctx, {
+          x: 0,
+          y: 0,
+          r: this.radius * 1.6,
+          primaryColor: this.color || '#60a5fa',
+          accentColor: '#ffffff',
+          rotation: this.elapsed * 9,
+          spokes: 5,
+          polygonSides: 5,
+          polygonStep: 2,
+          ringWidth: 1.1,
+          showNodes: false,
+          dashedInner: false
+        });
 
         // Directional Sonic Arrow-Qi Wake (流线型破空箭气尾羽)
         ctx.save();
         ctx.rotate(this.rotation);
-        const wakeGrad = ctx.createLinearGradient(-this.radius * 3.4, 0, this.radius * 1.6, 0);
+        const wakeGrad = ctx.createLinearGradient(-this.radius * 3.8, 0, this.radius * 1.7, 0);
         wakeGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
         wakeGrad.addColorStop(0.55, this.color || '#60a5fa');
         wakeGrad.addColorStop(1, '#ffffff');
         ctx.fillStyle = wakeGrad;
         ctx.beginPath();
-        ctx.moveTo(this.radius * 1.5, 0);
-        ctx.quadraticCurveTo(0, -this.radius * 1.15, -this.radius * 3.2, -this.radius * 1.5);
-        ctx.quadraticCurveTo(-this.radius * 0.9, 0, -this.radius * 3.2, this.radius * 1.5);
-        ctx.quadraticCurveTo(0, this.radius * 1.15, this.radius * 1.5, 0);
+        ctx.moveTo(this.radius * 1.6, 0);
+        ctx.quadraticCurveTo(0, -this.radius * 1.25, -this.radius * 3.6, -this.radius * 1.6);
+        ctx.quadraticCurveTo(-this.radius * 0.9, 0, -this.radius * 3.6, this.radius * 1.6);
+        ctx.quadraticCurveTo(0, this.radius * 1.25, this.radius * 1.6, 0);
         ctx.fill();
         ctx.restore();
 
         // Radial Arcane Aura
-        const boltGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, this.radius * 2.2);
+        const boltGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, this.radius * 2.3);
         boltGrad.addColorStop(0, '#ffffff');
         boltGrad.addColorStop(0.4, this.color || '#60a5fa');
         boltGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = boltGrad;
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius * 2.2, 0, Math.PI * 2);
+        ctx.arc(0, 0, this.radius * 2.3, 0, Math.PI * 2);
         ctx.fill();
 
-        // 4-Pointed Star Flare
-        ctx.rotate(this.elapsed * 12);
-        ctx.fillStyle = '#ffffff';
-        const sr = this.radius * 1.5;
-        ctx.beginPath();
-        ctx.moveTo(0, -sr);
-        ctx.quadraticCurveTo(2, -2, sr, 0);
-        ctx.quadraticCurveTo(2, 2, 0, sr);
-        ctx.quadraticCurveTo(-2, 2, -sr, 0);
-        ctx.quadraticCurveTo(-2, -2, 0, -sr);
-        ctx.fill();
+        // Crisp Rotating 4-Pointed Gothic Star Flare
+        drawFourPointStar(ctx, 0, 0, this.radius * 1.65, 2.0, '#ffffff', '#fef08a', this.elapsed * 12);
         break;
       }
     }

@@ -3,6 +3,13 @@ import { Vector2 } from '../core/Vector2';
 import { Player } from '../entities/Player';
 import { DropType } from '../entities/DropItem';
 import { SpriteRenderer } from '../renderer/SpriteRenderer';
+import {
+  drawCathedralRoseWeb,
+  drawConcentricRuneHalo,
+  drawFiligreeSpikeRing,
+  drawFourPointStar,
+  drawGothicCrossEmblem
+} from '../vfx/GothicVFX';
 
 export enum EnemyType {
   WALKER = 'WALKER',         // Zombie / Ghoul
@@ -892,45 +899,37 @@ export class Enemy extends Entity {
 
     // 0. Render Boss High-Speed Dash/Leap Afterimages & World-Space Telegraphs
     if (this.isBoss) {
-      // Leap Slam Target Reticle in World Space (2.5D Octagonal Target Lock & Converging Wave)
+      // Leap Slam Target Reticle in World Space (2.5D Gothic Astrolabe Lock Mandala & Converging Spikes)
       if (this.bossState === 'LEAP_TELEGRAPH') {
         ctx.save();
         ctx.translate(this.bossTargetPos.x, this.bossTargetPos.y);
         ctx.globalCompositeOperation = 'lighter';
-        const pulse = 0.85 + Math.sin(this.animTimer * 5) * 0.15;
+        const pulse = 0.86 + Math.sin(this.animTimer * 5) * 0.14;
 
         // Outer warning glow dome
-        const tGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, 56);
-        tGrad.addColorStop(0, 'rgba(254, 240, 138, 0.45)');
-        tGrad.addColorStop(0.6, 'rgba(239, 68, 68, 0.28)');
+        const tGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, 62);
+        tGrad.addColorStop(0, 'rgba(254, 240, 138, 0.48)');
+        tGrad.addColorStop(0.6, 'rgba(239, 68, 68, 0.3)');
         tGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = tGrad;
         ctx.beginPath();
-        ctx.arc(0, 0, 56, 0, Math.PI * 2);
+        ctx.arc(0, 0, 62, 0, Math.PI * 2);
         ctx.fill();
 
-        // Rotating dashed lock ring
-        ctx.save();
-        ctx.rotate(this.animTimer * 1.2);
-        ctx.strokeStyle = '#ef4444';
-        ctx.lineWidth = 2.6;
-        ctx.setLineDash([10, 6]);
-        ctx.beginPath();
-        ctx.arc(0, 0, 50 * pulse, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.restore();
-
-        // Crosshair lock spikes
-        ctx.strokeStyle = '#fef08a';
-        ctx.lineWidth = 2.2;
-        for (let k = 0; k < 4; k++) {
-          const ka = (k * Math.PI) / 2 + Math.PI * 0.25;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(ka) * 18, Math.sin(ka) * 18);
-          ctx.lineTo(Math.cos(ka) * 38 * pulse, Math.sin(ka) * 38 * pulse);
-          ctx.stroke();
-        }
+        drawConcentricRuneHalo(ctx, {
+          x: 0,
+          y: 0,
+          r: 52 * pulse,
+          primaryColor: '#ef4444',
+          accentColor: '#fef08a',
+          rotation: this.animTimer * 1.4,
+          spokes: 8,
+          polygonSides: 8,
+          polygonStep: 3,
+          ringWidth: 2.2
+        });
+        drawFiligreeSpikeRing(ctx, 0, 0, 52 * pulse, 8, 9, '#fef08a', -this.animTimer * 1.8, 1.8);
+        drawFourPointStar(ctx, 0, 0, 18 * pulse, 4, '#fef08a', '#ffffff', this.animTimer * 2);
         ctx.restore();
       }
 
@@ -971,46 +970,56 @@ export class Enemy extends Entity {
         ctx.ellipse(0, this.radius * 0.65, shadowSpread, shadowSpread * 0.56, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // 地面熔岩暗金蚀环光晕
+        // 地面熔岩暗金蚀环光晕 + 哥特大阵仪轨
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
-        const rimR = r * (0.65 + spawnProgress * 1.15);
-        const rimGrad = ctx.createRadialGradient(0, this.radius * 0.65, rimR * 0.45, 0, this.radius * 0.65, rimR * 1.25);
-        rimGrad.addColorStop(0, 'rgba(220, 38, 38, 0.48)');
-        rimGrad.addColorStop(0.5, 'rgba(251, 191, 36, 0.35)');
+        const rimR = r * (0.68 + spawnProgress * 1.2);
+        const rimGrad = ctx.createRadialGradient(0, this.radius * 0.65, rimR * 0.4, 0, this.radius * 0.65, rimR * 1.3);
+        rimGrad.addColorStop(0, 'rgba(220, 38, 38, 0.5)');
+        rimGrad.addColorStop(0.5, 'rgba(251, 191, 36, 0.36)');
         rimGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = rimGrad;
         ctx.beginPath();
-        ctx.ellipse(0, this.radius * 0.65, rimR * 1.25, rimR * 0.68, 0, 0, Math.PI * 2);
+        ctx.ellipse(0, this.radius * 0.65, rimR * 1.3, rimR * 0.7, 0, 0, Math.PI * 2);
         ctx.fill();
+
+        ctx.translate(0, this.radius * 0.65);
+        ctx.scale(1, 0.54);
+        drawCathedralRoseWeb(ctx, 0, 0, rimR * 1.1, 10, this.animTimer * 0.7, 'rgba(248, 113, 113, 0.65)', 'rgba(254, 240, 138, 0.6)', 1.6);
+        drawConcentricRuneHalo(ctx, {
+          x: 0,
+          y: 0,
+          r: rimR,
+          primaryColor: 'rgba(251, 191, 36, 0.8)',
+          accentColor: '#ef4444',
+          rotation: -this.animTimer * 0.9,
+          spokes: 8,
+          polygonSides: 8,
+          polygonStep: 3,
+          ringWidth: 2.0
+        });
         ctx.restore();
       } else {
-        // 普通怪物召唤光阵
-        const portalColor = '#c084fc';
-        const crossColor = '#f43f5e';
+        // 普通怪物召唤哥特六芒星法阵
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
         ctx.scale(1, 0.55);
         ctx.translate(0, this.radius * 1.2);
 
         const ringScale = spawnProgress < 0.3 ? spawnProgress / 0.3 : 1.0 + Math.sin(spawnProgress * Math.PI * 3) * 0.08;
-        ctx.rotate(this.animTimer * 1.4);
-        ctx.strokeStyle = portalColor;
-        ctx.lineWidth = 2.2;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * ringScale, 0, Math.PI * 2);
-        ctx.stroke();
-
-        const crossLen = r * 0.62 * ringScale;
-        ctx.strokeStyle = crossColor;
-        ctx.lineWidth = 2.6;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(-crossLen, -crossLen);
-        ctx.lineTo(crossLen, crossLen);
-        ctx.moveTo(crossLen, -crossLen);
-        ctx.lineTo(-crossLen, crossLen);
-        ctx.stroke();
+        drawConcentricRuneHalo(ctx, {
+          x: 0,
+          y: 0,
+          r: r * 1.15 * ringScale,
+          primaryColor: '#c084fc',
+          accentColor: '#f43f5e',
+          rotation: this.animTimer * 1.6,
+          spokes: 6,
+          polygonSides: 6,
+          polygonStep: 2,
+          ringWidth: 2.0
+        });
+        drawFourPointStar(ctx, 0, 0, r * 0.55 * ringScale, 2.5, '#f43f5e', '#fde047', -this.animTimer * 2);
         ctx.restore();
       }
 
@@ -1234,28 +1243,28 @@ export class Enemy extends Entity {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
 
-        // Converging Runic Charge Waves & Contraction Ring during Telegraph
+        // Converging Gothic Octagonal Muzzle Mandala during Laser Telegraph
         if (this.bossState === 'LASER_TELEGRAPH') {
           const telProg = Math.max(0, Math.min(1, 1 - this.bossStateTimer / 0.55));
-          const shrinkR = this.radius * (2.6 - telProg * 1.8);
-          ctx.strokeStyle = 'rgba(254, 240, 138, 0.85)';
-          ctx.lineWidth = 2.6;
-          ctx.setLineDash([8, 5]);
-          ctx.beginPath();
-          ctx.arc(0, 0, shrinkR, 0, Math.PI * 2);
-          ctx.stroke();
-          ctx.setLineDash([]);
-
-          // Runic Ripple Wave
-          ctx.strokeStyle = `rgba(239, 68, 68, ${0.8 - telProg * 0.6})`;
-          ctx.lineWidth = 2.0;
-          ctx.beginPath();
-          ctx.arc(0, 0, this.radius * (0.9 + telProg * 1.4), 0, Math.PI * 2);
-          ctx.stroke();
+          const shrinkR = this.radius * (2.6 - telProg * 1.75);
+          drawConcentricRuneHalo(ctx, {
+            x: 0,
+            y: 0,
+            r: shrinkR,
+            primaryColor: 'rgba(254, 240, 138, 0.88)',
+            accentColor: '#ef4444',
+            rotation: telProg * 3.2,
+            spokes: 8,
+            polygonSides: 8,
+            polygonStep: 3,
+            ringWidth: 2.2
+          });
+        } else {
+          drawFiligreeSpikeRing(ctx, 0, 0, 24, 8, 8, '#fde047', this.animTimer * 4, 2.0);
         }
 
         // Central Arcane Cannon Muzzle Core on Boss
-        const coreR = this.bossState === 'LASER_SWEEP' ? 22 + Math.sin(this.animTimer * 12) * 4 : 14;
+        const coreR = this.bossState === 'LASER_SWEEP' ? 24 + Math.sin(this.animTimer * 12) * 4 : 15;
         const coreGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, coreR);
         coreGrad.addColorStop(0, '#ffffff');
         coreGrad.addColorStop(0.5, '#fbbf24');
@@ -1264,6 +1273,7 @@ export class Enemy extends Entity {
         ctx.beginPath();
         ctx.arc(0, 0, coreR, 0, Math.PI * 2);
         ctx.fill();
+        drawFourPointStar(ctx, 0, 0, coreR * 0.9, 4, '#fde047', '#ffffff', this.animTimer * 5);
 
         for (let b = 0; b < beamCount; b++) {
           const bAng = this.bossLaserAngle + (b * Math.PI * 2) / beamCount;
@@ -1378,18 +1388,33 @@ export class Enemy extends Entity {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
 
-      // 1. Perspective Ground Frost/Arcane Binding Ring
+      // 1. Perspective Ground Frost/Arcane Binding Seal
       ctx.save();
       ctx.translate(0, this.radius * 0.55);
       ctx.scale(1, 0.5);
-      ctx.strokeStyle = isIce ? 'rgba(56, 189, 248, 0.72)' : 'rgba(251, 191, 36, 0.72)';
-      ctx.lineWidth = 2.2;
-      ctx.setLineDash([8, 5]);
-      ctx.rotate(t * 0.4);
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius * 1.45, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
+      drawConcentricRuneHalo(ctx, {
+        x: 0,
+        y: 0,
+        r: this.radius * 1.5,
+        primaryColor: isIce ? 'rgba(56, 189, 248, 0.8)' : 'rgba(251, 191, 36, 0.8)',
+        accentColor: '#ffffff',
+        rotation: t * 0.45,
+        spokes: 6,
+        polygonSides: 6,
+        polygonStep: 2,
+        ringWidth: 2.0
+      });
+      drawFiligreeSpikeRing(
+        ctx,
+        0,
+        0,
+        this.radius * 1.52,
+        8,
+        7,
+        isIce ? 'rgba(125, 211, 252, 0.7)' : 'rgba(254, 240, 138, 0.7)',
+        -t * 0.35,
+        1.5
+      );
       ctx.restore();
 
       // 2. Faceted Translucent Ice Shards around Boss lower body when frozen
@@ -1398,9 +1423,9 @@ export class Enemy extends Entity {
           const sx = (s - 1.5) * 18;
           const sh = 18 + (s % 2) * 8;
           const sy = this.radius * 0.45;
-          ctx.fillStyle = 'rgba(125, 211, 252, 0.26)';
-          ctx.strokeStyle = 'rgba(224, 242, 254, 0.65)';
-          ctx.lineWidth = 1.1;
+          ctx.fillStyle = 'rgba(125, 211, 252, 0.28)';
+          ctx.strokeStyle = 'rgba(224, 242, 254, 0.72)';
+          ctx.lineWidth = 1.2;
           ctx.beginPath();
           ctx.moveTo(sx - 6, sy);
           ctx.lineTo(sx, sy - sh);
@@ -1411,19 +1436,12 @@ export class Enemy extends Entity {
         }
       }
 
-      // 3. Three Orbiting Stun Rune Stars above Boss Head
+      // 3. Three Orbiting Gothic Stun Rune Stars above Boss Head
       for (let i = 0; i < 3; i++) {
         const ang = t * 1.35 + (i * Math.PI * 2) / 3;
-        const ox = Math.cos(ang) * (this.radius * 0.85);
+        const ox = Math.cos(ang) * (this.radius * 0.88);
         const oy = -this.radius * 1.35 + Math.sin(ang) * 7;
-        ctx.fillStyle = isIce ? '#7dd3fc' : '#fef08a';
-        ctx.beginPath();
-        ctx.moveTo(ox, oy - 5);
-        ctx.lineTo(ox + 4, oy);
-        ctx.lineTo(ox, oy + 5);
-        ctx.lineTo(ox - 4, oy);
-        ctx.closePath();
-        ctx.fill();
+        drawFourPointStar(ctx, ox, oy, 6.2, 1.8, isIce ? '#7dd3fc' : '#fef08a', '#ffffff', ang);
       }
       ctx.restore();
     }
@@ -1793,58 +1811,53 @@ export class EnemyProjectile extends Entity {
       ctx.globalAlpha = fadeAlpha;
       ctx.globalCompositeOperation = 'lighter';
 
-      // 1. Distinct Emerald-Gold Friendly Halo Ring (Player immediately recognizes it's safe!)
-      ctx.strokeStyle = '#34d399';
-      ctx.lineWidth = 2.0;
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius * 1.65, 0, Math.PI * 2);
-      ctx.stroke();
+      // 1. Consecrated Emerald-Gold Halo Mandala (Instantly readable friendly parry projectile)
+      drawConcentricRuneHalo(ctx, {
+        x: 0,
+        y: 0,
+        r: this.radius * 1.8,
+        primaryColor: '#34d399',
+        accentColor: '#fef08a',
+        rotation: this.elapsed * 7,
+        spokes: 4,
+        polygonSides: 4,
+        polygonStep: 1,
+        ringWidth: 1.6,
+        showNodes: true,
+        dashedInner: false
+      });
 
       ctx.save();
       ctx.rotate(this.velocity.angle());
 
       // 2. Long Emerald-Turquoise Comet Wake
-      const wakeGrad = ctx.createLinearGradient(-this.radius * 4.5, 0, this.radius, 0);
+      const wakeGrad = ctx.createLinearGradient(-this.radius * 5.0, 0, this.radius, 0);
       wakeGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-      wakeGrad.addColorStop(0.5, 'rgba(16, 185, 129, 0.65)');
+      wakeGrad.addColorStop(0.5, 'rgba(16, 185, 129, 0.7)');
       wakeGrad.addColorStop(1, 'rgba(254, 240, 138, 0.95)');
       ctx.fillStyle = wakeGrad;
       ctx.beginPath();
-      ctx.moveTo(-this.radius * 4.5, 0);
-      ctx.lineTo(0, -this.radius * 1.15);
-      ctx.lineTo(this.radius * 1.3, 0);
-      ctx.lineTo(0, this.radius * 1.15);
+      ctx.moveTo(-this.radius * 5.0, 0);
+      ctx.lineTo(0, -this.radius * 1.2);
+      ctx.lineTo(this.radius * 1.4, 0);
+      ctx.lineTo(0, this.radius * 1.2);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
 
       // 3. Radial Jade-Gold Aura
-      const glow = ctx.createRadialGradient(0, 0, 1, 0, 0, this.radius * 2.6);
+      const glow = ctx.createRadialGradient(0, 0, 1, 0, 0, this.radius * 2.8);
       glow.addColorStop(0, '#ffffff');
       glow.addColorStop(0.4, '#34d399');
-      glow.addColorStop(0.75, 'rgba(250, 204, 21, 0.45)');
+      glow.addColorStop(0.75, 'rgba(250, 204, 21, 0.48)');
       glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
       ctx.fillStyle = glow;
       ctx.beginPath();
-      ctx.arc(0, 0, this.radius * 2.6, 0, Math.PI * 2);
+      ctx.arc(0, 0, this.radius * 2.8, 0, Math.PI * 2);
       ctx.fill();
 
-      // 4. Spinning Golden-White 4-Pointed Reflected Star Core ('✦')
-      ctx.rotate(this.elapsed * 16);
-      ctx.fillStyle = '#fef08a';
-      const sr = this.radius * 1.55;
-      ctx.beginPath();
-      ctx.moveTo(0, -sr);
-      ctx.quadraticCurveTo(2.5, -2.5, sr, 0);
-      ctx.quadraticCurveTo(2.5, 2.5, 0, sr);
-      ctx.quadraticCurveTo(-2.5, 2.5, -sr, 0);
-      ctx.quadraticCurveTo(-2.5, -2.5, 0, -sr);
-      ctx.fill();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius * 0.45, 0, Math.PI * 2);
-      ctx.fill();
+      // 4. Spinning Consecrated Patonce Cross + White Star Core
+      drawGothicCrossEmblem(ctx, 0, 0, this.radius * 1.65, 2.2, '#fef08a', '#ffffff', this.elapsed * 14);
 
       ctx.restore();
       return;
@@ -1854,27 +1867,46 @@ export class EnemyProjectile extends Entity {
       const progress = Math.max(0, Math.min(1, 1 - this.lifetime / this.maxLifetime));
       ctx.globalCompositeOperation = 'lighter';
 
-      // 1. Tactical Ground Hazard Ring (旋转符文锁定法阵 + 聚焦收缩环 + 符文充能波纹)
-      ctx.save();
-      ctx.rotate(this.elapsed * 2.2);
-      ctx.strokeStyle = progress > 0.8 ? '#ffffff' : 'rgba(249, 115, 22, 0.9)';
-      ctx.lineWidth = 2.4;
-      ctx.setLineDash([10, 6]);
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.restore();
+      // 1. Tactical Ground Hazard Mandala (双层旋转哥特星盘预警法阵 + 聚焦收缩尖刺环)
+      drawCathedralRoseWeb(
+        ctx,
+        0,
+        0,
+        this.radius * 0.94,
+        8,
+        -this.elapsed * 1.2,
+        progress > 0.8 ? '#ffffff' : 'rgba(249, 115, 22, 0.72)',
+        'rgba(254, 240, 138, 0.6)',
+        1.5
+      );
+      drawConcentricRuneHalo(ctx, {
+        x: 0,
+        y: 0,
+        r: this.radius,
+        primaryColor: progress > 0.8 ? '#ffffff' : 'rgba(249, 115, 22, 0.92)',
+        accentColor: '#fef08a',
+        rotation: this.elapsed * 2.4,
+        spokes: 8,
+        polygonSides: 8,
+        polygonStep: 3,
+        ringWidth: 2.1
+      });
 
-      // Focusing Contraction Ring (聚焦收缩环：从外向圆心急速收拢)
-      const shrinkRadius = Math.max(4, this.radius * (1.35 - progress * 1.15));
-      ctx.strokeStyle = progress > 0.75 ? '#ffffff' : '#fef08a';
-      ctx.lineWidth = 2.2;
-      ctx.beginPath();
-      ctx.arc(0, 0, shrinkRadius, 0, Math.PI * 2);
-      ctx.stroke();
+      // Focusing Contraction Ring with Spikes (聚焦收缩环：从外向圆心急速收拢)
+      const shrinkRadius = Math.max(5, this.radius * (1.35 - progress * 1.15));
+      drawFiligreeSpikeRing(
+        ctx,
+        0,
+        0,
+        shrinkRadius,
+        8,
+        7,
+        progress > 0.75 ? '#ffffff' : '#fef08a',
+        this.elapsed * 3,
+        2.0
+      );
 
-      // Runic Charge Ripple & Octagram Marks (符文充能波纹与四向锁定刻度)
+      // Runic Charge Ripple (符文充能波纹)
       const ripplePhase = (this.elapsed * 3.5) % 1;
       ctx.strokeStyle = `rgba(251, 191, 36, ${(1 - ripplePhase) * 0.75})`;
       ctx.lineWidth = 1.6;
@@ -1882,21 +1914,11 @@ export class EnemyProjectile extends Entity {
       ctx.arc(0, 0, this.radius * (0.25 + ripplePhase * 0.75), 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.strokeStyle = 'rgba(254, 240, 138, 0.75)';
-      ctx.lineWidth = 1.8;
-      for (let k = 0; k < 4; k++) {
-        const ka = (k * Math.PI) / 2 + this.elapsed * 0.8;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(ka) * (this.radius * 0.68), Math.sin(ka) * (this.radius * 0.68));
-        ctx.lineTo(Math.cos(ka) * (this.radius * 0.96), Math.sin(ka) * (this.radius * 0.96));
-        ctx.stroke();
-      }
-
       // Inner expanding magma charge circle
       const fillGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, this.radius * progress);
-      fillGrad.addColorStop(0, 'rgba(254, 240, 138, 0.65)');
-      fillGrad.addColorStop(0.65, 'rgba(239, 68, 68, 0.42)');
-      fillGrad.addColorStop(1, 'rgba(220, 38, 38, 0.14)');
+      fillGrad.addColorStop(0, 'rgba(254, 240, 138, 0.68)');
+      fillGrad.addColorStop(0.65, 'rgba(239, 68, 68, 0.45)');
+      fillGrad.addColorStop(1, 'rgba(220, 38, 38, 0.16)');
       ctx.fillStyle = fillGrad;
       ctx.beginPath();
       ctx.arc(0, 0, this.radius * progress, 0, Math.PI * 2);
@@ -1906,15 +1928,15 @@ export class EnemyProjectile extends Entity {
       const dropY = -210 * (1 - Math.pow(progress, 1.85));
       if (progress < 0.83) {
         // Outer wide fire wake
-        const outerWake = ctx.createLinearGradient(18 * (1 - progress), dropY - 68, 0, dropY);
+        const outerWake = ctx.createLinearGradient(18 * (1 - progress), dropY - 76, 0, dropY);
         outerWake.addColorStop(0, 'rgba(0, 0, 0, 0)');
-        outerWake.addColorStop(0.5, 'rgba(239, 68, 68, 0.65)');
+        outerWake.addColorStop(0.5, 'rgba(239, 68, 68, 0.68)');
         outerWake.addColorStop(1, '#fbbf24');
         ctx.strokeStyle = outerWake;
-        ctx.lineWidth = 15;
+        ctx.lineWidth = 16;
         ctx.lineCap = 'round';
         ctx.beginPath();
-        ctx.moveTo(18 * (1 - progress), dropY - 68);
+        ctx.moveTo(18 * (1 - progress), dropY - 76);
         ctx.lineTo(0, dropY);
         ctx.stroke();
 
@@ -1922,43 +1944,27 @@ export class EnemyProjectile extends Entity {
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 6;
         ctx.beginPath();
-        ctx.moveTo(10 * (1 - progress), dropY - 38);
+        ctx.moveTo(10 * (1 - progress), dropY - 40);
         ctx.lineTo(0, dropY);
         ctx.stroke();
 
-        // Spinning Molten Meteorhead Boulder
-        ctx.fillStyle = '#fef08a';
-        ctx.beginPath();
-        ctx.arc(0, dropY, 9.5, 0, Math.PI * 2);
-        ctx.fill();
+        // Crowned Molten Meteorhead Boulder
+        drawFiligreeSpikeRing(ctx, 0, dropY, 10, 6, 6, '#f97316', this.elapsed * 8, 1.6);
+        drawFourPointStar(ctx, 0, dropY, 13, 3.5, '#fef08a', '#ffffff', this.elapsed * 5);
       } else {
-        // Detonation Impact Dome + 8 Radiating Tectonic Lava Spikes!
+        // Detonation Impact Dome + 12 Radiating Gothic Lava Spikes!
         const impactT = Math.min(1, (progress - 0.83) / 0.17);
-        const domeGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, this.radius * (1.05 + impactT * 0.25));
+        const domeGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, this.radius * (1.08 + impactT * 0.25));
         domeGrad.addColorStop(0, '#ffffff');
-        domeGrad.addColorStop(0.45, 'rgba(254, 240, 138, 0.92)');
-        domeGrad.addColorStop(0.8, 'rgba(239, 68, 68, 0.75)');
+        domeGrad.addColorStop(0.45, 'rgba(254, 240, 138, 0.94)');
+        domeGrad.addColorStop(0.8, 'rgba(239, 68, 68, 0.78)');
         domeGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
         ctx.fillStyle = domeGrad;
         ctx.beginPath();
-        ctx.arc(0, 0, this.radius * (1.05 + impactT * 0.25), 0, Math.PI * 2);
+        ctx.arc(0, 0, this.radius * (1.08 + impactT * 0.25), 0, Math.PI * 2);
         ctx.fill();
 
-        // 8 Jagged Lava Shockwave Spikes erupting outward
-        ctx.fillStyle = '#fef08a';
-        for (let s = 0; s < 8; s++) {
-          const sa = (s * Math.PI) / 4 + 0.15;
-          const spikeLen = this.radius * (0.95 + impactT * 0.45);
-          ctx.save();
-          ctx.rotate(sa);
-          ctx.beginPath();
-          ctx.moveTo(10, -4.5 * (1 - impactT * 0.5));
-          ctx.lineTo(spikeLen, 0);
-          ctx.lineTo(10, 4.5 * (1 - impactT * 0.5));
-          ctx.closePath();
-          ctx.fill();
-          ctx.restore();
-        }
+        drawFiligreeSpikeRing(ctx, 0, 0, this.radius * 0.9, 12, this.radius * (0.4 + impactT * 0.3), '#fef08a', 0.2, 2.4);
       }
 
       ctx.restore();
@@ -1970,7 +1976,7 @@ export class EnemyProjectile extends Entity {
     ctx.globalCompositeOperation = 'lighter';
 
     // 1. Multi-Stop High-Velocity Kinetic Ribbon Wake (流线型高动能破空尾迹)
-    const wakeLen = this.visualType === 'CRESCENT' ? this.radius * 4.2 : this.radius * 3.8;
+    const wakeLen = this.visualType === 'CRESCENT' ? this.radius * 4.4 : this.radius * 3.9;
     const wakeGrad = ctx.createLinearGradient(-wakeLen, 0, this.radius * 0.5, 0);
     wakeGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
     wakeGrad.addColorStop(0.55, `${this.color}88`);
@@ -1978,106 +1984,94 @@ export class EnemyProjectile extends Entity {
     ctx.fillStyle = wakeGrad;
     ctx.beginPath();
     ctx.moveTo(-wakeLen, 0);
-    ctx.lineTo(-this.radius * 0.4, -this.radius * 0.95);
-    ctx.lineTo(this.radius * 0.8, 0);
-    ctx.lineTo(-this.radius * 0.4, this.radius * 0.95);
+    ctx.lineTo(-this.radius * 0.4, -this.radius * 0.98);
+    ctx.lineTo(this.radius * 0.85, 0);
+    ctx.lineTo(-this.radius * 0.4, this.radius * 0.98);
     ctx.closePath();
     ctx.fill();
 
     // 2. Outer Hellfire / Arcane Radial Corona
-    const glow = ctx.createRadialGradient(0, 0, 1, 0, 0, this.radius * 2.7);
+    const glow = ctx.createRadialGradient(0, 0, 1, 0, 0, this.radius * 2.8);
     glow.addColorStop(0, '#ffffff');
     glow.addColorStop(0.38, this.color);
     glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(0, 0, this.radius * 2.7, 0, Math.PI * 2);
+    ctx.arc(0, 0, this.radius * 2.8, 0, Math.PI * 2);
     ctx.fill();
 
     if (this.visualType === 'CRESCENT') {
-      // Heavy 3-Layer Boss Crescent Slash Wave (立体三层重型破空月牙斩波 + 音障气浪弧)
-      // Outer sonic bow-wave arc ahead of the blade
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.72)';
-      ctx.lineWidth = 1.6;
+      // Heavy 3-Layer Boss Crescent Slash Wave + Gothic Spike Filaments
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.78)';
+      ctx.lineWidth = 1.7;
       ctx.beginPath();
-      ctx.arc(4, 0, this.radius * 1.65, -Math.PI * 0.42, Math.PI * 0.42);
+      ctx.arc(4, 0, this.radius * 1.72, -Math.PI * 0.44, Math.PI * 0.44);
       ctx.stroke();
 
-      // Colored plasma crescent body
       ctx.fillStyle = this.color;
       ctx.beginPath();
-      ctx.arc(2, 0, this.radius * 1.55, -Math.PI * 0.54, Math.PI * 0.54, false);
-      ctx.arc(-4.5, 0, this.radius * 1.28, Math.PI * 0.48, -Math.PI * 0.48, true);
+      ctx.arc(2, 0, this.radius * 1.6, -Math.PI * 0.56, Math.PI * 0.56, false);
+      ctx.arc(-4.5, 0, this.radius * 1.3, Math.PI * 0.48, -Math.PI * 0.48, true);
       ctx.closePath();
       ctx.fill();
 
-      // Razor-sharp white-hot leading edge
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(3, 0, this.radius * 1.42, -Math.PI * 0.48, Math.PI * 0.48, false);
-      ctx.arc(-2, 0, this.radius * 1.22, Math.PI * 0.42, -Math.PI * 0.42, true);
+      ctx.arc(3, 0, this.radius * 1.45, -Math.PI * 0.5, Math.PI * 0.5, false);
+      ctx.arc(-2, 0, this.radius * 1.24, Math.PI * 0.42, -Math.PI * 0.42, true);
       ctx.closePath();
       ctx.fill();
     } else if (this.visualType === 'STAR') {
-      // High-Speed 3D Mechanical Sawblade / 4-Point Shuriken (高速旋转十字机械飞轮)
+      // Ornate Rotating Gothic Saw-Wheel / Pinwheel Rune
       ctx.rotate(this.elapsed * 14);
-
-      // Outer spinning energy ring
-      ctx.strokeStyle = this.color;
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius * 1.38, 0, Math.PI * 2);
-      ctx.stroke();
-
-      const sr = this.radius * 1.68;
-      ctx.fillStyle = this.color;
-      ctx.beginPath();
-      ctx.moveTo(0, -sr);
-      ctx.quadraticCurveTo(3, -3, sr, 0);
-      ctx.quadraticCurveTo(3, 3, 0, sr);
-      ctx.quadraticCurveTo(-3, 3, -sr, 0);
-      ctx.quadraticCurveTo(-3, -3, 0, -sr);
-      ctx.fill();
-
-      ctx.fillStyle = '#ffffff';
-      const innerSr = sr * 0.72;
-      ctx.beginPath();
-      ctx.moveTo(0, -innerSr);
-      ctx.quadraticCurveTo(1.8, -1.8, innerSr, 0);
-      ctx.quadraticCurveTo(1.8, 1.8, 0, innerSr);
-      ctx.quadraticCurveTo(-1.8, 1.8, -innerSr, 0);
-      ctx.quadraticCurveTo(-1.8, -1.8, 0, -innerSr);
-      ctx.fill();
+      drawConcentricRuneHalo(ctx, {
+        x: 0,
+        y: 0,
+        r: this.radius * 1.48,
+        primaryColor: this.color,
+        accentColor: '#ffffff',
+        rotation: 0,
+        spokes: 4,
+        polygonSides: 4,
+        polygonStep: 1,
+        ringWidth: 1.5,
+        showNodes: true,
+        dashedInner: false
+      });
+      drawFourPointStar(ctx, 0, 0, this.radius * 1.72, 2.8, this.color, '#ffffff');
     } else if (this.visualType === 'HOMING') {
-      // Homing Void-Eye Seeker Orb (双环旋转噬魂追踪魔眼法球)
-      ctx.save();
-      ctx.rotate(this.elapsed * 8);
-      ctx.strokeStyle = '#e879f9';
-      ctx.lineWidth = 1.8;
-      ctx.setLineDash([5, 4]);
-      ctx.beginPath();
-      ctx.arc(0, 0, this.radius * 1.55, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.restore();
+      // Homing Abyssal Eye Seeker inside Counter-Rotating Hex Seal
+      drawConcentricRuneHalo(ctx, {
+        x: 0,
+        y: 0,
+        r: this.radius * 1.65,
+        primaryColor: '#e879f9',
+        accentColor: '#fde047',
+        rotation: this.elapsed * 7.5,
+        spokes: 6,
+        polygonSides: 6,
+        polygonStep: 2,
+        ringWidth: 1.5
+      });
 
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(0, 0, this.radius * 0.85, 0, Math.PI * 2);
+      ctx.arc(0, 0, this.radius * 0.88, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.fillStyle = '#581c87';
       ctx.beginPath();
-      ctx.arc(this.radius * 0.25, 0, this.radius * 0.38, 0, Math.PI * 2);
+      ctx.arc(this.radius * 0.25, 0, this.radius * 0.4, 0, Math.PI * 2);
       ctx.fill();
     } else {
-      // Heavy Beveled Diamond Energy Bolt (重型棱晶能量弹)
+      // Heavy Beveled Gothic Rune Bolt + Mini Halo
+      drawFiligreeSpikeRing(ctx, 0, 0, this.radius * 1.15, 4, 3.2, this.color, this.elapsed * 8, 1.2);
       ctx.fillStyle = this.color;
       ctx.beginPath();
-      ctx.moveTo(this.radius * 1.45, 0);
-      ctx.lineTo(0, -this.radius * 0.92);
-      ctx.lineTo(-this.radius * 1.15, 0);
-      ctx.lineTo(0, this.radius * 0.92);
+      ctx.moveTo(this.radius * 1.5, 0);
+      ctx.lineTo(0, -this.radius * 0.95);
+      ctx.lineTo(-this.radius * 1.2, 0);
+      ctx.lineTo(0, this.radius * 0.95);
       ctx.closePath();
       ctx.fill();
 

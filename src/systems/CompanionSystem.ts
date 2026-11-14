@@ -1,4 +1,5 @@
 import { Vector2 } from '../core/Vector2';
+import { drawConcentricRuneHalo, drawFiligreeSpikeRing, drawFourPointStar } from '../vfx/GothicVFX';
 import { Player } from '../entities/Player';
 import { CombatSystem } from './CombatSystem';
 import { Projectile, ProjectileType } from '../weapons/Projectile';
@@ -408,90 +409,158 @@ export class CompanionSystem {
     }
     ctx.stroke();
 
-    // 连线上的哥特鎏金符文节点
-    ctx.fillStyle = '#fbbf24';
-    for (let k = 1; k < 4; k++) {
-      const kt = ((k / 4) + (this.pulseTime * 0.15)) % 1;
-      const kx = p1.x + dx * kt;
-      const ky = p1.y + dy * kt;
-      ctx.beginPath();
-      ctx.arc(kx, ky, 2.5, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    // 2. 若激活 [近战] 共鸣，绘制伙伴周围的旋转哥特剑刃法阵
-    if (this.getBondTier(SkillTag.MELEE) >= 1) {
+    // 连线上的 5 枚菱形鎏金铸铁香炉链环 (沿波纹契约弦动态流转)
+    const linkAngle = Math.atan2(dy, dx);
+    for (let k = 1; k <= 5; k++) {
+      const kt = ((k / 6) + (this.pulseTime * 0.14)) % 1;
+      const kWave = Math.sin(kt * Math.PI * 3 + this.pulseTime * 2.5) * Math.sin(kt * Math.PI) * 6;
+      const kx = p1.x + dx * kt + nx * kWave;
+      const ky = p1.y + dy * kt + ny * kWave;
       ctx.save();
-      ctx.translate(p2.x, p2.y);
-      ctx.rotate(this.pulseTime);
-      ctx.strokeStyle = 'rgba(248, 113, 113, 0.55)';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([10, 6]);
+      ctx.translate(kx, ky);
+      ctx.rotate(linkAngle);
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 1.25;
+      ctx.fillStyle = tetherColor;
       ctx.beginPath();
-      ctx.arc(0, 0, 72, 0, Math.PI * 2);
+      ctx.moveTo(4.8, 0);
+      ctx.lineTo(0, -3.2);
+      ctx.lineTo(-4.8, 0);
+      ctx.lineTo(0, 3.2);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
-      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(0, 0, 1.35, 0, Math.PI * 2);
+      ctx.fill();
       ctx.restore();
     }
 
-    // 3. 绘制六翼哥特圣物提灯伙伴本体 (Seraphic Astral Reliquary Lantern)
+    // 2. 若激活 [近战] 共鸣，绘制伙伴周围的旋转哥特剑刃玫瑰法阵
+    if (this.getBondTier(SkillTag.MELEE) >= 1) {
+      drawConcentricRuneHalo(ctx, {
+        x: p2.x,
+        y: p2.y,
+        r: 72,
+        primaryColor: 'rgba(248, 113, 113, 0.62)',
+        accentColor: 'rgba(253, 224, 71, 0.55)',
+        rotation: this.pulseTime,
+        spokes: 8,
+        polygonSides: 8,
+        polygonStep: 3,
+        ringWidth: 1.6
+      });
+      drawFiligreeSpikeRing(ctx, p2.x, p2.y, 72, 12, 6, 'rgba(251, 113, 133, 0.65)', -this.pulseTime * 0.6, 1.4);
+    }
+
+    // 3. 绘制六翼哥特圣物提灯香炉本体 (Seraphic Astral Reliquary Thurible)
     ctx.translate(p2.x, p2.y);
     const bob = Math.sin(this.pulseTime * 1.5) * 3;
     const wingFlap = Math.sin(this.pulseTime * 3.2) * 0.25;
 
     if (this.mode === 'ANCHOR') {
-      // 定点锚定哥特八芒星法阵
-      ctx.strokeStyle = '#fbbf24';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.arc(0, 0, 24 + Math.sin(this.pulseTime * 2) * 2.5, 0, Math.PI * 2);
-      ctx.stroke();
+      // 定点锚定旋转哥特八芒星圣环
+      drawConcentricRuneHalo(ctx, {
+        x: 0,
+        y: 0,
+        r: 28 + Math.sin(this.pulseTime * 2) * 2.5,
+        primaryColor: 'rgba(251, 191, 36, 0.9)',
+        accentColor: '#fef08a',
+        rotation: this.pulseTime * 0.8,
+        spokes: 8,
+        polygonSides: 8,
+        polygonStep: 2,
+        ringWidth: 1.5
+      });
     }
 
-    // 灵魂核心光晕
-    const aura = ctx.createRadialGradient(0, bob, 2, 0, bob, 26);
+    // 灵魂核心双层圣光晕
+    const aura = ctx.createRadialGradient(0, bob, 2, 0, bob, 32);
     aura.addColorStop(0, '#ffffff');
-    aura.addColorStop(0.4, tetherColor);
+    aura.addColorStop(0.38, tetherColor);
+    aura.addColorStop(0.75, 'rgba(251, 191, 36, 0.24)');
     aura.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = aura;
     ctx.beginPath();
-    ctx.arc(0, bob, 26, 0, Math.PI * 2);
+    ctx.arc(0, bob, 32, 0, Math.PI * 2);
     ctx.fill();
 
-    // 左右拍动的鎏金圣翼 (Golden Seraph Wings)
-    ctx.fillStyle = '#fde047';
+    // 双层锯齿鎏金圣翼 (Twin Layered Serrated Seraph Wings)
     for (const side of [-1, 1]) {
       ctx.save();
       ctx.scale(side, 1);
       ctx.rotate(wingFlap);
+
+      // 主上羽翼
+      ctx.fillStyle = '#fde047';
       ctx.beginPath();
-      ctx.moveTo(4, bob - 2);
-      ctx.quadraticCurveTo(15, bob - 12, 18, bob - 4);
-      ctx.quadraticCurveTo(13, bob + 2, 4, bob + 2);
+      ctx.moveTo(5, bob - 3);
+      ctx.quadraticCurveTo(16, bob - 16, 23, bob - 8);
+      ctx.lineTo(17, bob - 3);
+      ctx.lineTo(20, bob);
+      ctx.quadraticCurveTo(14, bob + 3, 5, bob + 2);
+      ctx.closePath();
+      ctx.fill();
+
+      // 次下羽翼
+      ctx.rotate(-0.22);
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.8)';
+      ctx.beginPath();
+      ctx.moveTo(5, bob + 1);
+      ctx.quadraticCurveTo(13, bob + 3, 15, bob + 9);
+      ctx.quadraticCurveTo(9, bob + 9, 4, bob + 4);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
     }
 
-    // 哥特黄铜提灯外框与炽白圣火核心
+    // 哥特尖顶香炉冠饰与底部垂坠
+    ctx.fillStyle = '#fbbf24';
+    ctx.beginPath();
+    ctx.moveTo(0, -18 + bob);
+    ctx.lineTo(3.2, -12 + bob);
+    ctx.lineTo(-3.2, -12 + bob);
+    ctx.closePath();
+    ctx.moveTo(0, 17 + bob);
+    ctx.lineTo(2.4, 12 + bob);
+    ctx.lineTo(-2.4, 12 + bob);
+    ctx.closePath();
+    ctx.fill();
+
+    // 哥特黄铜提灯外框 + 镂空十字雕花肋条 + 圣光星芒核心
     ctx.strokeStyle = '#f59e0b';
-    ctx.lineWidth = 1.8;
+    ctx.lineWidth = 1.9;
     ctx.beginPath();
     ctx.moveTo(0, -12 + bob);
-    ctx.lineTo(9, bob);
+    ctx.lineTo(9.5, bob);
     ctx.lineTo(0, 12 + bob);
-    ctx.lineTo(-9, bob);
+    ctx.lineTo(-9.5, bob);
     ctx.closePath();
     ctx.stroke();
 
-    ctx.fillStyle = '#ffffff';
+    drawFourPointStar(ctx, 0, bob, 8.5, 2.2, '#fde047', '#ffffff', this.pulseTime * 0.6);
+
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.72)';
+    ctx.lineWidth = 1.1;
     ctx.beginPath();
-    ctx.moveTo(0, -8 + bob);
-    ctx.lineTo(6, bob);
-    ctx.lineTo(0, 8 + bob);
-    ctx.lineTo(-6, bob);
-    ctx.closePath();
-    ctx.fill();
+    ctx.moveTo(0, -11 + bob);
+    ctx.lineTo(0, 11 + bob);
+    ctx.moveTo(-8.5, bob);
+    ctx.lineTo(8.5, bob);
+    ctx.stroke();
+
+    // 环绕香炉飘散的 4 颗琥珀香火火星
+    for (let s = 0; s < 4; s++) {
+      const ang = this.pulseTime * 2.2 + (s * Math.PI) / 2;
+      const sx = Math.cos(ang) * 15;
+      const sy = bob + Math.sin(ang * 1.4) * 10 - ((this.pulseTime * 8 + s * 3) % 10) * 0.35;
+      ctx.fillStyle = s % 2 === 0 ? '#fef08a' : tetherColor;
+      ctx.beginPath();
+      ctx.arc(sx, sy, 1.4, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
     ctx.restore();
   }
